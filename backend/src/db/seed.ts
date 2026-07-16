@@ -161,10 +161,10 @@ async function seedQuestions(): Promise<void> {
   await withTransaction(async (client) => {
     for (const q of DEMO_QUESTIONS) {
       await client.query(
-        `INSERT INTO questions (category, text, options, correct_index, explanation, difficulty)
-         SELECT $1, $2, $3::jsonb, $4, $5, $6
+        `INSERT INTO questions (category, text, options, correct_index, explanation, difficulty, audiences, qtype)
+         SELECT $1, $2, $3::jsonb, $4, $5, $6, $7, $8
          WHERE NOT EXISTS (SELECT 1 FROM questions WHERE text = $2)`,
-        [q.category, q.text, JSON.stringify(q.options), q.correct, q.explanation, q.difficulty],
+        [q.category, q.text, JSON.stringify(q.options), q.correct, q.explanation, q.difficulty, ['jovenes', 'adultos'], 'teorica'],
       );
     }
   });

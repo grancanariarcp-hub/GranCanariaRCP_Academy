@@ -6,6 +6,7 @@ import {
   listAdmins,
   createAdmin,
   createQuestion,
+  listQuestions,
   listAuditLogs,
 } from '../controllers/admin.controller.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -25,6 +26,7 @@ router.post('/institutions', asyncHandler(createInstitution));
 router.get('/admins', asyncHandler(listAdmins));
 router.post('/admins', asyncHandler(createAdmin));
 
+router.get('/questions', asyncHandler(listQuestions));
 router.post('/questions', asyncHandler(createQuestion));
 
 router.get('/audit-logs', asyncHandler(listAuditLogs));

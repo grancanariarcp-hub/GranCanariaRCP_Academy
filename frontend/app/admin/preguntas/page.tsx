@@ -1,0 +1,345 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useSession } from '@/hooks/useSession';
+import { AppShell } from '@/components/AppShell';
+import { api, ApiError } from '@/lib/api';
+
+type Level = 'SVB' | 'SVI' | 'SVA';
+type Audience = 'ninos' | 'jovenes' | 'adultos';
+type QType = 'teorica' | 'caso_clinico';
+
+interface QuestionRow {
+  id: string;
+  category: Level;
+  audiences: Audience[];
+  qtype: QType;
+  difficulty: number;
+  text: string;
+  is_critical: boolean;
+}
+
+const AUDIENCE_LABEL: Record<Audience, string> = {
+  ninos: '👶 Niños',
+  jovenes: '🧑 Jóvenes',
+  adultos: '👨 Adultos',
+};
+
+export default function PreguntasPage() {
+  const user = useSession(['super_admin'], '/login/admin');
+
+  // form state
+  const [category, setCategory] = useState<Level>('SVB');
+  const [audiences, setAudiences] = useState<Audience[]>(['jovenes', 'adultos']);
+  const [qtype, setQtype] = useState<QType>('teorica');
+  const [difficulty, setDifficulty] = useState(1);
+  const [clinicalContext, setClinicalContext] = useState('');
+  const [text, setText] = useState('');
+  const [options, setOptions] = useState<string[]>(['', '', '', '']);
+  const [correctIndex, setCorrectIndex] = useState(0);
+  const [explanation, setExplanation] = useState('');
+  const [sourceErc, setSourceErc] = useState('');
+  const [sourcePlan, setSourcePlan] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [flashcard, setFlashcard] = useState('');
+  const [tags, setTags] = useState('');
+  const [isCritical, setIsCritical] = useState(false);
+
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [list, setList] = useState<QuestionRow[]>([]);
+
+  async function loadList() {
+    try {
+      const r = await api<{ questions: QuestionRow[] }>('/api/admin/questions', { auth: true });
+      setList(r.questions);
+    } catch {
+      /* ignore */
+    }
+  }
+  useEffect(() => {
+    if (user) loadList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  function toggleAudience(a: Audience) {
+    setAudiences((prev) => (prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]));
+  }
+  function setOption(i: number, v: string) {
+    setOptions((prev) => prev.map((o, idx) => (idx === i ? v : o)));
+  }
+  function addOption() {
+    if (options.length < 6) setOptions((p) => [...p, '']);
+  }
+  function removeOption(i: number) {
+    if (options.length <= 2) return;
+    setOptions((p) => p.filter((_, idx) => idx !== i));
+    if (correctIndex >= options.length - 1) setCorrectIndex(0);
+  }
+
+  function resetForm() {
+    setText('');
+    setClinicalContext('');
+    setOptions(['', '', '', '']);
+    setCorrectIndex(0);
+    setExplanation('');
+    setSourceErc('');
+    setSourcePlan('');
+    setVideoUrl('');
+    setFlashcard('');
+    setTags('');
+    setIsCritical(false);
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+    setSaving(true);
+    try {
+      await api('/api/admin/questions', {
+        method: 'POST',
+        auth: true,
+        body: JSON.stringify({
+          category,
+          audiences,
+          qtype,
+          difficulty,
+          text,
+          clinicalContext: qtype === 'caso_clinico' ? clinicalContext : undefined,
+          options: options.map((o) => o.trim()).filter(Boolean),
+          correctIndex,
+          explanation: explanation || undefined,
+          sourceErc: sourceErc || undefined,
+          sourcePlanNacional: sourcePlan || undefined,
+          videoUrl: videoUrl || '',
+          flashcard: flashcard || undefined,
+          tags: tags
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean),
+          isCritical,
+        }),
+      });
+      setMsg({ ok: true, text: 'Pregunta creada correctamente ✅' });
+      resetForm();
+      loadList();
+    } catch (err) {
+      const detail =
+        err instanceof ApiError && err.details
+          ? ' — ' + (err.details as Array<{ message: string }>).map((d) => d.message).join('; ')
+          : '';
+      setMsg({ ok: false, text: (err instanceof ApiError ? err.message : 'Error al guardar') + detail });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
+
+  return (
+    <AppShell
+      user={user}
+      title="Preguntas"
+      nav={[
+        { label: 'Resumen', href: '/admin' },
+        { label: 'Preguntas', href: '/admin/preguntas', active: true },
+      ]}
+    >
+      <div className="grid grid-2">
+        {/* ---------------- Form ---------------- */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Nueva pregunta</div>
+            <div className="card-subtitle">Clasifícala por nivel, público y tipo</div>
+          </div>
+
+          {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
+
+          <form onSubmit={onSubmit}>
+            <div className="grid grid-2" style={{ gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Nivel</label>
+                <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value as Level)}>
+                  <option value="SVB">SVB · Básico</option>
+                  <option value="SVI">SVI · Intermedio</option>
+                  <option value="SVA">SVA · Avanzado</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Dificultad</label>
+                <select className="form-select" value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}>
+                  <option value={1}>Fácil</option>
+                  <option value={2}>Media</option>
+                  <option value={3}>Difícil</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Público (uno o varios)</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(['ninos', 'jovenes', 'adultos'] as Audience[]).map((a) => (
+                  <button
+                    type="button"
+                    key={a}
+                    onClick={() => toggleAudience(a)}
+                    className={`tab ${audiences.includes(a) ? 'active' : ''}`}
+                    style={{ flex: 'unset', padding: '8px 14px' }}
+                  >
+                    {AUDIENCE_LABEL[a]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Tipo de pregunta</label>
+              <div className="tabs">
+                <button type="button" className={`tab ${qtype === 'teorica' ? 'active' : ''}`} onClick={() => setQtype('teorica')}>
+                  📘 Teórica / técnica
+                </button>
+                <button type="button" className={`tab ${qtype === 'caso_clinico' ? 'active' : ''}`} onClick={() => setQtype('caso_clinico')}>
+                  🩺 Caso clínico
+                </button>
+              </div>
+            </div>
+
+            {qtype === 'caso_clinico' && (
+              <div className="form-group">
+                <label className="form-label">Contexto clínico (el escenario)</label>
+                <textarea
+                  className="form-input"
+                  style={{ height: 80, padding: 10 }}
+                  placeholder="Ej.: Encuentras a un hombre de 60 años en la calle, no responde y no respira con normalidad…"
+                  value={clinicalContext}
+                  onChange={(e) => setClinicalContext(e.target.value)}
+                />
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Enunciado</label>
+              <textarea
+                className="form-input"
+                style={{ height: 64, padding: 10 }}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Opciones (marca la correcta)</label>
+              {options.map((opt, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <input
+                    type="radio"
+                    name="correct"
+                    checked={correctIndex === i}
+                    onChange={() => setCorrectIndex(i)}
+                    title="Marcar como correcta"
+                  />
+                  <input
+                    className="form-input"
+                    placeholder={`Opción ${String.fromCharCode(65 + i)}`}
+                    value={opt}
+                    onChange={(e) => setOption(i, e.target.value)}
+                    required={i < 2}
+                  />
+                  {options.length > 2 && (
+                    <button type="button" className="btn btn-outline btn-small" onClick={() => removeOption(i)}>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+              {options.length < 6 && (
+                <button type="button" className="btn btn-outline btn-small" onClick={addOption}>
+                  + Añadir opción
+                </button>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Explicación (debriefing)</label>
+              <textarea className="form-input" style={{ height: 64, padding: 10 }} value={explanation} onChange={(e) => setExplanation(e.target.value)} />
+            </div>
+
+            <details style={{ marginBottom: 16 }}>
+              <summary style={{ cursor: 'pointer', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                Campos avanzados (fuentes, vídeo, flashcard, etiquetas)
+              </summary>
+              <div className="form-group">
+                <label className="form-label">Fuente ERC 2025</label>
+                <input className="form-input" placeholder="Capítulo / sección / página / enlace" value={sourceErc} onChange={(e) => setSourceErc(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Fuente Plan Nacional RCP</label>
+                <input className="form-input" value={sourcePlan} onChange={(e) => setSourcePlan(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Vídeo (URL)</label>
+                <input className="form-input" placeholder="https://youtube.com/…" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Flashcard (frase clave)</label>
+                <input className="form-input" value={flashcard} onChange={(e) => setFlashcard(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Etiquetas (separadas por comas)</label>
+                <input className="form-input" placeholder="parada, desfibrilación, compresiones" value={tags} onChange={(e) => setTags(e.target.value)} />
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <input type="checkbox" checked={isCritical} onChange={(e) => setIsCritical(e.target.checked)} />
+                Marcar como pregunta crítica (prioritaria)
+              </label>
+            </details>
+
+            <button className="btn btn-primary btn-full" disabled={saving || audiences.length === 0}>
+              {saving ? 'Guardando…' : 'Crear pregunta'}
+            </button>
+          </form>
+        </div>
+
+        {/* ---------------- List ---------------- */}
+        <div className="card">
+          <div className="card-header">
+            <div className="card-title">Banco de preguntas</div>
+            <div className="card-subtitle">{list.length} preguntas</div>
+          </div>
+          <div className="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nivel</th>
+                  <th>Público</th>
+                  <th>Tipo</th>
+                  <th>Enunciado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.map((q) => (
+                  <tr key={q.id}>
+                    <td>
+                      <span className="badge badge-primary">{q.category}</span>
+                    </td>
+                    <td style={{ fontSize: 12 }}>{q.audiences.map((a) => AUDIENCE_LABEL[a].split(' ')[0]).join(' ')}</td>
+                    <td style={{ fontSize: 12 }}>{q.qtype === 'caso_clinico' ? '🩺' : '📘'}</td>
+                    <td style={{ fontSize: 13 }}>{q.text.length > 60 ? q.text.slice(0, 60) + '…' : q.text}</td>
+                  </tr>
+                ))}
+                {list.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="muted">
+                      Aún no hay preguntas
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </AppShell>
+  );
+}

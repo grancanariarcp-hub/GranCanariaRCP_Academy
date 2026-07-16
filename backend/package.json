@@ -10,6 +10,8 @@
     "start": "node dist/index.js",
     "db:setup": "tsx src/db/setup.ts",
     "db:setup:prod": "node dist/db/setup.js",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:migrate:prod": "node dist/db/migrate.js",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/setup.ts --reset"
   },

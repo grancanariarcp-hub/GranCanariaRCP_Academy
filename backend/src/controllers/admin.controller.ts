@@ -136,32 +136,58 @@ export async function createAdmin(req: Request, res: Response): Promise<void> {
 // ---------------------------------------------------------------------------
 // Questions (super_admin can create question-bank items)
 // ---------------------------------------------------------------------------
-const createQuestionSchema = z.object({
-  category: z.enum(['SVB', 'SVI', 'SVA']),
-  text: z.string().min(10),
-  options: z.array(z.string().min(1)).min(2).max(6),
-  correctIndex: z.number().int().min(0),
-  explanation: z.string().optional(),
-  difficulty: z.number().int().min(1).max(3).default(1),
-});
+const createQuestionSchema = z
+  .object({
+    category: z.enum(['SVB', 'SVI', 'SVA']), // nivel
+    audiences: z.array(z.enum(['ninos', 'jovenes', 'adultos'])).min(1, 'Elige al menos un público'),
+    qtype: z.enum(['teorica', 'caso_clinico']).default('teorica'),
+    difficulty: z.number().int().min(1).max(3).default(1),
+    text: z.string().min(10),
+    clinicalContext: z.string().optional(),
+    options: z.array(z.string().min(1)).min(2).max(6),
+    correctIndex: z.number().int().min(0),
+    explanation: z.string().optional(),
+    sourceErc: z.string().optional(),
+    sourcePlanNacional: z.string().optional(),
+    videoUrl: z.string().url('URL de vídeo no válida').optional().or(z.literal('')),
+    flashcard: z.string().optional(),
+    tags: z.array(z.string()).optional().default([]),
+    isCritical: z.boolean().optional().default(false),
+  })
+  .refine((d) => d.correctIndex < d.options.length, {
+    message: 'La opción correcta está fuera de rango',
+    path: ['correctIndex'],
+  })
+  .refine((d) => d.qtype !== 'caso_clinico' || (d.clinicalContext && d.clinicalContext.trim().length > 0), {
+    message: 'Un caso clínico necesita un contexto clínico',
+    path: ['clinicalContext'],
+  });
 
 export async function createQuestion(req: Request, res: Response): Promise<void> {
   const data = createQuestionSchema.parse(req.body);
-  if (data.correctIndex >= data.options.length) {
-    throw badRequest('correctIndex fuera de rango', 'BAD_CORRECT_INDEX');
-  }
 
   const { rows } = await query(
-    `INSERT INTO questions (category, text, options, correct_index, explanation, difficulty, created_by)
-     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7)
-     RETURNING id, category, text, options, correct_index, difficulty, created_at`,
+    `INSERT INTO questions
+       (category, audiences, qtype, difficulty, text, clinical_context, options, correct_index,
+        explanation, source_erc, source_plan_nacional, video_url, flashcard, tags, is_critical, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+     RETURNING id, category, audiences, qtype, difficulty, text, created_at`,
     [
       data.category,
+      data.audiences,
+      data.qtype,
+      data.difficulty,
       data.text,
+      data.clinicalContext ?? null,
       JSON.stringify(data.options),
       data.correctIndex,
       data.explanation ?? null,
-      data.difficulty,
+      data.sourceErc ?? null,
+      data.sourcePlanNacional ?? null,
+      data.videoUrl || null,
+      data.flashcard ?? null,
+      data.tags ?? [],
+      data.isCritical,
       req.auth!.sub,
     ],
   );
@@ -173,9 +199,40 @@ export async function createQuestion(req: Request, res: Response): Promise<void>
     entity: 'question',
     entityId: rows[0].id,
     ip: clientIp(req),
+    metadata: { category: data.category, qtype: data.qtype, audiences: data.audiences },
   });
 
   res.status(201).json({ question: rows[0] });
+}
+
+// GET /api/admin/questions -> list with optional filters (level/audience/type)
+export async function listQuestions(req: Request, res: Response): Promise<void> {
+  const { level, audience, type } = req.query as Record<string, string | undefined>;
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (level && ['SVB', 'SVI', 'SVA'].includes(level)) {
+    params.push(level);
+    conditions.push(`category = $${params.length}`);
+  }
+  if (audience && ['ninos', 'jovenes', 'adultos'].includes(audience)) {
+    params.push(audience);
+    conditions.push(`$${params.length} = ANY(audiences)`);
+  }
+  if (type && ['teorica', 'caso_clinico'].includes(type)) {
+    params.push(type);
+    conditions.push(`qtype = $${params.length}`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const { rows } = await query(
+    `SELECT id, category, audiences, qtype, difficulty, text, is_critical, is_active, created_at
+     FROM questions ${where}
+     ORDER BY created_at DESC
+     LIMIT 200`,
+    params,
+  );
+  res.json({ questions: rows });
 }
 
 // ---------------------------------------------------------------------------

@@ -83,18 +83,36 @@ CREATE INDEX IF NOT EXISTS idx_students_access_code ON students(access_code);
 -- --------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS questions (
   id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  category       VARCHAR(8) NOT NULL CHECK (category IN ('SVB', 'SVI', 'SVA')),
+  category       VARCHAR(8) NOT NULL CHECK (category IN ('SVB', 'SVI', 'SVA')),  -- nivel
   text           TEXT NOT NULL,
   options        JSONB NOT NULL,                       -- array of option strings
   correct_index  SMALLINT NOT NULL,
   explanation    TEXT,
   difficulty     SMALLINT NOT NULL DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 3),
+
+  -- Target audience(s): a question can serve one or more of niños/jóvenes/adultos.
+  audiences      TEXT[] NOT NULL DEFAULT '{}',          -- values: ninos | jovenes | adultos
+  -- Question type: pure theory/technique vs. clinical-scenario reasoning.
+  qtype          VARCHAR(16) NOT NULL DEFAULT 'teorica' CHECK (qtype IN ('teorica', 'caso_clinico')),
+  -- For caso_clinico: the scenario the student must interpret.
+  clinical_context TEXT,
+
+  -- References / learning support
+  source_erc            TEXT,   -- ERC 2025 chapter/section/page/url
+  source_plan_nacional  TEXT,   -- Plan Nacional RCP reference
+  video_url             TEXT,
+  flashcard             TEXT,   -- key take-away to remember
+  tags                  TEXT[] NOT NULL DEFAULT '{}',
+  is_critical           BOOLEAN NOT NULL DEFAULT FALSE,
+
   is_active      BOOLEAN NOT NULL DEFAULT TRUE,
   created_by     UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_questions_category ON questions(category);
+CREATE INDEX IF NOT EXISTS idx_questions_qtype ON questions(qtype);
+CREATE INDEX IF NOT EXISTS idx_questions_audiences ON questions USING GIN (audiences);
 
 -- --------------------------------------------------------------------------
 -- Test responses (one row per answered question).
