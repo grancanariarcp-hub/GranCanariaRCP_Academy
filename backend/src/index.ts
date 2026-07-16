@@ -15,9 +15,28 @@ const app = express();
 app.set('trust proxy', 1);
 
 app.use(helmet());
+
+// Allowed browser origins: the ones configured in CORS_ORIGIN plus any
+// Vercel deployment (*.vercel.app), so preview + production URLs work
+// without having to hard-code them.
+const allowedOrigins = env.corsOrigin
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: env.corsOrigin.split(',').map((o) => o.trim()),
+    origin(origin, callback) {
+      // Non-browser clients (curl, health checks) send no Origin header.
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      try {
+        if (/\.vercel\.app$/.test(new URL(origin).hostname)) return callback(null, true);
+      } catch {
+        /* malformed origin -> fall through to deny */
+      }
+      return callback(new Error('Origin no permitido por CORS'));
+    },
     credentials: true,
   }),
 );
