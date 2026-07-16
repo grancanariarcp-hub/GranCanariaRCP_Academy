@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GranCanaria RCP Academy - Corporativo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-dark: #1a365d;
+            --primary-medium: #2d3748;
+            --primary-light: #4a5568;
+            --secondary-dark: #2c5282;
+            --secondary-medium: #2d5a7b;
+            --accent: #c41e3a;
+            --accent-light: #e74c3c;
+            --success: #276749;
+            --warning: #975a16;
+            --danger: #c53030;
+            
+            --gray-100: #f7fafc;
+            --gray-200: #edf2f7;
+            --gray-300: #e2e8f0;
+            --gray-400: #cbd5e0;
+            --gray-500: #a0aec0;
+            --gray-600: #718096;
+            --gray-700: #4a5568;
+            --gray-800: #2d3748;
+            --gray-900: #1a202c;
+            
+            --bg-primary: #f5f7fa;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #edf2f7;
+            
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --text-tertiary: #718096;
+            
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        /* ===== LAYOUT ===== */
+        .app-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: auto 1fr;
+            min-height: 100vh;
+        }
+
+        /* ===== NAVBAR ===== */
+        .navbar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--gray-200);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--primary-dark);
+        }
+
+        .navbar-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary-dark) 100%);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .navbar-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .hamburger {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+
+        .user-menu {
+            width: 36px;
+            height: 36px;
+            background: var(--gray-200);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        /* ===== SIDEBAR ===== */
+        .sidebar {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 260px;
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--gray-200);
+            flex-direction: column;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .sidebar.open {
+            display: flex;
+        }
+
+        .sidebar-close {
+            display: none;
+            align-self: flex-end;
+            padding: 12px 16px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+
+        .sidebar-header {
+            padding: 20px 16px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .nav-section {
+            padding: 16px 0;
+        }
+
+        .nav-section-title {
+            padding: 8px 16px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--gray-600);
+        }
+
+        .nav-item {
+            padding: 10px 16px;
+            margin: 0 8px;
+            border: none;
+            background: none;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-radius: 6px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-item:hover {
+            background: var(--gray-100);
+            color: var(--primary-dark);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary-dark) 100%);
+            color: white;
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            width: 18px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .overlay.open {
+            display: block;
+        }
+
+        /* ===== MAIN CONTENT ===== */
+        .main-content {
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ===== HEADER ===== */
+        .page-header {
+            margin-bottom: 32px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--text-tertiary);
+        }
+
+        /* ===== GRID LAYOUTS ===== */
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        .grid-3col {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        .grid-4col {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        @media (min-width: 768px) {
+            .grid-2col {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .grid-3col {
+                grid-template-columns: 1fr;
+            }
+
+            .grid-4col {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .hamburger {
+                display: none;
+            }
+
+            .sidebar {
+                display: flex !important;
+                position: static;
+                width: 260px;
+                height: auto;
+            }
+
+            .sidebar-close {
+                display: none;
+            }
+
+            .overlay {
+                display: none !important;
+            }
+
+            .app-container {
+                grid-template-columns: 260px 1fr;
+            }
+
+            .main-content {
+                grid-column: 2;
+                max-width: 1400px;
+                margin: 0 auto;
+                width: 100%;
+                padding: 32px;
+            }
+
+            .grid-2col {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .grid-3col {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .grid-4col {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .page-title {
+                font-size: 32px;
+            }
+        }
+
+        /* ===== COMPONENTES ===== */
+
+        /* Cards */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: var(--gray-300);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card-subtitle {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 4px;
+        }
+
+        /* Stat Cards */
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary-dark) 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-change {
+            font-size: 12px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-change.positive {
+            color: #48bb78;
+        }
+
+        .stat-change.negative {
+            color: #f56565;
+        }
+
+        /* Buttons */
+        button {
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            padding: 10px 16px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary-dark) 100%);
+            color: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .btn-primary:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--gray-200);
+            color: var(--primary-dark);
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-300);
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--gray-300);
+            color: var(--text-primary);
+        }
+
+        .btn-outline:hover {
+            border-color: var(--primary-dark);
+            background: var(--gray-100);
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+        }
+
+        .form-input,
+        .form-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            transition: all 0.2s;
+        }
+
+        .form-input:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: var(--primary-dark);
+            box-shadow: 0 0 0 3px rgba(26, 54, 93, 0.1);
+            background: var(--gray-100);
+        }
+
+        /* Tables */
+        .table-responsive {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: var(--gray-100);
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-primary);
+            border-bottom: 2px solid var(--gray-200);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--gray-200);
+            color: var(--text-secondary);
+        }
+
+        tr:hover {
+            background: var(--gray-100);
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-success {
+            background: #c6f6d5;
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: #feebc8;
+            color: var(--warning);
+        }
+
+        .badge-danger {
+            background: #fed7d7;
+            color: var(--danger);
+        }
+
+        .badge-primary {
+            background: rgba(26, 54, 93, 0.1);
+            color: var(--primary-dark);
+        }
+
+        /* Info Box */
+        .info-box {
+            background: linear-gradient(135deg, rgba(26, 54, 93, 0.05) 0%, rgba(45, 85, 130, 0.05) 100%);
+            border-left: 4px solid var(--primary-dark);
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--primary-dark);
+            margin-bottom: 20px;
+        }
+
+        /* Progress */
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--gray-200);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-dark) 0%, var(--secondary-dark) 100%);
+            width: 65%;
+            transition: width 0.3s ease;
+        }
+
+        /* Section Title */
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        /* Chart Placeholder */
+        .chart-placeholder {
+            background: linear-gradient(135deg, var(--gray-100) 0%, var(--gray-200) 100%);
+            border-radius: 8px;
+            height: 250px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-tertiary);
+            font-size: 14px;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-tertiary);
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .empty-state-text {
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            cursor: help;
+            border-bottom: 1px dotted var(--gray-500);
+        }
+
+        /* Colors para diferentes estados */
+        .text-success { color: var(--success); }
+        .text-warning { color: var(--warning); }
+        .text-danger { color: var(--danger); }
+        .text-primary { color: var(--primary-dark); }
+        .text-secondary { color: var(--text-secondary); }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--secondary-dark) 100%);
+            color: white;
+            padding: 40px 24px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+        }
+
+        .hero h2 {
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .hero p {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--gray-400);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--gray-500);
+        }
+    </style>
+</head>
+<body>
+    <!-- NAVBAR -->
+    <div class="navbar">
+        <div class="navbar-brand">
+            <div class="navbar-icon">❤️</div>
+            <span>GranCanaria RCP</span>
+        </div>
+        <div class="navbar-actions">
+            <button class="hamburger" onclick="toggleSidebar()">☰</button>
+            <div class="user-menu" title="Usuario">👤</div>
+        </div>
+    </div>
+
+    <div class="overlay" onclick="toggleSidebar()"></div>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <button class="sidebar-close" onclick="toggleSidebar()">✕</button>
+        
+        <div class="sidebar-header">
+            <div style="font-weight: 600; font-size: 13px; color: var(--text-primary);">MENÚ</div>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">General</div>
+            <button class="nav-item active" onclick="showScreen('dashboard', event)">
+                <span class="nav-icon">📊</span>
+                Dashboard
+            </button>
+            <button class="nav-item" onclick="showScreen('tests', event)">
+                <span class="nav-icon">📝</span>
+                Tests
+            </button>
+            <button class="nav-item" onclick="showScreen('ranking', event)">
+                <span class="nav-icon">🏆</span>
+                Rankings
+            </button>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-section-title">Gestión</div>
+            <button class="nav-item" onclick="showScreen('cursos', event)">
+                <span class="nav-icon">📚</span>
+                Cursos
+            </button>
+            <button class="nav-item" onclick="showScreen('alumnos', event)">
+                <span class="nav-icon">👥</span>
+                Alumnos
+            </button>
+            <button class="nav-item" onclick="showScreen('admin', event)">
+                <span class="nav-icon">⚙️</span>
+                Administración
+            </button>
+        </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+
+        <!-- DASHBOARD SCREEN -->
+        <div class="screen active" id="screen-dashboard">
+            <div class="page-header">
+                <h1 class="page-title">Dashboard</h1>
+                <p class="page-subtitle">Bienvenido a GranCanaria RCP Academy</p>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="grid-4col">
+                <div class="stat-card">
+                    <div class="stat-value">1,245</div>
+                    <div class="stat-label">Alumnos Activos</div>
+                    <div class="stat-change positive">↑ 12% este mes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">3,847</div>
+                    <div class="stat-label">Tests Completados</div>
+                    <div class="stat-change positive">↑ 23% este mes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">82.4%</div>
+                    <div class="stat-label">Promedio General</div>
+                    <div class="stat-change positive">↑ 2.1% este mes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">47</div>
+                    <div class="stat-label">Instituciones</div>
+                    <div class="stat-change positive">↑ 3 nuevas</div>
+                </div>
+            </div>
+
+            <!-- Main Content Area -->
+            <div class="grid-2col" style="margin-top: 32px;">
+                <!-- Left Column -->
+                <div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Rendimiento por Curso</div>
+                                <div class="card-subtitle">Últimos 30 días</div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">SVB - Soporte Vital Básico</span>
+                                <span style="font-size: 14px; font-weight: 700; color: var(--primary-dark);">85%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 85%;"></div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">SVI - Soporte Vital Inmediato</span>
+                                <span style="font-size: 14px; font-weight: 700; color: var(--primary-dark);">79%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 79%;"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">SVA - Soporte Vital Avanzado</span>
+                                <span style="font-size: 14px; font-weight: 700; color: var(--primary-dark);">88%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 88%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Actividad Reciente</div>
+                                <div class="card-subtitle">Últimas 24 horas</div>
+                            </div>
+                        </div>
+
+                        <div style="font-size: 13px; line-height: 1.8;">
+                            <div style="padding: 10px 0; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between;">
+                                <div>
+                                    <div style="color: var(--text-primary); font-weight: 500;">234 tests realizados</div>
+                                    <div style="color: var(--text-tertiary); font-size: 11px;">Hace 2 horas</div>
+                                </div>
+                                <span class="badge badge-success">Bueno</span>
+                            </div>
+                            <div style="padding: 10px 0; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between;">
+                                <div>
+                                    <div style="color: var(--text-primary); font-weight: 500;">12 nuevas instituciones</div>
+                                    <div style="color: var(--text-tertiary); font-size: 11px;">Hace 6 horas</div>
+                                </div>
+                                <span class="badge badge-primary">Nuevo</span>
+                            </div>
+                            <div style="padding: 10px 0; display: flex; justify-content: space-between;">
+                                <div>
+                                    <div style="color: var(--text-primary); font-weight: 500;">Mantenimiento BD completado</div>
+                                    <div style="color: var(--text-tertiary); font-size: 11px;">Hace 1 día</div>
+                                </div>
+                                <span class="badge badge-success">OK</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full Width Table -->
+            <div class="card" style="margin-top: 32px;">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Top Alumnos Este Mes</div>
+                        <div class="card-subtitle">Ranking de mejores desempeños</div>
+                    </div>
+                    <button class="btn-secondary btn-small">Ver todos</button>
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Posición</th>
+                                <th>Alumno</th>
+                                <th>Institución</th>
+                                <th>Tests</th>
+                                <th>Promedio</th>
+                                <th>Estatus</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="text-align: center; font-weight: 700; color: #f6ad55;">🥇</td>
+                                <td><strong>Estudiante_K_821</strong></td>
+                                <td>Colegio San Telmo</td>
+                                <td>28</td>
+                                <td><strong>94%</strong></td>
+                                <td><span class="badge badge-success">Excelente</span></td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: center; font-weight: 700; color: #a0aec0;">🥈</td>
+                                <td><strong>Estudiante_M_456</strong></td>
+                                <td>Instituto Vega</td>
+                                <td>24</td>
+                                <td><strong>91%</strong></td>
+                                <td><span class="badge badge-success">Muy Bueno</span></td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: center; font-weight: 700; color: #d4a574;">🥉</td>
+                                <td><strong>Estudiante_J_789</strong></td>
+                                <td>Hospital Dr. Negrín</td>
+                                <td>31</td>
+                                <td><strong>89%</strong></td>
+                                <td><span class="badge badge-success">Muy Bueno</span></td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: center;">4</td>
+                                <td><strong>Estudiante_L_234</strong></td>
+                                <td>Colegio San Telmo</td>
+                                <td>19</td>
+                                <td><strong>87%</strong></td>
+                                <td><span class="badge badge-warning">Bueno</span></td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: center;">5</td>
+                                <td><strong>Estudiante_P_567</strong></td>
+                                <td>Instituto Vega</td>
+                                <td>22</td>
+                                <td><strong>84%</strong></td>
+                                <td><span class="badge badge-warning">Bueno</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TESTS SCREEN -->
+        <div class="screen" id="screen-tests">
+            <div class="page-header">
+                <h1 class="page-title">Gestión de Tests</h1>
+                <p class="page-subtitle">Crear y gestionar evaluaciones</p>
+            </div>
+
+            <div class="grid-2col">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Crear Nuevo Test</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Tipo de Test</label>
+                        <select class="form-select">
+                            <option>SVB - Soporte Vital Básico</option>
+                            <option>SVI - Soporte Vital Inmediato</option>
+                            <option>SVA - Soporte Vital Avanzado</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Número de Preguntas</label>
+                        <select class="form-select">
+                            <option>10 preguntas</option>
+                            <option selected>30 preguntas</option>
+                            <option>50 preguntas</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Tiempo Límite (minutos)</label>
+                        <input type="number" class="form-input" value="30" min="5" max="180">
+                    </div>
+
+                    <button class="btn-primary" style="width: 100%;">Crear Test</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Estadísticas de Tests</div>
+                        <div class="card-subtitle">Total de intentos</div>
+                    </div>
+                    
+                    <div style="text-align: center; padding: 20px 0;">
+                        <div style="font-size: 36px; font-weight: 700; color: var(--primary-dark);">3,847</div>
+                        <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 8px;">Tests completados</div>
+                        <div class="progress-bar" style="margin-top: 16px;">
+                            <div class="progress-fill" style="width: 65%;"></div>
+                        </div>
+                        <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 8px;">65% aprobados en primer intento</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RANKING SCREEN -->
+        <div class="screen" id="screen-ranking">
+            <div class="page-header">
+                <h1 class="page-title">Rankings</h1>
+                <p class="page-subtitle">Posiciones de alumnos y instituciones</p>
+            </div>
+
+            <div class="grid-2col">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Top Instituciones</div>
+                        <div class="card-subtitle">Por número de alumnos</div>
+                    </div>
+
+                    <div style="font-size: 13px; line-height: 2;">
+                        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--gray-200);">
+                            <span><strong>🥇 Colegio San Telmo</strong></span>
+                            <span style="color: var(--primary-dark); font-weight: 700;">285 alumnos</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--gray-200);">
+                            <span><strong>🥈 Instituto Vega</strong></span>
+                            <span style="color: var(--primary-dark); font-weight: 700;">241 alumnos</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--gray-200);">
+                            <span><strong>🥉 Hospital Dr. Negrín</strong></span>
+                            <span style="color: var(--primary-dark); font-weight: 700;">198 alumnos</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 10px 0;">
+                            <span><strong>4. Instituto Técnico</strong></span>
+                            <span style="color: var(--primary-dark); font-weight: 700;">176 alumnos</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Promedio por Institución</div>
+                        <div class="card-subtitle">Calificaciones</div>
+                    </div>
+
+                    <div style="font-size: 13px;">
+                        <div style="margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Colegio San Telmo</span>
+                                <span style="font-weight: 700; color: var(--primary-dark);">86%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 86%;"></div>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Instituto Vega</span>
+                                <span style="font-weight: 700; color: var(--primary-dark);">83%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 83%;"></div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span>Hospital Dr. Negrín</span>
+                                <span style="font-weight: 700; color: var(--primary-dark);">89%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 89%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CURSOS SCREEN -->
+        <div class="screen" id="screen-cursos">
+            <div class="page-header">
+                <h1 class="page-title">Cursos</h1>
+                <p class="page-subtitle">Gestión de contenidos formativos</p>
+            </div>
+
+            <div class="grid-3col">
+                <div class="card">
+                    <div class="card-header">
+                        <div style="flex: 1;">
+                            <div class="card-title">SVB - Soporte Vital Básico</div>
+                            <div class="card-subtitle">Para todos los públicos</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <span class="badge badge-primary">ACTIVO</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-tertiary); line-height: 1.8; margin-bottom: 16px;">
+                        <div>📊 1,245 alumnos inscritos</div>
+                        <div>✅ 982 completados</div>
+                        <div>📈 Promedio: 84%</div>
+                    </div>
+                    <button class="btn-outline" style="width: 100%;">Editar Curso</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div style="flex: 1;">
+                            <div class="card-title">SVI - Soporte Vital Inmediato</div>
+                            <div class="card-subtitle">Estudiantes de Medicina/Enfermería</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <span class="badge badge-primary">ACTIVO</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-tertiary); line-height: 1.8; margin-bottom: 16px;">
+                        <div>📊 456 alumnos inscritos</div>
+                        <div>✅ 389 completados</div>
+                        <div>📈 Promedio: 81%</div>
+                    </div>
+                    <button class="btn-outline" style="width: 100%;">Editar Curso</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div style="flex: 1;">
+                            <div class="card-title">SVA - Soporte Vital Avanzado</div>
+                            <div class="card-subtitle">Médicos y Enfermeros</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 16px;">
+                        <span class="badge badge-primary">ACTIVO</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-tertiary); line-height: 1.8; margin-bottom: 16px;">
+                        <div>📊 234 alumnos inscritos</div>
+                        <div>✅ 198 completados</div>
+                        <div>📈 Promedio: 88%</div>
+                    </div>
+                    <button class="btn-outline" style="width: 100%;">Editar Curso</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ALUMNOS SCREEN -->
+        <div class="screen" id="screen-alumnos">
+            <div class="page-header">
+                <h1 class="page-title">Gestión de Alumnos</h1>
+                <p class="page-subtitle">Control de usuarios y desempeño</p>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <div style="flex: 1;">
+                        <div class="card-title">Alumnos Registrados</div>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-secondary btn-small">Importar CSV</button>
+                        <button class="btn-primary btn-small">+ Nuevo Alumno</button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Institución</th>
+                                <th>Tests Realizados</th>
+                                <th>Promedio</th>
+                                <th>Última Actividad</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>#1001</td>
+                                <td><strong>Estudiante_K_821</strong></td>
+                                <td>Colegio San Telmo</td>
+                                <td>28</td>
+                                <td><strong style="color: var(--success);">94%</strong></td>
+                                <td>Hace 1 hora</td>
+                                <td><button class="btn-secondary btn-small">Ver</button></td>
+                            </tr>
+                            <tr>
+                                <td>#1002</td>
+                                <td><strong>Estudiante_M_456</strong></td>
+                                <td>Instituto Vega</td>
+                                <td>24</td>
+                                <td><strong style="color: var(--success);">91%</strong></td>
+                                <td>Hace 4 horas</td>
+                                <td><button class="btn-secondary btn-small">Ver</button></td>
+                            </tr>
+                            <tr>
+                                <td>#1003</td>
+                                <td><strong>Estudiante_L_678</strong></td>
+                                <td>Hospital Dr. Negrín</td>
+                                <td>15</td>
+                                <td><strong style="color: var(--warning);">72%</strong></td>
+                                <td>Hace 2 días</td>
+                                <td><button class="btn-secondary btn-small">Ver</button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADMIN SCREEN -->
+        <div class="screen" id="screen-admin">
+            <div class="page-header">
+                <h1 class="page-title">Administración</h1>
+                <p class="page-subtitle">Configuración y mantenimiento del sistema</p>
+            </div>
+
+            <div class="grid-3col">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Base de Datos</div>
+                    </div>
+                    <div style="font-size: 13px; line-height: 1.8;">
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--gray-200);">
+                            <span>Estado:</span>
+                            <span class="badge badge-success">Conectada</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                            <span>Última Copia:</span>
+                            <span style="font-weight: 600;">Hace 2h</span>
+                        </div>
+                    </div>
+                    <button class="btn-secondary" style="width: 100%; margin-top: 12px;">Hacer Backup</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Servidor</div>
+                    </div>
+                    <div style="font-size: 13px; line-height: 1.8;">
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--gray-200);">
+                            <span>CPU:</span>
+                            <span style="font-weight: 600;">45%</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                            <span>Memoria:</span>
+                            <span style="font-weight: 600;">62%</span>
+                        </div>
+                    </div>
+                    <button class="btn-secondary" style="width: 100%; margin-top: 12px;">Monitoreo</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">Seguridad</div>
+                    </div>
+                    <div style="font-size: 13px; line-height: 1.8;">
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--gray-200);">
+                            <span>SSL:</span>
+                            <span class="badge badge-success">Activo</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                            <span>Backup:</span>
+                            <span class="badge badge-success">OK</span>
+                        </div>
+                    </div>
+                    <button class="btn-secondary" style="width: 100%; margin-top: 12px;">Configurar</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('open');
+            document.querySelector('.overlay').classList.toggle('open');
+        }
+
+        function showScreen(screenId, event) {
+            if (event) event.preventDefault();
+
+            // Cerrar sidebar en móvil
+            if (window.innerWidth < 1024) {
+                toggleSidebar();
+            }
+
+            // Cambiar pantalla
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById('screen-' + screenId).classList.add('active');
+
+            // Marcar nav item
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.closest('.nav-item')?.classList.add('active');
+
+            // Scroll al top
+            document.querySelector('.main-content').scrollTop = 0;
+        }
+
+        // Responsive adjustments
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 1024) {
+                document.querySelector('.sidebar').classList.remove('open');
+                document.querySelector('.overlay').classList.remove('open');
+            }
+        });
+    </script>
+</body>
+</html>
