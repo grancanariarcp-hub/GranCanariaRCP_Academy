@@ -1,0 +1,26 @@
+import Link from 'next/link';
+
+export default function Home() {
+  return (
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div className="auth-logo">
+          <div className="heart">🫀</div>
+          <h1>GranCanaria RCP Academy</h1>
+          <p>Plataforma de formación en reanimación cardiopulmonar</p>
+        </div>
+
+        <Link href="/login/student" className="btn btn-primary btn-full" style={{ marginBottom: 12 }}>
+          Soy alumno
+        </Link>
+        <Link href="/login/admin" className="btn btn-outline btn-full">
+          Acceso administración
+        </Link>
+
+        <p className="muted" style={{ textAlign: 'center', fontSize: 12, marginTop: 20 }}>
+          Fase 1 · Infraestructura y autenticación
+        </p>
+      </div>
+    </div>
+  );
+}

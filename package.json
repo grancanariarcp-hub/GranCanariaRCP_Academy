@@ -1,0 +1,18 @@
+{
+  "name": "grancanaria-rcp-academy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GranCanaria RCP Academy - monorepo (frontend Next.js + backend Express)",
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "setup:backend": "npm --prefix backend install",
+    "setup:frontend": "npm --prefix frontend install",
+    "setup": "npm run setup:backend && npm run setup:frontend",
+    "db:setup": "npm --prefix backend run db:setup",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev"
+  },
+  "author": "Federico Lubbe",
+  "license": "UNLICENSED"
+}

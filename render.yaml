@@ -1,0 +1,44 @@
+# Render Blueprint for the GranCanaria RCP Academy backend (Express API).
+# In Render: New + -> Blueprint -> connect this repo -> it reads this file.
+# The frontend is deployed separately on Vercel (see DEPLOY.md).
+services:
+  - type: web
+    name: grancanaria-rcp-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render injects PORT automatically; the app reads process.env.PORT.
+
+      # Public URL of the frontend (CORS allow-list). Comma-separate if several.
+      - key: CORS_ORIGIN
+        value: https://campus.grancanariarcp.es
+
+      # Auth
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+
+      # 32-byte AES key as 64 hex chars. Set manually (see DEPLOY.md):
+      #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      - key: ENCRYPTION_KEY
+        sync: false
+
+      # PostgreSQL connection string from Neon. Set manually.
+      - key: DATABASE_URL
+        sync: false
+
+      # Super admin (Federico). Set the password manually as a secret.
+      - key: SUPERADMIN_EMAIL
+        value: grancanariarcp@gmail.com
+      - key: SUPERADMIN_PASSWORD
+        sync: false
+      - key: SUPERADMIN_NAME
+        value: Federico Lubbe

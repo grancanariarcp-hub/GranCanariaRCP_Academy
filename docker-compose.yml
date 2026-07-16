@@ -1,0 +1,24 @@
+# Local PostgreSQL for GranCanaria RCP Academy.
+# Start with:  docker compose up -d
+# Then:        cd backend && npm run db:setup
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: rcp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rcp_admin
+      POSTGRES_PASSWORD: rcp_password
+      POSTGRES_DB: grancanaria_rcp
+    ports:
+      - '5432:5432'
+    volumes:
+      - rcp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U rcp_admin -d grancanaria_rcp']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rcp_pgdata:
