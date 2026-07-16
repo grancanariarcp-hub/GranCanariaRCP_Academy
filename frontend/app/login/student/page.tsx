@@ -66,7 +66,7 @@ export default function StudentLoginPage() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="heart">🫀</div>
+          <img src="/logo-horizontal.png" alt="Gran Canaria RCP" />
           <h1>Acceso alumnos</h1>
           <p>Elige tu método de acceso</p>
         </div>

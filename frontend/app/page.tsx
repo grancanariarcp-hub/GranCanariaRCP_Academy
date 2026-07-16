@@ -5,8 +5,7 @@ export default function Home() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="heart">🫀</div>
-          <h1>GranCanaria RCP Academy</h1>
+          <img src="/logo-horizontal.png" alt="Gran Canaria RCP" />
           <p>Plataforma de formación en reanimación cardiopulmonar</p>
         </div>
 

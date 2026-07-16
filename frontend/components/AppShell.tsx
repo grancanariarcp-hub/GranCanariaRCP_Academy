@@ -36,7 +36,10 @@ export function AppShell({
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">🫀 RCP Academy</div>
+        <div className="brand">
+          <img src="/logo-emblem.png" alt="" />
+          Gran Canaria RCP
+        </div>
         <nav>
           {nav.map((item) => (
             <a key={item.href} href={item.href} className={item.active ? 'active' : ''}>

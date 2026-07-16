@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
     <div className="auth-wrap">
       <div className="auth-card">
         <div className="auth-logo">
-          <div className="heart">🫀</div>
+          <img src="/logo-horizontal.png" alt="Gran Canaria RCP" />
           <h1>Panel de administración</h1>
           <p>Super Admin / Administrador de institución</p>
         </div>
