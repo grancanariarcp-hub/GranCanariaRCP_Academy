@@ -1,5 +1,8 @@
 import type { Request, Response } from 'express';
 import { query } from '../config/database.js';
+import { badRequest, forbidden, notFound } from '../utils/httpError.js';
+import { audit } from '../services/audit.js';
+import { clientIp } from '../utils/asyncHandler.js';
 
 /**
  * Basic student dashboard payload: their profile summary + progress.
@@ -44,4 +47,78 @@ export async function getStudentDashboard(req: Request, res: Response): Promise<
     },
     byCategory: perCategory.rows,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Fase D: matrícula y cursos del alumno
+// ---------------------------------------------------------------------------
+
+/** Cursos con matrícula abierta en los que el alumno AÚN no está matriculado. */
+export async function listAvailableCourses(req: Request, res: Response): Promise<void> {
+  const { rows } = await query(
+    `SELECT c.id, c.title, c.tema, c.subtema, c.modality, c.duration_hours, c.price_cents, c.publico_objetivo
+     FROM courses c
+     WHERE c.status = 'publicado' AND c.enrollment_open = TRUE
+       AND NOT EXISTS (SELECT 1 FROM enrollments e WHERE e.course_id = c.id AND e.student_id = $1)
+     ORDER BY c.created_at DESC`,
+    [req.auth!.sub],
+  );
+  res.json({ courses: rows });
+}
+
+/** Matricular al alumno actual. Curso gratis -> activo; de pago -> pendiente_pago. */
+export async function enrollCourse(req: Request, res: Response): Promise<void> {
+  const courseId = req.params.courseId;
+  const course = await query<{ status: string; enrollment_open: boolean; price_cents: number }>(
+    'SELECT status, enrollment_open, price_cents FROM courses WHERE id = $1',
+    [courseId],
+  );
+  if (course.rows.length === 0) throw notFound('Curso no encontrado');
+  const c = course.rows[0];
+  if (c.status !== 'publicado' || !c.enrollment_open) throw badRequest('La matrícula de este curso no está abierta', 'ENROLL_CLOSED');
+
+  const status = c.price_cents > 0 ? 'pendiente_pago' : 'activo';
+  const { rows } = await query(
+    `INSERT INTO enrollments (student_id, course_id, status)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (student_id, course_id) DO UPDATE SET status = enrollments.status
+     RETURNING id, status`,
+    [req.auth!.sub, courseId, status],
+  );
+
+  await audit({ actorId: req.auth!.sub, actorType: 'student', action: 'ENROLL', entity: 'course', entityId: courseId, ip: clientIp(req) });
+  res.status(201).json({ enrollment: rows[0], paymentRequired: c.price_cents > 0 });
+}
+
+/** "Mis cursos": los cursos en los que está matriculado. */
+export async function listMyCourses(req: Request, res: Response): Promise<void> {
+  const { rows } = await query(
+    `SELECT c.id, c.title, c.tema, c.subtema, c.modality, e.status, e.enrolled_at
+     FROM enrollments e JOIN courses c ON c.id = e.course_id
+     WHERE e.student_id = $1
+     ORDER BY e.enrolled_at DESC`,
+    [req.auth!.sub],
+  );
+  res.json({ courses: rows });
+}
+
+/** Contenido del curso para estudiar (solo si está matriculado). */
+export async function getMyCourseContent(req: Request, res: Response): Promise<void> {
+  const courseId = req.params.courseId;
+  const enr = await query('SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2', [req.auth!.sub, courseId]);
+  if (enr.rows.length === 0) throw forbidden('No estás matriculado en este curso');
+
+  const course = await query('SELECT id, title, tema, subtema, modality, objetivo_general FROM courses WHERE id = $1', [courseId]);
+  if (course.rows.length === 0) throw notFound('Curso no encontrado');
+
+  const modules = await query<{ id: string }>('SELECT id, title, sort_order FROM modules WHERE course_id = $1 ORDER BY sort_order', [courseId]);
+  const activities = await query<{ module_id: string }>(
+    `SELECT a.id, a.module_id, a.type, a.title, a.url, a.document_id, a.exam_id, d.title AS document_title
+     FROM activities a LEFT JOIN documents d ON d.id = a.document_id
+     WHERE a.module_id IN (SELECT id FROM modules WHERE course_id = $1)
+     ORDER BY a.sort_order`,
+    [courseId],
+  );
+  const mods = modules.rows.map((m) => ({ ...m, activities: activities.rows.filter((a) => a.module_id === m.id) }));
+  res.json({ course: course.rows[0], modules: mods });
 }

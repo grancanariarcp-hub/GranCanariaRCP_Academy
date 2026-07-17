@@ -1,110 +1,121 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
 
-interface Dashboard {
-  profile: {
-    display_name: string;
-    is_minor: boolean;
-    access_code: string;
-    institution_name: string;
-  } | null;
-  progress: { answered: number; correct: number; scorePct: number | null };
-  byCategory: Array<{ category: string; answered: string; correct: string }>;
+interface MyCourse {
+  id: string;
+  title: string;
+  tema: string | null;
+  subtema: string | null;
+  modality: string;
+  status: string;
+}
+interface AvailableCourse {
+  id: string;
+  title: string;
+  tema: string | null;
+  subtema: string | null;
+  modality: string;
+  duration_hours: number | null;
+  price_cents: number;
 }
 
 export default function StudentDashboard() {
   const user = useSession(['student'], '/login/student');
-  const [data, setData] = useState<Dashboard | null>(null);
+  const [mine, setMine] = useState<MyCourse[]>([]);
+  const [available, setAvailable] = useState<AvailableCourse[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
+  async function load() {
+    try {
+      const [m, a] = await Promise.all([
+        api<{ courses: MyCourse[] }>('/api/student/courses', { auth: true }),
+        api<{ courses: AvailableCourse[] }>('/api/student/available-courses', { auth: true }),
+      ]);
+      setMine(m.courses);
+      setAvailable(a.courses);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error cargando cursos');
+    }
+  }
   useEffect(() => {
-    if (!user) return;
-    api<Dashboard>('/api/student/dashboard', { auth: true })
-      .then(setData)
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Error cargando datos'));
+    if (user) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function enroll(courseId: string) {
+    setMsg(null);
+    try {
+      await api(`/api/student/enroll/${courseId}`, { method: 'POST', auth: true });
+      setMsg('¡Matrícula realizada! Ya lo tienes en "Mis cursos" ✅');
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al matricular');
+    }
+  }
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
   return (
-    <AppShell
-      user={user}
-      title="Mi progreso"
-      nav={[
-        { label: 'Inicio', href: '/student', active: true },
-        { label: 'Tests', href: '/student' },
-        { label: 'Cursos', href: '/student' },
-      ]}
-    >
+    <AppShell user={user} title="Campus" nav={[{ label: 'Inicio', href: '/student', active: true }]}>
       {error && <div className="alert alert-error">{error}</div>}
+      {msg && <div className="alert alert-success">{msg}</div>}
 
-      <div className="grid grid-4" style={{ marginBottom: 24 }}>
-        <div className="stat-card">
-          <div className="stat-value">{data?.progress.answered ?? '—'}</div>
-          <div className="stat-label">Preguntas respondidas</div>
+      {/* Mis cursos */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-header">
+          <div className="card-title">Mis cursos</div>
+          <div className="card-subtitle">Cursos en los que estás matriculado</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-value">{data?.progress.correct ?? '—'}</div>
-          <div className="stat-label">Aciertos</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">
-            {data?.progress.scorePct != null ? `${data.progress.scorePct}%` : '—'}
+        {mine.length === 0 ? (
+          <div className="muted">Aún no estás matriculado en ningún curso. ¡Explora los disponibles abajo!</div>
+        ) : (
+          <div className="grid grid-2">
+            {mine.map((c) => (
+              <div key={c.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: 16 }}>
+                <div style={{ fontWeight: 600 }}>{c.title}</div>
+                <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>
+                  {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')} ·{' '}
+                  <span className={`badge ${c.status === 'completado' ? 'badge-success' : c.status === 'pendiente_pago' ? 'badge-warning' : 'badge-primary'}`}>{c.status}</span>
+                </div>
+                <Link className="btn btn-primary btn-small" href={`/student/curso/${c.id}`}>Entrar al curso</Link>
+              </div>
+            ))}
           </div>
-          <div className="stat-label">Puntuación</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{data?.byCategory.length ?? 0}</div>
-          <div className="stat-label">Categorías iniciadas</div>
-        </div>
+        )}
       </div>
 
-      <div className="grid grid-2">
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">¡Hola, {user.name}!</div>
-            <div className="card-subtitle">{data?.profile?.institution_name ?? ''}</div>
-          </div>
-          <div className="info-box" style={{ marginBottom: 16 }}>
-            Bienvenido a tu área de formación en RCP. Aquí verás tu progreso por
-            niveles (SVB, SVI, SVA) a medida que completes tests.
-          </div>
-          {data?.profile && (
-            <p className="muted" style={{ fontSize: 13 }}>
-              Tu código de acceso: <strong>{data.profile.access_code}</strong>
-              {data.profile.is_minor && <> · <span className="badge badge-warning">Menor</span></>}
-            </p>
-          )}
+      {/* Cursos disponibles */}
+      <div className="card">
+        <div className="card-header">
+          <div className="card-title">Cursos disponibles</div>
+          <div className="card-subtitle">Con matrícula abierta</div>
         </div>
-
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">Progreso por categoría</div>
+        {available.length === 0 ? (
+          <div className="muted">No hay cursos con matrícula abierta ahora mismo.</div>
+        ) : (
+          <div className="grid grid-2">
+            {available.map((c) => (
+              <div key={c.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: 16 }}>
+                <div style={{ fontWeight: 600 }}>{c.title}</div>
+                <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>
+                  {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')}
+                  {c.duration_hours ? ` · ${c.duration_hours} h` : ''}
+                  {' · '}
+                  {c.price_cents > 0 ? <strong>{(c.price_cents / 100).toFixed(2)} €</strong> : <span className="badge badge-success">Gratis</span>}
+                </div>
+                <button className="btn btn-primary btn-small" onClick={() => enroll(c.id)}>
+                  {c.price_cents > 0 ? 'Matricularme (pago)' : 'Matricularme gratis'}
+                </button>
+              </div>
+            ))}
           </div>
-          <div className="table-responsive">
-            <table>
-              <thead>
-                <tr><th>Nivel</th><th>Respondidas</th><th>Aciertos</th></tr>
-              </thead>
-              <tbody>
-                {(data?.byCategory ?? []).map((c) => (
-                  <tr key={c.category}>
-                    <td><span className="badge badge-primary">{c.category}</span></td>
-                    <td>{c.answered}</td>
-                    <td>{c.correct}</td>
-                  </tr>
-                ))}
-                {(!data || data.byCategory.length === 0) && (
-                  <tr><td colSpan={3} className="muted">Aún no has realizado tests</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        )}
       </div>
     </AppShell>
   );

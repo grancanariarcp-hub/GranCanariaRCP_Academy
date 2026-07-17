@@ -64,6 +64,16 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
   res.status(201).json({ course });
 }
 
+/** Public: courses with open enrollment (for the login / discovery page). */
+export async function listOpenCourses(_req: Request, res: Response): Promise<void> {
+  const { rows } = await query(
+    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, objetivo_general
+     FROM courses WHERE status = 'publicado' AND enrollment_open = TRUE
+     ORDER BY created_at DESC`,
+  );
+  res.json({ courses: rows });
+}
+
 export async function listCourses(req: Request, res: Response): Promise<void> {
   const isSuper = req.auth!.role === 'super_admin';
   const { rows } = isSuper
