@@ -133,7 +133,10 @@ export default function PublicCoursePage() {
 
             {/* Acción de matrícula */}
             {!course.enrollment_open ? (
-              <div className="info-box">La matrícula de este curso aún no está abierta.</div>
+              <div className="info-box" style={{ textAlign: 'center' }}>
+                🔜 <strong>Próximamente.</strong> La matrícula de este curso aún no está abierta.{' '}
+                {!isStudent && <><Link href="/registro">Regístrate</Link> para no perdértela.</>}
+              </div>
             ) : isStudent ? (
               <button className="btn btn-primary btn-full" onClick={enroll}>
                 {course.price_cents > 0 ? 'Matricularme (pago)' : 'Matricularme gratis'}

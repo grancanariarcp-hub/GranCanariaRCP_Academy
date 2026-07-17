@@ -68,12 +68,17 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
   res.status(201).json({ course });
 }
 
-/** Public: courses with open enrollment (for the login / discovery page). */
+/**
+ * Public: todos los cursos publicados (para la portada / descubrimiento).
+ * Se muestran también los que tienen la matrícula cerrada, como "próximamente"
+ * (genera interés); la tarjeta indica el estado con enrollment_open.
+ * Los de matrícula abierta salen primero.
+ */
 export async function listOpenCourses(_req: Request, res: Response): Promise<void> {
   const { rows } = await query(
-    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, resumen, thumbnail_key
-     FROM courses WHERE status = 'publicado' AND enrollment_open = TRUE
-     ORDER BY created_at DESC`,
+    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, resumen, thumbnail_key, enrollment_open
+     FROM courses WHERE status = 'publicado'
+     ORDER BY enrollment_open DESC, created_at DESC`,
   );
   res.json({ courses: await presignKeys(rows, 'thumbnail_key', 'thumbnail_url') });
 }

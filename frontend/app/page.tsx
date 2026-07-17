@@ -14,6 +14,7 @@ interface OpenCourse {
   duration_hours: number | null;
   price_cents: number;
   thumbnail_url?: string;
+  enrollment_open: boolean;
 }
 
 export default function Home() {
@@ -89,7 +90,10 @@ export default function Home() {
         ) : (
           <div className="grid grid-4">
             {courses.map((c) => (
-              <Link key={c.id} href={`/curso/${c.id}`} className="card" style={{ textDecoration: 'none' }}>
+              <Link key={c.id} href={`/curso/${c.id}`} className="card" style={{ textDecoration: 'none', position: 'relative' }}>
+                {!c.enrollment_open && (
+                  <span className="badge" style={{ position: 'absolute', top: 8, right: 8, background: 'var(--secondary-dark)', color: '#fff' }}>Próximamente</span>
+                )}
                 {c.thumbnail_url && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 6, marginBottom: 8 }} />
@@ -99,10 +103,12 @@ export default function Home() {
                   {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')}
                   {c.duration_hours ? ` · ${c.duration_hours} h` : ''}
                 </div>
-                {c.price_cents > 0 ? (
+                {!c.enrollment_open ? (
+                  <span className="badge badge-warning">Matrícula cerrada</span>
+                ) : c.price_cents > 0 ? (
                   <span className="badge badge-primary">{(c.price_cents / 100).toFixed(2)} €</span>
                 ) : (
-                  <span className="badge badge-success">Gratis</span>
+                  <span className="badge badge-success">Gratis · matrícula abierta</span>
                 )}
               </Link>
             ))}

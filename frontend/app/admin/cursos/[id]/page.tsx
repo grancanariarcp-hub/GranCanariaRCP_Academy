@@ -278,26 +278,25 @@ export default function CourseDetailPage() {
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                 <span className={`badge ${course.status === 'publicado' ? 'badge-success' : 'badge-warning'}`}>{course.status}</span>
-                {course.enrollment_open && course.status === 'publicado' && <span className="badge badge-primary">visible al público</span>}
+                {course.status === 'publicado' && (
+                  <span className="badge badge-primary">{course.enrollment_open ? 'matrícula abierta' : 'próximamente'}</span>
+                )}
                 {course.status === 'publicado' ? (
                   <button className="btn btn-outline btn-small" onClick={() => patchCourse({ status: 'borrador' })}>Pasar a borrador</button>
                 ) : (
-                  // Publicar abre también la matrícula, si no el curso quedaría publicado pero invisible.
-                  <button className="btn btn-primary btn-small" onClick={() => patchCourse({ status: 'publicado', enrollmentOpen: true })}>Publicar y abrir matrícula</button>
+                  <button className="btn btn-primary btn-small" onClick={() => patchCourse({ status: 'publicado' })}>Publicar</button>
                 )}
                 <button className="btn btn-outline btn-small" onClick={() => patchCourse({ enrollmentOpen: !course.enrollment_open })}>
                   {course.enrollment_open ? 'Cerrar matrícula' : 'Abrir matrícula'}
                 </button>
               </div>
             </div>
-            {course.status === 'publicado' && !course.enrollment_open && (
-              <div className="alert alert-warning" style={{ marginTop: 12, marginBottom: 0 }}>
-                Este curso está <strong>publicado pero con la matrícula cerrada</strong>, por eso no aparece en la página pública. Pulsa <strong>«Abrir matrícula»</strong> para que se vea y los alumnos puedan inscribirse.
-              </div>
-            )}
-            {course.status === 'publicado' && course.enrollment_open && (
+            {course.status === 'publicado' && (
               <div className="info-box" style={{ marginTop: 12, fontSize: 13 }}>
-                Visible en la página de inicio pública. <Link href={`/curso/${course.id}`} target="_blank">Ver ficha pública ↗</Link>
+                {course.enrollment_open
+                  ? <>Visible en la portada, con <strong>matrícula abierta</strong> (los alumnos pueden inscribirse). </>
+                  : <>Visible en la portada como <strong>«Próximamente»</strong> (genera interés; aún no se pueden inscribir). Pulsa <strong>«Abrir matrícula»</strong> cuando quieras permitir inscripciones. </>}
+                <Link href={`/curso/${course.id}`} target="_blank">Ver ficha pública ↗</Link>
               </div>
             )}
           </div>
