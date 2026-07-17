@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { saveSession, type SessionUser } from '@/lib/auth';
+import { AppVersion } from '@/components/AppVersion';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -72,6 +73,9 @@ export default function AdminLoginPage() {
 
         <p className="muted" style={{ textAlign: 'center', fontSize: 13, marginTop: 18 }}>
           <Link href="/login/student">Acceso alumnos</Link> · <Link href="/">Inicio</Link>
+        </p>
+        <p style={{ textAlign: 'center', marginTop: 8 }}>
+          <AppVersion />
         </p>
       </div>
     </div>

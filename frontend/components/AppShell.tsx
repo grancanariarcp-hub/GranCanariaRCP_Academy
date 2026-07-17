@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { clearSession, type SessionUser } from '@/lib/auth';
 import { api } from '@/lib/api';
+import { AppVersion } from '@/components/AppVersion';
 
 interface NavItem {
   label: string;
@@ -47,6 +48,9 @@ export function AppShell({
             </a>
           ))}
         </nav>
+        <div style={{ marginTop: 24, paddingLeft: 12 }}>
+          <AppVersion style={{ color: 'rgba(255,255,255,0.6)' }} />
+        </div>
       </aside>
 
       <div className="main">

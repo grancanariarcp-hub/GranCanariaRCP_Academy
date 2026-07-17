@@ -129,6 +129,30 @@ Certificados PDF → generación en el servidor (fondo + texto + firmantes).
 
 ---
 
-## 7. Próximo paso
-Rematar **C0** (carga masiva de preguntas, ya casi lista) y arrancar **Fase A**
-(rol profesor + crear curso + dashboard del profesor).
+## 8. Requisitos adicionales (v3.1)
+
+- **Versión visible** en la app (semver: `v1.0.0`, `v1.1.0`, …) + commit corto. ⭐
+- **Import de preguntas en JSON** (para IA) además de Excel. JSON recomendado para test y V/F.
+- **Bancos de preguntas con permisos**:
+  - `super_admin` accede a **todos** los bancos y decide cuáles son **públicos**.
+  - Cada `profesor` accede a **las preguntas que él crea/importa** + las **públicas**.
+  - Campos nuevos en `questions`: `owner_id`, `is_public` (solo super_admin lo cambia), estado `borrador/revisada`.
+- **Alta de profesores**: auto-registro con estado **pendiente** → el super_admin **valida** (aprueba/rechaza); o el super_admin **crea** el profesor directamente.
+- **Cursos multi-profesor y directores**:
+  - Tabla `course_staff` (curso × profesor × rol `director`/`instructor`).
+  - El creador es **director** por defecto; los directores pueden **añadir/invitar** profesores.
+- **Reclutamiento de profesores**:
+  - `convocatorias` (visibles solo para profesores): perfil buscado + qué se ofrece.
+  - `postulaciones`: el profesor pulsa **"Postularse"**; el convocante ve su perfil y contacta.
+- **Notificaciones** (push + email) al **abrir matrícula**, **filtradas por público objetivo**
+  del curso (si es "todos", a todos). Requiere servicio de email (p. ej. Resend) + web push.
+
+### Mejoras recomendadas (anotadas, se activan cuando toque)
+- Revisión/aprobación de preguntas (borrador → revisada) — clave por el uso de IA.
+- Estado **borrador/publicado** de cursos + **vista previa** del profesor como alumno.
+- **Buscador y filtros** en el banco de preguntas.
+
+### Orden sugerido con lo nuevo
+`C0` (import Excel **+ JSON**, con owner/visibilidad) → **versión visible v1.0.0** →
+`Fase A` (rol profesor + validación de altas + crear curso + directores) → B → C … 
+Reclutamiento y notificaciones se integran junto a las fases de profesores/matrícula.

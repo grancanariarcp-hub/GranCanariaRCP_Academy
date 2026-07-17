@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { saveSession, type SessionUser } from '@/lib/auth';
+import { AppVersion } from '@/components/AppVersion';
 
 type Method = 'code' | 'email' | 'register';
 
@@ -144,6 +145,9 @@ export default function StudentLoginPage() {
 
         <p className="muted" style={{ textAlign: 'center', fontSize: 13, marginTop: 18 }}>
           <Link href="/login/admin">Acceso administración</Link> · <Link href="/">Inicio</Link>
+        </p>
+        <p style={{ textAlign: 'center', marginTop: 8 }}>
+          <AppVersion />
         </p>
       </div>
     </div>

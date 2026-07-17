@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppVersion } from '@/components/AppVersion';
 
 export default function Home() {
   return (
@@ -16,8 +17,8 @@ export default function Home() {
           Acceso administración
         </Link>
 
-        <p className="muted" style={{ textAlign: 'center', fontSize: 12, marginTop: 20 }}>
-          Fase 1 · Infraestructura y autenticación
+        <p style={{ textAlign: 'center', marginTop: 20 }}>
+          <AppVersion />
         </p>
       </div>
     </div>
