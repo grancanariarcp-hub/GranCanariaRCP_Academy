@@ -68,6 +68,13 @@ export default function Home() {
           <Link href="/registro" className="btn" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', boxShadow: 'var(--shadow-sm)' }}>✍️ Registrarse</Link>
         </div>
 
+        {/* Desafíos */}
+        <Link href="/desafios" style={{ display: 'block', maxWidth: 720, margin: '0 auto 32px', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 18, textAlign: 'center', background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)' }}>
+          <div style={{ fontSize: 26 }}>🏆</div>
+          <div style={{ fontWeight: 700, fontSize: 18 }}>Desafíos y ranking</div>
+          <div style={{ fontSize: 13, opacity: 0.95 }}>Pon a prueba tus conocimientos de RCP y primeros auxilios · sube en el ranking</div>
+        </Link>
+
         {/* Cursos con matrícula abierta */}
         <h2 style={{ textAlign: 'center', marginBottom: 16 }}>Cursos disponibles</h2>
         {courses.length === 0 ? (

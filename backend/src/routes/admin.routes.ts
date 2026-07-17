@@ -15,6 +15,7 @@ import {
 } from '../controllers/admin.controller.js';
 import { uploadDocument, listDocuments, getDocumentUrl } from '../controllers/document.controller.js';
 import { getTemplate, importQuestions } from '../controllers/questionImport.controller.js';
+import { createChallenge, listAllChallenges } from '../controllers/challenge.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -47,6 +48,9 @@ router.post('/questions/import', upload.single('file'), asyncHandler(importQuest
 router.get('/documents', asyncHandler(listDocuments));
 router.post('/documents', upload.single('file'), asyncHandler(uploadDocument));
 router.get('/documents/:id/url', asyncHandler(getDocumentUrl));
+
+router.get('/challenges', asyncHandler(listAllChallenges));
+router.post('/challenges', asyncHandler(createChallenge));
 
 router.get('/audit-logs', asyncHandler(listAuditLogs));
 
