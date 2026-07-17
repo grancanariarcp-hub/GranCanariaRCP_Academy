@@ -16,7 +16,7 @@ import {
 import { uploadDocument, listDocuments, getDocumentUrl } from '../controllers/document.controller.js';
 import { getTemplate, importQuestions } from '../controllers/questionImport.controller.js';
 import { createChallenge, listAllChallenges } from '../controllers/challenge.controller.js';
-import { createBank, listBanks, getBankTemas, importBankQuestions, globalFailedStats } from '../controllers/bank.controller.js';
+import { createBank, updateBank, listBanks, getBankTemas, importBankQuestions, globalFailedStats } from '../controllers/bank.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -55,6 +55,7 @@ router.post('/challenges', asyncHandler(createChallenge));
 
 router.get('/banks', asyncHandler(listBanks));
 router.post('/banks', asyncHandler(createBank));
+router.patch('/banks/:id', asyncHandler(updateBank));
 router.get('/banks/:id/temas', asyncHandler(getBankTemas));
 router.post('/banks/:id/import', asyncHandler(importBankQuestions));
 router.get('/failed-general', asyncHandler(globalFailedStats));

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { clearSession, type SessionUser } from '@/lib/auth';
 import { api } from '@/lib/api';
@@ -23,6 +24,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   async function logout() {
     try {
@@ -36,14 +38,15 @@ export function AppShell({
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
+      <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="brand">
           <img src="/logo-emblem.png" alt="" />
           Gran Canaria RCP
         </div>
         <nav>
           {nav.map((item) => (
-            <a key={item.href} href={item.href} className={item.active ? 'active' : ''}>
+            <a key={item.href} href={item.href} className={item.active ? 'active' : ''} onClick={() => setMenuOpen(false)}>
               {item.label}
             </a>
           ))}
@@ -55,7 +58,10 @@ export function AppShell({
 
       <div className="main">
         <div className="topbar">
-          <h2>{title}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <button className="menu-toggle" aria-label="Menú" onClick={() => setMenuOpen((v) => !v)}>☰</button>
+            <h2>{title}</h2>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <span className="muted" style={{ fontSize: 13 }}>
               {user.name} · <span className="badge badge-primary">{roleLabel(user.role)}</span>

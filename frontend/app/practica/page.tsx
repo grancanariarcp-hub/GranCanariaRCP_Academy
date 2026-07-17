@@ -6,7 +6,7 @@ import { api, ApiError } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 
-interface Q { id: string; category: string; text: string; options: string[] }
+interface Q { id: string; category: string | null; text: string; options: string[] }
 interface Feedback { id: string; correct_index: number; your: number | null; is_correct: boolean; explanation: string | null; document_title: string | null; ref_page: number | null }
 interface Stats {
   failedByCategory: Array<{ category: string; count: number }>;
@@ -28,10 +28,18 @@ export default function PracticaPage() {
   const [count, setCount] = useState('10');
 
   // Banco (RCP por defecto; OPE/MIR cuando el super admin los sube)
-  const [banks, setBanks] = useState<Array<{ id: string; name: string; kind: string }>>([]);
+  type Bank = { id: string; name: string; kind: string; sim_questions: number | null; sim_minutes: number | null; sim_pass_pct: number | null };
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [bankId, setBankId] = useState('');
   const [bankTemas, setBankTemas] = useState<Array<{ tema: string; questions: string }>>([]);
   const [tema, setTema] = useState('');
+
+  // Simulacro cronometrado (config del banco)
+  const [simActive, setSimActive] = useState(false);
+  const [simTimed, setSimTimed] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [passPct, setPassPct] = useState<number | null>(null);
+  const selectedBank = banks.find((b) => b.id === bankId) || null;
 
   const [questions, setQuestions] = useState<Q[]>([]);
   const [answers, setAnswers] = useState<Record<string, number | null>>({});
@@ -47,7 +55,7 @@ export default function PracticaPage() {
   }
   async function loadBanks() {
     try {
-      setBanks((await api<{ banks: Array<{ id: string; name: string; kind: string }> }>('/api/public/banks')).banks);
+      setBanks((await api<{ banks: Bank[] }>('/api/public/banks')).banks);
     } catch { /* ignore */ }
   }
   useEffect(() => { if (user) { loadStats(); loadBanks(); } /* eslint-disable-next-line */ }, []);
@@ -61,8 +69,18 @@ export default function PracticaPage() {
       .catch(() => setBankTemas([]));
   }, [bankId]);
 
+  // Cuenta atrás del simulacro: al llegar a 0 se corrige automáticamente.
+  useEffect(() => {
+    if (!simActive || !simTimed || phase !== 'taking') return;
+    if (timeLeft <= 0) { submit(); return; }
+    const t = setTimeout(() => setTimeLeft((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simActive, simTimed, phase, timeLeft]);
+
   async function start() {
     setError(null);
+    setSimActive(false); setSimTimed(false); setPassPct(null);
     try {
       const r = await api<{ questions: Q[] }>('/api/practice/start', {
         method: 'POST', auth: true,
@@ -76,6 +94,27 @@ export default function PracticaPage() {
       });
       setQuestions(r.questions);
       setAnswers(Object.fromEntries(r.questions.map((q) => [q.id, null])));
+      setPhase('taking');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al empezar');
+    }
+  }
+
+  async function startSimulacro() {
+    if (!selectedBank?.sim_questions) return;
+    setError(null);
+    try {
+      const r = await api<{ questions: Q[] }>('/api/practice/start', {
+        method: 'POST', auth: true,
+        body: JSON.stringify({ mode: 'aleatorio', bankId, count: selectedBank.sim_questions }),
+      });
+      setQuestions(r.questions);
+      setAnswers(Object.fromEntries(r.questions.map((q) => [q.id, null])));
+      setPassPct(selectedBank.sim_pass_pct ?? null);
+      const timed = !!selectedBank.sim_minutes;
+      setSimTimed(timed);
+      setTimeLeft(timed ? selectedBank.sim_minutes! * 60 : 0);
+      setSimActive(true);
       setPhase('taking');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al empezar');
@@ -125,13 +164,27 @@ export default function PracticaPage() {
                     {stats.failedByCategory.map((f) => `${f.category} (${f.count})`).join(' · ')}
                   </p>
                 )}
+                <div className="info-box" style={{ fontSize: 13, marginBottom: 8 }}>
+                  Repeticiones medias por pregunta: <strong>{stats.distinctAnswered > 0 ? (stats.totalAnswered / stats.distinctAnswered).toFixed(1) : '—'}</strong>
+                </div>
                 {stats.daily.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Preguntas por día (30 días)</div>
-                    <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 60 }}>
-                      {stats.daily.map((d) => (
-                        <div key={d.day} title={`${d.day}: ${d.answered} (${d.correct} ✓)`} style={{ flex: 1, background: 'var(--secondary-dark)', height: `${(d.answered / maxDay) * 100}%`, minHeight: 3, borderRadius: 2 }} />
-                      ))}
+                  <div className="grid grid-2" style={{ marginTop: 10, gap: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Preguntas por día (30 días)</div>
+                      <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 60 }}>
+                        {stats.daily.map((d) => (
+                          <div key={d.day} title={`${d.day}: ${d.answered} (${d.correct} ✓)`} style={{ flex: 1, background: 'var(--secondary-dark)', height: `${(d.answered / maxDay) * 100}%`, minHeight: 3, borderRadius: 2 }} />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Aciertos por día (%)</div>
+                      <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 60 }}>
+                        {stats.daily.map((d) => {
+                          const pct = d.answered > 0 ? Math.round((d.correct / d.answered) * 100) : 0;
+                          return <div key={d.day} title={`${d.day}: ${pct}%`} style={{ flex: 1, background: pct >= 50 ? 'var(--success)' : 'var(--danger)', height: `${Math.max(pct, 2)}%`, minHeight: 3, borderRadius: 2 }} />;
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -185,12 +238,32 @@ export default function PracticaPage() {
               </div>
             )}
 
+            {/* Simulacro (si el banco elegido tiene simulacro configurado) */}
+            {phase === 'config' && selectedBank?.sim_questions && (
+              <div className="card" style={{ marginTop: 16, borderLeft: '4px solid var(--secondary-dark)' }}>
+                <div className="card-header"><div className="card-title">⏱️ Simulacro oficial — {selectedBank.name}</div></div>
+                <p style={{ fontSize: 14, marginBottom: 12 }}>
+                  <strong>{selectedBank.sim_questions}</strong> preguntas ·{' '}
+                  {selectedBank.sim_minutes ? <><strong>{selectedBank.sim_minutes}</strong> min</> : 'tiempo libre'}
+                  {selectedBank.sim_pass_pct != null && <> · aprobado ≥ <strong>{selectedBank.sim_pass_pct}%</strong></>}
+                </p>
+                <button className="btn btn-primary btn-full" onClick={startSimulacro}>Empezar simulacro</button>
+              </div>
+            )}
+
             {/* Taking */}
             {phase === 'taking' && (
               <>
+                {simActive && simTimed && (
+                  <div className="card" style={{ position: 'sticky', top: 8, zIndex: 10, textAlign: 'center', padding: 12, marginBottom: 12, background: timeLeft <= 60 ? '#fde8e8' : undefined }}>
+                    <span style={{ fontSize: 22, fontWeight: 700, color: timeLeft <= 60 ? 'var(--danger)' : 'var(--primary-dark)' }}>
+                      ⏱️ {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
                 {questions.map((q, i) => (
                   <div className="card" key={q.id} style={{ marginBottom: 12 }}>
-                    <div style={{ fontWeight: 600, marginBottom: 8 }}>{i + 1}. {q.text} <span className="badge badge-primary" style={{ fontSize: 11 }}>{q.category}</span></div>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>{i + 1}. {q.text} {q.category && <span className="badge badge-primary" style={{ fontSize: 11 }}>{q.category}</span>}</div>
                     {q.options.map((opt, idx) => (
                       <label key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0', cursor: 'pointer' }}>
                         <input type="radio" name={q.id} checked={answers[q.id] === idx} onChange={() => setAnswers({ ...answers, [q.id]: idx })} />
@@ -207,8 +280,13 @@ export default function PracticaPage() {
             {phase === 'result' && feedback && score && (
               <>
                 <div className="card" style={{ textAlign: 'center', marginBottom: 16 }}>
-                  <h2>{score.correct}/{score.total} aciertos</h2>
-                  <button className="btn btn-primary" onClick={() => setPhase('config')}>Otra tanda</button>
+                  <h2>{score.correct}/{score.total} aciertos ({Math.round((score.correct / score.total) * 100)}%)</h2>
+                  {simActive && passPct != null && (
+                    (score.correct / score.total) * 100 >= passPct
+                      ? <div className="badge badge-success" style={{ fontSize: 16, padding: '6px 14px', margin: '8px 0' }}>✅ APROBADO (corte {passPct}%)</div>
+                      : <div className="badge" style={{ fontSize: 16, padding: '6px 14px', margin: '8px 0', background: 'var(--danger)', color: '#fff' }}>❌ NO APTO (corte {passPct}%)</div>
+                  )}
+                  <div><button className="btn btn-primary" onClick={() => setPhase('config')}>Otra tanda</button></div>
                 </div>
                 {questions.map((q, i) => {
                   const fb = feedback.find((f) => f.id === q.id)!;

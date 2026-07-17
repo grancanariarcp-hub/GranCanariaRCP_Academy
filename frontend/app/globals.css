@@ -101,6 +101,9 @@ h3 {
 .grid-2 {
   grid-template-columns: repeat(2, 1fr);
 }
+.grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
 
 /* ---------- Cards ---------- */
 .card {
@@ -426,10 +429,47 @@ tbody tr:hover {
   color: var(--text-secondary);
 }
 
+/* Hamburger toggle: hidden on desktop, shown on tablet/mobile. */
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--primary-dark);
+  padding: 0 4px;
+}
+.sidebar-backdrop {
+  display: none;
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1023px) {
+  .menu-toggle {
+    display: block;
+  }
+  /* Sidebar becomes an off-canvas drawer instead of disappearing. */
   .sidebar {
-    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+  }
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 40;
   }
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
@@ -443,6 +483,7 @@ tbody tr:hover {
     gap: 12px;
   }
   .grid-4,
+  .grid-3,
   .grid-2 {
     grid-template-columns: 1fr;
   }

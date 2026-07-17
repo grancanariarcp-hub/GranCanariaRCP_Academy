@@ -30,21 +30,47 @@ const createSchema = z.object({
   categoriaProfesional: z.string().max(160).optional(),
   official: z.boolean().optional().default(false),
   descripcion: z.string().optional(),
+  simQuestions: z.number().int().min(1).max(300).optional(),
+  simMinutes: z.number().int().min(1).max(600).optional(),
+  simPassPct: z.number().int().min(0).max(100).optional(),
 });
 
 export async function createBank(req: Request, res: Response): Promise<void> {
   const d = createSchema.parse(req.body);
   const { rows } = await query(
-    `INSERT INTO question_banks (name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official`,
-    [d.name, d.kind, d.comunidadAutonoma ?? null, d.anio ?? null, d.categoriaProfesional ?? null, d.official, d.descripcion ?? null],
+    `INSERT INTO question_banks (name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, sim_questions, sim_minutes, sim_pass_pct`,
+    [d.name, d.kind, d.comunidadAutonoma ?? null, d.anio ?? null, d.categoriaProfesional ?? null, d.official, d.descripcion ?? null,
+      d.simQuestions ?? null, d.simMinutes ?? null, d.simPassPct ?? null],
   );
   res.status(201).json({ bank: rows[0] });
+}
+
+/** Editar la configuración del simulacro (y metadatos) de un banco. */
+export async function updateBank(req: Request, res: Response): Promise<void> {
+  const d = createSchema.partial().parse(req.body);
+  const { rows } = await query(
+    `UPDATE question_banks SET
+       name = COALESCE($2, name),
+       comunidad_autonoma = COALESCE($3, comunidad_autonoma),
+       anio = COALESCE($4, anio),
+       categoria_profesional = COALESCE($5, categoria_profesional),
+       official = COALESCE($6, official),
+       sim_questions = $7, sim_minutes = $8, sim_pass_pct = $9
+     WHERE id = $1
+     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, sim_questions, sim_minutes, sim_pass_pct`,
+    [req.params.id, d.name ?? null, d.comunidadAutonoma ?? null, d.anio ?? null, d.categoriaProfesional ?? null,
+      d.official ?? null, d.simQuestions ?? null, d.simMinutes ?? null, d.simPassPct ?? null],
+  );
+  if (rows.length === 0) throw notFound('Banco no encontrado');
+  res.json({ bank: rows[0] });
 }
 
 export async function listBanks(_req: Request, res: Response): Promise<void> {
   const { rows } = await query(
     `SELECT b.id, b.name, b.kind, b.comunidad_autonoma, b.anio, b.categoria_profesional, b.official, b.descripcion,
+            b.sim_questions, b.sim_minutes, b.sim_pass_pct,
             (SELECT COUNT(*) FROM questions q WHERE q.bank_id = b.id) AS questions
      FROM question_banks b ORDER BY (b.kind = 'rcp') DESC, b.created_at DESC`,
   );

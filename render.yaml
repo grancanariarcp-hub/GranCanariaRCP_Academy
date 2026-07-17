@@ -10,7 +10,9 @@ services:
     # --include=dev forces devDependencies (typescript, tsx) to install even
     # though NODE_ENV=production, so the TypeScript build can run on Render.
     buildCommand: npm install --include=dev && npm run build
-    startCommand: npm start
+    # Run pending DB migrations against Neon on every boot (idempotent, tracked
+    # in the _migrations table) so prod schema stays in sync with the code.
+    startCommand: npm run db:migrate:prod && npm start
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
