@@ -153,6 +153,8 @@ const createQuestionSchema = z
     flashcard: z.string().optional(),
     tags: z.array(z.string()).optional().default([]),
     isCritical: z.boolean().optional().default(false),
+    refDocumentId: z.string().uuid().optional().or(z.literal('')),
+    refPage: z.coerce.number().int().positive().optional(),
   })
   .refine((d) => d.correctIndex < d.options.length, {
     message: 'La opción correcta está fuera de rango',
@@ -169,8 +171,9 @@ export async function createQuestion(req: Request, res: Response): Promise<void>
   const { rows } = await query(
     `INSERT INTO questions
        (category, audiences, qtype, difficulty, text, clinical_context, options, correct_index,
-        explanation, source_erc, source_plan_nacional, video_url, flashcard, tags, is_critical, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        explanation, source_erc, source_plan_nacional, video_url, flashcard, tags, is_critical,
+        ref_document_id, ref_page, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      RETURNING id, category, audiences, qtype, difficulty, text, created_at`,
     [
       data.category,
@@ -188,6 +191,8 @@ export async function createQuestion(req: Request, res: Response): Promise<void>
       data.flashcard ?? null,
       data.tags ?? [],
       data.isCritical,
+      data.refDocumentId || null,
+      data.refPage ?? null,
       req.auth!.sub,
     ],
   );

@@ -44,3 +44,14 @@ services:
         sync: false
       - key: SUPERADMIN_NAME
         value: Federico Lubbe
+
+      # Cloudflare R2 (reference PDFs). Account id and bucket are not secret;
+      # the access keys are set manually in the Render dashboard.
+      - key: R2_ACCOUNT_ID
+        value: 596821561e3c696ec537191e622784d6
+      - key: R2_BUCKET
+        value: grancanaria-rcp-docs
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false

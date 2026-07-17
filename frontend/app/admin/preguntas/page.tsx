@@ -45,14 +45,22 @@ export default function PreguntasPage() {
   const [tags, setTags] = useState('');
   const [isCritical, setIsCritical] = useState(false);
 
+  const [refDocumentId, setRefDocumentId] = useState('');
+  const [refPage, setRefPage] = useState('');
+
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [list, setList] = useState<QuestionRow[]>([]);
+  const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
 
   async function loadList() {
     try {
-      const r = await api<{ questions: QuestionRow[] }>('/api/admin/questions', { auth: true });
-      setList(r.questions);
+      const [q, d] = await Promise.all([
+        api<{ questions: QuestionRow[] }>('/api/admin/questions', { auth: true }),
+        api<{ documents: Array<{ id: string; title: string }> }>('/api/admin/documents', { auth: true }),
+      ]);
+      setList(q.questions);
+      setDocs(d.documents);
     } catch {
       /* ignore */
     }
@@ -89,6 +97,8 @@ export default function PreguntasPage() {
     setFlashcard('');
     setTags('');
     setIsCritical(false);
+    setRefDocumentId('');
+    setRefPage('');
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -118,6 +128,8 @@ export default function PreguntasPage() {
             .map((t) => t.trim())
             .filter(Boolean),
           isCritical,
+          refDocumentId: refDocumentId || undefined,
+          refPage: refPage ? Number(refPage) : undefined,
         }),
       });
       setMsg({ ok: true, text: 'Pregunta creada correctamente ✅' });
@@ -143,6 +155,7 @@ export default function PreguntasPage() {
       nav={[
         { label: 'Resumen', href: '/admin' },
         { label: 'Preguntas', href: '/admin/preguntas', active: true },
+        { label: 'Documentos', href: '/admin/documentos' },
       ]}
     >
       <div className="grid grid-2">
@@ -277,6 +290,28 @@ export default function PreguntasPage() {
                 <label className="form-label">Fuente Plan Nacional RCP</label>
                 <input className="form-input" value={sourcePlan} onChange={(e) => setSourcePlan(e.target.value)} />
               </div>
+              <div className="grid grid-2" style={{ gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Documento de referencia</label>
+                  <select className="form-select" value={refDocumentId} onChange={(e) => setRefDocumentId(e.target.value)}>
+                    <option value="">— Ninguno —</option>
+                    {docs.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Página</label>
+                  <input className="form-input" type="number" min={1} placeholder="45" value={refPage} onChange={(e) => setRefPage(e.target.value)} />
+                </div>
+              </div>
+              {docs.length === 0 && (
+                <div className="info-box" style={{ marginBottom: 12 }}>
+                  Sube tus guías en <a href="/admin/documentos">Documentos</a> para poder referenciar páginas.
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">Vídeo (URL)</label>
                 <input className="form-input" placeholder="https://youtube.com/…" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} />

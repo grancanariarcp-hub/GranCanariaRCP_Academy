@@ -78,6 +78,23 @@ CREATE INDEX IF NOT EXISTS idx_students_institution ON students(institution_id);
 CREATE INDEX IF NOT EXISTS idx_students_access_code ON students(access_code);
 
 -- --------------------------------------------------------------------------
+-- Reference documents (ERC 2025 guides, PNRCP manuals). The PDF lives in
+-- Cloudflare R2; only light metadata is stored here.
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS documents (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title         VARCHAR(200) NOT NULL,
+  kind          VARCHAR(16) NOT NULL DEFAULT 'otro' CHECK (kind IN ('erc', 'pnrcp', 'otro')),
+  storage_key   TEXT,
+  content_type  VARCHAR(80),
+  size_bytes    BIGINT,
+  pages         INT,
+  is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+  uploaded_by   UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- --------------------------------------------------------------------------
 -- Question bank. Categories map to the CPR course levels:
 --   SVB = Soporte Vital Basico, SVI = Intermedio, SVA = Avanzado
 -- --------------------------------------------------------------------------
@@ -104,6 +121,10 @@ CREATE TABLE IF NOT EXISTS questions (
   flashcard             TEXT,   -- key take-away to remember
   tags                  TEXT[] NOT NULL DEFAULT '{}',
   is_critical           BOOLEAN NOT NULL DEFAULT FALSE,
+
+  -- Minimum feedback: the exact document + page that explains the answer.
+  ref_document_id UUID REFERENCES documents(id) ON DELETE SET NULL,
+  ref_page        INT,
 
   is_active      BOOLEAN NOT NULL DEFAULT TRUE,
   created_by     UUID REFERENCES users(id) ON DELETE SET NULL,

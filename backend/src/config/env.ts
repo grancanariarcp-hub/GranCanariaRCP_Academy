@@ -54,6 +54,20 @@ export const env = {
     password: optional('SUPERADMIN_PASSWORD', 'Admin123!RCP'),
     name: optional('SUPERADMIN_NAME', 'Federico Lubbe'),
   },
+
+  // Cloudflare R2 (S3-compatible) for storing reference PDFs.
+  r2: {
+    accountId: process.env.R2_ACCOUNT_ID ?? '',
+    accessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
+    bucket: optional('R2_BUCKET', 'grancanaria-rcp-docs'),
+    get endpoint() {
+      return `https://${this.accountId}.r2.cloudflarestorage.com`;
+    },
+    get configured() {
+      return Boolean(this.accountId && this.accessKeyId && this.secretAccessKey);
+    },
+  },
 };
 
 // In production we refuse to run with insecure defaults.
