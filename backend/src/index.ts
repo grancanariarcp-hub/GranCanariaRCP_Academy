@@ -11,6 +11,7 @@ import studentRoutes from './routes/student.routes.js';
 import taxonomiesRoutes from './routes/taxonomies.routes.js';
 import coursesRoutes from './routes/courses.routes.js';
 import publicRoutes from './routes/public.routes.js';
+import profileRoutes from './routes/profile.routes.js';
 
 const app = express();
 
@@ -58,6 +59,7 @@ app.use('/api/student', studentRoutes);
 app.use('/api/taxonomies', taxonomiesRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/public', publicRoutes);
+app.use('/api/profile', profileRoutes);
 
 // 404 + central error handler (must be last)
 app.use(notFoundHandler);

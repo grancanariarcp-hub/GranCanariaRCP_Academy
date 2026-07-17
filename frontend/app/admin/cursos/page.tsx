@@ -107,8 +107,12 @@ export default function CursosPage() {
           { label: 'Preguntas', href: '/admin/preguntas' },
           { label: 'Documentos', href: '/admin/documentos' },
           { label: 'Profesores', href: '/admin/profesores' },
+          { label: 'Perfil', href: '/admin/perfil' },
         ]
-      : [{ label: 'Mis cursos', href: '/admin/cursos', active: true }];
+      : [
+          { label: 'Mis cursos', href: '/admin/cursos', active: true },
+          { label: 'Perfil', href: '/admin/perfil' },
+        ];
 
   return (
     <AppShell user={user} title="Cursos" nav={nav}>

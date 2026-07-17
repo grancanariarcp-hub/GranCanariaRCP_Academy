@@ -96,6 +96,7 @@ export default function AdminDashboard() {
         { label: 'Preguntas', href: '/admin/preguntas' },
         { label: 'Documentos', href: '/admin/documentos' },
         { label: 'Profesores', href: '/admin/profesores' },
+        { label: 'Perfil', href: '/admin/perfil' },
         { label: 'Instituciones', href: '/admin' },
         { label: 'Administradores', href: '/admin' },
         { label: 'Auditoría', href: '/admin' },
