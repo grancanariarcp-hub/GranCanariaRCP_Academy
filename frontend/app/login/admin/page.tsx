@@ -24,7 +24,7 @@ export default function AdminLoginPage() {
         body: JSON.stringify({ email, password }),
       });
       saveSession(res.token, res.user);
-      router.push(res.user.role === 'super_admin' ? '/admin' : '/admin');
+      router.push(res.user.role === 'profesor' ? '/admin/cursos' : '/admin');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error de conexión con el servidor');
     } finally {
@@ -73,6 +73,9 @@ export default function AdminLoginPage() {
 
         <p className="muted" style={{ textAlign: 'center', fontSize: 13, marginTop: 18 }}>
           <Link href="/login/student">Acceso alumnos</Link> · <Link href="/">Inicio</Link>
+        </p>
+        <p className="muted" style={{ textAlign: 'center', fontSize: 13, marginTop: 4 }}>
+          ¿Eres profesor? <Link href="/registro-profesor">Regístrate aquí</Link>
         </p>
         <p style={{ textAlign: 'center', marginTop: 8 }}>
           <AppVersion />

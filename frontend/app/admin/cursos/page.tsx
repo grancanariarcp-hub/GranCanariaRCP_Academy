@@ -98,12 +98,16 @@ export default function CursosPage() {
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
-  const nav = [
-    { label: 'Resumen', href: '/admin' },
-    { label: 'Cursos', href: '/admin/cursos', active: true },
-    { label: 'Preguntas', href: '/admin/preguntas' },
-    { label: 'Documentos', href: '/admin/documentos' },
-  ];
+  const nav =
+    user.role === 'super_admin'
+      ? [
+          { label: 'Resumen', href: '/admin' },
+          { label: 'Cursos', href: '/admin/cursos', active: true },
+          { label: 'Preguntas', href: '/admin/preguntas' },
+          { label: 'Documentos', href: '/admin/documentos' },
+          { label: 'Profesores', href: '/admin/profesores' },
+        ]
+      : [{ label: 'Mis cursos', href: '/admin/cursos', active: true }];
 
   return (
     <AppShell user={user} title="Cursos" nav={nav}>

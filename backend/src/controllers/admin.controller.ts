@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../config/database.js';
 import { hashPassword } from '../utils/crypto.js';
-import { badRequest, conflict, forbidden } from '../utils/httpError.js';
+import { badRequest, conflict, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 
@@ -131,6 +131,63 @@ export async function createAdmin(req: Request, res: Response): Promise<void> {
   });
 
   res.status(201).json({ admin: rows[0] });
+}
+
+// ---------------------------------------------------------------------------
+// Professors: list, validate (approve/reject), create directly
+// ---------------------------------------------------------------------------
+export async function listProfessors(_req: Request, res: Response): Promise<void> {
+  const { rows } = await query(
+    `SELECT id, email, name, headline, status, last_login_at, created_at
+     FROM users WHERE role = 'profesor'
+     ORDER BY (status = 'pending') DESC, created_at DESC`,
+  );
+  res.json({ professors: rows });
+}
+
+export async function setProfessorStatus(req: Request, res: Response): Promise<void> {
+  const status = req.params.action === 'approve' ? 'active' : 'rejected';
+  const { rows } = await query(
+    `UPDATE users SET status = $1, updated_at = NOW()
+     WHERE id = $2 AND role = 'profesor'
+     RETURNING id, email, name, status`,
+    [status, req.params.id],
+  );
+  if (rows.length === 0) throw notFound('Profesor no encontrado');
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role,
+    action: status === 'active' ? 'PROFESSOR_APPROVE' : 'PROFESSOR_REJECT',
+    entity: 'user', entityId: rows[0].id, ip: clientIp(req),
+  });
+  res.json({ professor: rows[0] });
+}
+
+const createProfessorSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(2).max(160),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  headline: z.string().max(160).optional(),
+});
+
+export async function createProfessor(req: Request, res: Response): Promise<void> {
+  const { email, name, password, headline } = createProfessorSchema.parse(req.body);
+  const existing = await query('SELECT 1 FROM users WHERE email = $1', [email.toLowerCase()]);
+  if (existing.rows.length > 0) throw conflict('Ya existe un usuario con ese email', 'EMAIL_TAKEN');
+
+  const passwordHash = await hashPassword(password);
+  const { rows } = await query(
+    `INSERT INTO users (email, password_hash, name, role, institution_id, status, headline)
+     VALUES ($1, $2, $3, 'profesor', NULL, 'active', $4)
+     RETURNING id, email, name, headline, status, created_at`,
+    [email.toLowerCase(), passwordHash, name, headline ?? null],
+  );
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role, action: 'PROFESSOR_CREATE',
+    entity: 'user', entityId: rows[0].id, ip: clientIp(req), metadata: { email: email.toLowerCase() },
+  });
+  res.status(201).json({ professor: rows[0] });
 }
 
 // ---------------------------------------------------------------------------

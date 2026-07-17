@@ -8,6 +8,9 @@ import {
   createAdmin,
   createQuestion,
   listQuestions,
+  listProfessors,
+  setProfessorStatus,
+  createProfessor,
   listAuditLogs,
 } from '../controllers/admin.controller.js';
 import { uploadDocument, listDocuments, getDocumentUrl } from '../controllers/document.controller.js';
@@ -31,6 +34,10 @@ router.post('/institutions', asyncHandler(createInstitution));
 
 router.get('/admins', asyncHandler(listAdmins));
 router.post('/admins', asyncHandler(createAdmin));
+
+router.get('/professors', asyncHandler(listProfessors));
+router.post('/professors', asyncHandler(createProfessor));
+router.post('/professors/:id/:action', asyncHandler(setProfessorStatus));
 
 router.get('/questions', asyncHandler(listQuestions));
 router.post('/questions', asyncHandler(createQuestion));

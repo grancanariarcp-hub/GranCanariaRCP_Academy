@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   adminLogin,
+  professorRegister,
   studentRegister,
   studentLoginEmail,
   studentLoginCode,
@@ -13,8 +14,11 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-// Admin (super_admin + institution_admin)
+// Admin (super_admin + institution_admin + profesor)
 router.post('/admin/login', authLimiter, asyncHandler(adminLogin));
+
+// Professor self-registration (creates a pending account)
+router.post('/professor/register', authLimiter, asyncHandler(professorRegister));
 
 // Student - 3 methods
 router.post('/student/register', authLimiter, asyncHandler(studentRegister)); // 1

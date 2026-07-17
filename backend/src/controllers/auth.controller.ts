@@ -108,6 +108,39 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Professor self-registration -> creates a PENDING account (needs approval)
+// ---------------------------------------------------------------------------
+const professorRegisterSchema = z.object({
+  name: z.string().min(2, 'El nombre es obligatorio').max(160),
+  email: z.string().email('Email no válido'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  headline: z.string().max(160).optional(),
+});
+
+export async function professorRegister(req: Request, res: Response): Promise<void> {
+  const { name, email, password, headline } = professorRegisterSchema.parse(req.body);
+  const ip = clientIp(req);
+
+  const existing = await query('SELECT 1 FROM users WHERE email = $1', [email.toLowerCase()]);
+  if (existing.rows.length > 0) throw conflict('Ya existe una cuenta con ese email', 'EMAIL_TAKEN');
+
+  const passwordHash = await hashPassword(password);
+  const { rows } = await query<{ id: string }>(
+    `INSERT INTO users (email, password_hash, name, role, institution_id, status, headline)
+     VALUES ($1, $2, $3, 'profesor', NULL, 'pending', $4)
+     RETURNING id`,
+    [email.toLowerCase(), passwordHash, name, headline ?? null],
+  );
+
+  await audit({
+    actorId: rows[0].id, actorType: 'profesor', action: 'PROFESSOR_REGISTER',
+    entity: 'user', entityId: rows[0].id, ip, metadata: { email: email.toLowerCase() },
+  });
+
+  res.status(201).json({ ok: true, message: 'Solicitud enviada. Un administrador validará tu cuenta.' });
+}
+
+// ---------------------------------------------------------------------------
 // Student method 1: register (adults) -> email + password
 // ---------------------------------------------------------------------------
 export async function studentRegister(req: Request, res: Response): Promise<void> {
