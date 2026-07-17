@@ -18,6 +18,10 @@ interface Course {
   publico_objetivo: string[];
   objetivo_general: string | null;
   objetivos_especificos: string | null;
+  resumen: string | null;
+  acreditacion: string | null;
+  cfc: string | null;
+  thumbnail_url?: string;
   enrollment_open: boolean;
 }
 interface Staff {
@@ -63,10 +67,16 @@ export default function PublicCoursePage() {
           !error && <div className="muted">Cargando…</div>
         ) : (
           <div className="card">
+            {course.thumbnail_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={course.thumbnail_url} alt="" style={{ width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, marginBottom: 16 }} />
+            )}
             <h1 style={{ marginBottom: 6 }}>{course.title}</h1>
             <div className="muted" style={{ marginBottom: 16 }}>
               {[course.tema, course.subtema, course.modality].filter(Boolean).join(' · ')}
             </div>
+
+            {course.resumen && <p style={{ marginBottom: 16 }}>{course.resumen}</p>}
 
             <div className="grid grid-2" style={{ marginBottom: 16 }}>
               <div className="info-box">⏱️ <strong>Duración:</strong> {course.duration_hours ? `${course.duration_hours} h` : '—'}</div>
@@ -74,6 +84,8 @@ export default function PublicCoursePage() {
                 💶 <strong>Coste:</strong>{' '}
                 {course.price_cents > 0 ? `${(course.price_cents / 100).toFixed(2)} €` : 'Gratis'}
               </div>
+              {course.acreditacion && <div className="info-box">🏛️ <strong>Acredita:</strong> {course.acreditacion}</div>}
+              {course.cfc && <div className="info-box">🎖️ <strong>CFC:</strong> {course.cfc}</div>}
             </div>
 
             {course.publico_objetivo.length > 0 && (

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { createCourse, listCourses, getCourse } from '../controllers/course.controller.js';
 import multer from 'multer';
 import {
-  updateCourse, addModule, updateModule, deleteModule,
+  updateCourse, uploadCourseThumbnail, addModule, updateModule, deleteModule,
   addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
 } from '../controllers/courseContent.controller.js';
 import {
@@ -22,6 +22,7 @@ router.get('/', asyncHandler(listCourses));
 router.post('/', asyncHandler(createCourse));
 router.get('/:id', asyncHandler(getCourse));
 router.patch('/:id', asyncHandler(updateCourse));
+router.post('/:id/thumbnail', upload.single('file'), asyncHandler(uploadCourseThumbnail));
 
 // Modules
 router.post('/:id/modules', asyncHandler(addModule));

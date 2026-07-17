@@ -13,6 +13,7 @@ interface OpenCourse {
   modality: string;
   duration_hours: number | null;
   price_cents: number;
+  thumbnail_url?: string;
 }
 
 export default function Home() {
@@ -56,6 +57,10 @@ export default function Home() {
           <div className="grid grid-4">
             {courses.map((c) => (
               <Link key={c.id} href={`/curso/${c.id}`} className="card" style={{ textDecoration: 'none' }}>
+                {c.thumbnail_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 6, marginBottom: 8 }} />
+                )}
                 <div style={{ fontWeight: 600 }}>{c.title}</div>
                 <div className="muted" style={{ fontSize: 13, margin: '6px 0' }}>
                   {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')}

@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
 import { forbidden, notFound } from '../utils/httpError.js';
-import { withImageUrls } from '../services/r2.js';
+import { withImageUrls, presignKeys } from '../services/r2.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 
@@ -21,6 +21,9 @@ const createSchema = z.object({
   objetivosEspecificos: z.string().optional(),
   publicoObjetivo: z.array(z.string()).optional().default([]),
   priceCents: z.number().int().min(0).optional().default(0),
+  resumen: z.string().optional(),
+  acreditacion: z.string().max(200).optional(),
+  cfc: z.string().max(120).optional(),
 });
 
 export async function createCourse(req: Request, res: Response): Promise<void> {
@@ -31,13 +34,13 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
     const { rows } = await client.query(
       `INSERT INTO courses
          (title, tema, subtema, duration_hours, modality, objetivo_general,
-          objetivos_especificos, publico_objetivo, price_cents, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+          objetivos_especificos, publico_objetivo, price_cents, resumen, acreditacion, cfc, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING id, title, tema, subtema, status, created_at`,
       [
         data.title, data.tema ?? null, data.subtema ?? null, data.durationHours ?? null,
         data.modality, data.objetivoGeneral ?? null, data.objetivosEspecificos ?? null,
-        data.publicoObjetivo, data.priceCents, userId,
+        data.publicoObjetivo, data.priceCents, data.resumen ?? null, data.acreditacion ?? null, data.cfc ?? null, userId,
       ],
     );
     const created = rows[0];
@@ -68,18 +71,19 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
 /** Public: courses with open enrollment (for the login / discovery page). */
 export async function listOpenCourses(_req: Request, res: Response): Promise<void> {
   const { rows } = await query(
-    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, objetivo_general
+    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, resumen, thumbnail_key
      FROM courses WHERE status = 'publicado' AND enrollment_open = TRUE
      ORDER BY created_at DESC`,
   );
-  res.json({ courses: rows });
+  res.json({ courses: await presignKeys(rows, 'thumbnail_key', 'thumbnail_url') });
 }
 
 /** Public: full info of one published course (for its landing page). */
 export async function getPublicCourse(req: Request, res: Response): Promise<void> {
   const { rows } = await query(
     `SELECT id, title, tema, subtema, modality, duration_hours, price_cents,
-            publico_objetivo, objetivo_general, objetivos_especificos, enrollment_open
+            publico_objetivo, objetivo_general, objetivos_especificos, resumen, acreditacion, cfc,
+            thumbnail_key, enrollment_open
      FROM courses WHERE id = $1 AND status = 'publicado'`,
     [req.params.id],
   );
@@ -88,7 +92,8 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
     `SELECT u.name, u.headline, cs.role FROM course_staff cs JOIN users u ON u.id = cs.user_id WHERE cs.course_id = $1`,
     [req.params.id],
   );
-  res.json({ course: rows[0], staff: staff.rows });
+  const [course] = await presignKeys(rows, 'thumbnail_key', 'thumbnail_url');
+  res.json({ course, staff: staff.rows });
 }
 
 export async function listCourses(req: Request, res: Response): Promise<void> {
@@ -151,5 +156,6 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
     activities: acts.filter((a) => a.module_id === m.id),
   }));
 
-  res.json({ course: course.rows[0], modules: modulesWithActivities, staff: staff.rows });
+  const [courseWithThumb] = await presignKeys(course.rows, 'thumbnail_key', 'thumbnail_url');
+  res.json({ course: courseWithThumb, modules: modulesWithActivities, staff: staff.rows });
 }

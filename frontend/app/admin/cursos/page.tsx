@@ -37,6 +37,9 @@ export default function CursosPage() {
   const [publicoObjetivo, setPublicoObjetivo] = useState<string[]>([]);
   const [objetivoGeneral, setObjetivoGeneral] = useState('');
   const [objetivosEspecificos, setObjetivosEspecificos] = useState('');
+  const [resumen, setResumen] = useState('');
+  const [acreditacion, setAcreditacion] = useState('');
+  const [cfc, setCfc] = useState('');
 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -81,14 +84,20 @@ export default function CursosPage() {
           objetivoGeneral: objetivoGeneral || undefined,
           objetivosEspecificos: objetivosEspecificos || undefined,
           publicoObjetivo,
+          resumen: resumen || undefined,
+          acreditacion: acreditacion || undefined,
+          cfc: cfc || undefined,
         }),
       });
-      setMsg({ ok: true, text: 'Curso creado (en borrador). Ya puedes añadirle módulos ✅' });
+      setMsg({ ok: true, text: 'Curso creado (en borrador). Ábrelo para subir la miniatura y añadir módulos ✅' });
       setTitle('');
       setDurationHours('');
       setObjetivoGeneral('');
       setObjetivosEspecificos('');
       setPublicoObjetivo([]);
+      setResumen('');
+      setAcreditacion('');
+      setCfc('');
       load();
     } catch (err) {
       setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error al crear el curso' });
@@ -189,10 +198,25 @@ export default function CursosPage() {
               <label className="form-label">Objetivos específicos</label>
               <textarea className="form-input" style={{ height: 60, padding: 10 }} value={objetivosEspecificos} onChange={(e) => setObjetivosEspecificos(e.target.value)} />
             </div>
+            <div className="form-group">
+              <label className="form-label">Resumen (para la ficha del curso)</label>
+              <textarea className="form-input" style={{ height: 70, padding: 10 }} placeholder="Qué se verá y por qué es relevante realizarlo" value={resumen} onChange={(e) => setResumen(e.target.value)} />
+            </div>
+            <div className="grid grid-2" style={{ gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Acreditación</label>
+                <input className="form-input" placeholder="Institución que acredita" value={acreditacion} onChange={(e) => setAcreditacion(e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">CFC</label>
+                <input className="form-input" placeholder="Ej.: 2,5 créditos (otorgados)" value={cfc} onChange={(e) => setCfc(e.target.value)} />
+              </div>
+            </div>
 
             <button className="btn btn-primary btn-full" disabled={saving}>
               {saving ? 'Creando…' : 'Crear curso'}
             </button>
+            <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>La miniatura se sube al abrir el curso.</p>
           </form>
         </div>
 

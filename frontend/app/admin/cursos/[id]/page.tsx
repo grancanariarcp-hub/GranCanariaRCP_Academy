@@ -38,6 +38,10 @@ interface Course {
   modality: string;
   status: string;
   enrollment_open: boolean;
+  resumen: string | null;
+  acreditacion: string | null;
+  cfc: string | null;
+  thumbnail_url?: string;
 }
 
 const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
@@ -54,6 +58,12 @@ export default function CourseDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [newModule, setNewModule] = useState('');
+
+  // Ficha del curso (editable)
+  const [fResumen, setFResumen] = useState('');
+  const [fAcred, setFAcred] = useState('');
+  const [fCfc, setFCfc] = useState('');
+  const [fichaMsg, setFichaMsg] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null); // moduleId
   const [actType, setActType] = useState<'documento' | 'video' | 'enlace' | 'texto' | 'imagen' | 'test' | 'examen'>('documento');
   const [actTitle, setActTitle] = useState('');
@@ -75,6 +85,9 @@ export default function CourseDetailPage() {
         api<{ documents: Array<{ id: string; title: string }> }>('/api/admin/documents', { auth: true }).catch(() => ({ documents: [] })),
       ]);
       setCourse(c.course);
+      setFResumen(c.course.resumen ?? '');
+      setFAcred(c.course.acreditacion ?? '');
+      setFCfc(c.course.cfc ?? '');
       setModules(c.modules);
       setStaff(c.staff);
       setDocs(d.documents);
@@ -93,6 +106,26 @@ export default function CourseDetailPage() {
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
+
+  async function saveFicha() {
+    setFichaMsg(null);
+    try {
+      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc }) });
+      setFichaMsg('Ficha guardada ✅');
+      load();
+    } catch (err) {
+      setFichaMsg(err instanceof ApiError ? err.message : 'Error al guardar');
+    }
+  }
+  async function uploadThumb(file: File | undefined) {
+    if (!file) return;
+    try {
+      await uploadFile(`/api/courses/${courseId}/thumbnail`, file);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al subir la miniatura');
     }
   }
 
@@ -202,6 +235,48 @@ export default function CourseDetailPage() {
                 <button className="btn btn-outline btn-small" onClick={() => patchCourse({ enrollmentOpen: !course.enrollment_open })}>
                   {course.enrollment_open ? 'Cerrar matrícula' : 'Abrir matrícula'}
                 </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Ficha del curso */}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <div className="card-title">Ficha del curso</div>
+              <div className="card-subtitle">Se muestra a los alumnos antes de matricularse</div>
+            </div>
+            {fichaMsg && <div className={`alert ${fichaMsg.includes('✅') ? 'alert-success' : 'alert-error'}`}>{fichaMsg}</div>}
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ width: 140, flexShrink: 0 }}>
+                <div style={{ width: 140, height: 90, background: 'var(--gray-200)', borderRadius: 8, overflow: 'hidden', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {course.thumbnail_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={course.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    <span style={{ fontSize: 26 }}>🖼️</span>
+                  )}
+                </div>
+                <label className="btn btn-outline btn-small btn-full" style={{ cursor: 'pointer' }}>
+                  Miniatura
+                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadThumb(e.target.files?.[0]); e.target.value = ''; }} />
+                </label>
+              </div>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div className="form-group">
+                  <label className="form-label">Resumen</label>
+                  <textarea className="form-input" style={{ height: 70, padding: 10 }} value={fResumen} onChange={(e) => setFResumen(e.target.value)} />
+                </div>
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Acreditación</label>
+                    <input className="form-input" value={fAcred} onChange={(e) => setFAcred(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">CFC</label>
+                    <input className="form-input" value={fCfc} onChange={(e) => setFCfc(e.target.value)} />
+                  </div>
+                </div>
+                <button className="btn btn-primary btn-small" onClick={saveFicha}>Guardar ficha</button>
               </div>
             </div>
           </div>

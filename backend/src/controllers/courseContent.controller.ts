@@ -5,7 +5,7 @@ import { badRequest, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { assertEditor, assertDirector } from '../services/courseAuth.js';
-import { r2Configured, buildKey, uploadObject } from '../services/r2.js';
+import { r2Configured, buildKey, uploadObject, presignedGetUrl } from '../services/r2.js';
 
 /** Editing the inside of a course: modules, activities and staff. */
 
@@ -20,6 +20,10 @@ const updateCourseSchema = z.object({
   endsAt: z.string().optional(),
   finalExamStart: z.string().optional(),
   finalExamEnd: z.string().optional(),
+  resumen: z.string().optional(),
+  acreditacion: z.string().max(200).optional(),
+  cfc: z.string().max(120).optional(),
+  durationHours: z.number().positive().max(1000).optional(),
 });
 
 export async function updateCourse(req: Request, res: Response): Promise<void> {
@@ -28,6 +32,7 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
   const map: Record<string, unknown> = {
     title: d.title, status: d.status, enrollment_open: d.enrollmentOpen,
     starts_at: d.startsAt, ends_at: d.endsAt, final_exam_start: d.finalExamStart, final_exam_end: d.finalExamEnd,
+    resumen: d.resumen, acreditacion: d.acreditacion, cfc: d.cfc, duration_hours: d.durationHours,
   };
   const fields: string[] = [];
   const params: unknown[] = [];
@@ -113,6 +118,19 @@ export async function addActivity(req: Request, res: Response): Promise<void> {
     [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.body ?? null, d.isMandatory],
   );
   res.status(201).json({ activity: rows[0] });
+}
+
+/** Upload the course thumbnail (multipart image) to R2. */
+export async function uploadCourseThumbnail(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  if (!r2Configured()) throw badRequest('El almacén de imágenes no está configurado', 'R2_NOT_CONFIGURED');
+  const file = req.file;
+  if (!file || !file.mimetype.startsWith('image/')) throw badRequest('Sube una imagen', 'NOT_IMAGE');
+
+  const key = buildKey(file.originalname, 'thumbs');
+  await uploadObject(key, file.buffer, file.mimetype);
+  await query('UPDATE courses SET thumbnail_key = $1, updated_at = NOW() WHERE id = $2', [key, req.params.id]);
+  res.json({ thumbnail_url: await presignedGetUrl(key, 3600) });
 }
 
 /** Add an image activity (multipart: file + title). Stores the image in R2. */

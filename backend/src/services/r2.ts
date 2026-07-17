@@ -46,6 +46,17 @@ export async function withImageUrls<T extends { image_key?: string | null }>(row
   );
 }
 
+/** Generic: attach a presigned URL (urlField) for rows carrying a key (keyField). */
+export async function presignKeys<T extends Record<string, unknown>>(rows: T[], keyField: string, urlField: string): Promise<T[]> {
+  if (!env.r2.configured) return rows;
+  return Promise.all(
+    rows.map(async (r) => {
+      const key = r[keyField] as string | null | undefined;
+      return key ? { ...r, [urlField]: await presignedGetUrl(key, 3600) } : r;
+    }),
+  );
+}
+
 export async function uploadObject(key: string, body: Buffer, contentType: string): Promise<void> {
   await s3().send(
     new PutObjectCommand({ Bucket: env.r2.bucket, Key: key, Body: body, ContentType: contentType }),
