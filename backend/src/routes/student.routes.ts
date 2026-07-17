@@ -6,6 +6,9 @@ import {
   listMyCourses,
   getMyCourseContent,
 } from '../controllers/student.controller.js';
+import {
+  startExam, submitExam, reviewAttempt, listMyAttempts,
+} from '../controllers/examAttempt.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -20,5 +23,11 @@ router.get('/available-courses', asyncHandler(listAvailableCourses));
 router.post('/enroll/:courseId', asyncHandler(enrollCourse));
 router.get('/courses', asyncHandler(listMyCourses));
 router.get('/courses/:courseId', asyncHandler(getMyCourseContent));
+
+// Exámenes (realizar / revisar)
+router.get('/exams/:examId/attempts', asyncHandler(listMyAttempts));
+router.post('/exams/:examId/start', asyncHandler(startExam));
+router.post('/exams/:examId/attempts/:attemptId/submit', asyncHandler(submitExam));
+router.get('/exams/:examId/attempts/:attemptId', asyncHandler(reviewAttempt));
 
 export default router;

@@ -47,11 +47,20 @@ export default function ExamEditorPage() {
   const [jsonText, setJsonText] = useState('');
   const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Calificaciones
+  const [attempts, setAttempts] = useState<Array<{ id: string; student: string; email: string; score: number | null; passed: boolean | null; attempts: string; time_spent_seconds: number | null }>>([]);
+
   async function load() {
     try {
       const r = await api<{ exam: Exam; questions: ExamQuestion[] }>(`/api/courses/${courseId}/exams/${examId}`, { auth: true });
       setExam(r.exam);
       setQuestions(r.questions);
+      try {
+        const a = await api<{ attempts: typeof attempts }>(`/api/courses/${courseId}/exams/${examId}/attempts`, { auth: true });
+        setAttempts(a.attempts);
+      } catch {
+        /* ignore */
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error cargando el examen');
     }
@@ -286,6 +295,33 @@ export default function ExamEditorPage() {
             </div>
           ))}
           {questions.length === 0 && <div className="muted">Aún no hay preguntas</div>}
+        </div>
+      </div>
+
+      {/* Calificaciones */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <div className="card-header">
+          <div className="card-title">Calificaciones</div>
+          <div className="card-subtitle">Notas, intentos y tiempo por alumno</div>
+        </div>
+        <div className="table-responsive">
+          <table>
+            <thead>
+              <tr><th>Alumno</th><th>Nota</th><th>Resultado</th><th>Intentos</th><th>Tiempo</th></tr>
+            </thead>
+            <tbody>
+              {attempts.map((a) => (
+                <tr key={a.id}>
+                  <td>{a.student}<div className="muted" style={{ fontSize: 12 }}>{a.email}</div></td>
+                  <td>{a.score ?? '—'}%</td>
+                  <td>{a.passed == null ? '—' : a.passed ? <span className="badge badge-success">Aprobado</span> : <span className="badge badge-danger">No superado</span>}</td>
+                  <td>{a.attempts}</td>
+                  <td>{a.time_spent_seconds != null ? `${Math.floor(a.time_spent_seconds / 60)}m ${a.time_spent_seconds % 60}s` : '—'}</td>
+                </tr>
+              ))}
+              {attempts.length === 0 && <tr><td colSpan={5} className="muted">Aún nadie ha realizado el examen</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
     </AppShell>

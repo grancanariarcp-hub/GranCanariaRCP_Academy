@@ -84,8 +84,8 @@ export default function StudentCoursePage() {
                       <a className="btn btn-primary btn-small" href={a.url} target="_blank" rel="noreferrer">Abrir</a>
                     ) : a.type === 'documento' ? (
                       <span className="badge badge-primary">Documento</span>
-                    ) : (a.type === 'test' || a.type === 'examen') ? (
-                      <span className="badge badge-warning">Examen (próximamente)</span>
+                    ) : (a.type === 'test' || a.type === 'examen') && a.exam_id ? (
+                      <Link className="btn btn-primary btn-small" href={`/student/curso/${courseId}/examen/${a.exam_id}`}>Realizar</Link>
                     ) : null}
                   </div>
                 )}

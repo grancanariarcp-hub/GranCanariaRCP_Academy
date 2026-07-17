@@ -212,3 +212,20 @@ export async function deleteExamQuestion(req: Request, res: Response): Promise<v
   await query('DELETE FROM exam_questions WHERE id = $1 AND exam_id = $2', [req.params.questionId, req.params.examId]);
   res.json({ ok: true });
 }
+
+// GET /api/courses/:id/exams/:examId/attempts — calificaciones (profesor)
+export async function listExamAttempts(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  const { rows } = await query(
+    `SELECT a.id, a.score, a.passed, a.time_spent_seconds, a.submitted_at,
+            s.display_name AS student, s.email,
+            (SELECT COUNT(*) FROM exam_attempts a2
+               WHERE a2.exam_id = a.exam_id AND a2.student_id = a.student_id AND a2.submitted_at IS NOT NULL) AS attempts
+     FROM exam_attempts a JOIN students s ON s.id = a.student_id
+     WHERE a.exam_id = $1 AND a.submitted_at IS NOT NULL
+     ORDER BY a.submitted_at DESC`,
+    [req.params.examId],
+  );
+  res.json({ attempts: rows });
+}

@@ -6,7 +6,7 @@ import {
   addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
 } from '../controllers/courseContent.controller.js';
 import {
-  createExam, getExam, updateExam, addExamQuestion, importExamQuestions, deleteExamQuestion,
+  createExam, getExam, updateExam, addExamQuestion, importExamQuestions, deleteExamQuestion, listExamAttempts,
 } from '../controllers/exam.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
@@ -45,5 +45,6 @@ router.patch('/:id/exams/:examId', asyncHandler(updateExam));
 router.post('/:id/exams/:examId/questions', asyncHandler(addExamQuestion));
 router.post('/:id/exams/:examId/questions/import', asyncHandler(importExamQuestions));
 router.delete('/:id/exams/:examId/questions/:questionId', asyncHandler(deleteExamQuestion));
+router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
 
 export default router;
