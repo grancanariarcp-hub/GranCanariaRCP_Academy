@@ -92,8 +92,20 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
     `SELECT u.id, u.name, u.headline, cs.role FROM course_staff cs JOIN users u ON u.id = cs.user_id WHERE cs.course_id = $1`,
     [req.params.id],
   );
+  // Programa público: módulos con los títulos de sus actividades (temas).
+  const program = await query<{ id: string; title: string }>(
+    `SELECT m.id, m.title,
+            COALESCE(json_agg(json_build_object('type', a.type, 'title', a.title) ORDER BY a.sort_order)
+                     FILTER (WHERE a.id IS NOT NULL), '[]') AS activities
+     FROM modules m
+     LEFT JOIN activities a ON a.module_id = m.id
+     WHERE m.course_id = $1
+     GROUP BY m.id, m.title, m.sort_order
+     ORDER BY m.sort_order`,
+    [req.params.id],
+  );
   const [course] = await presignKeys(rows, 'thumbnail_key', 'thumbnail_url');
-  res.json({ course, staff: staff.rows });
+  res.json({ course, staff: staff.rows, program: program.rows });
 }
 
 export async function listCourses(req: Request, res: Response): Promise<void> {

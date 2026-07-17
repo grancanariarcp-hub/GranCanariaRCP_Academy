@@ -30,6 +30,7 @@ interface Staff {
   headline: string | null;
   role: string;
 }
+interface Mod { title: string; activities: Array<{ type: string; title: string }> }
 
 export default function PublicCoursePage() {
   const params = useParams();
@@ -37,12 +38,13 @@ export default function PublicCoursePage() {
   const courseId = params.id as string;
   const [course, setCourse] = useState<Course | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [program, setProgram] = useState<Mod[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    api<{ course: Course; staff: Staff[] }>(`/api/public/courses/${courseId}`)
-      .then((r) => { setCourse(r.course); setStaff(r.staff); })
+    api<{ course: Course; staff: Staff[]; program: Mod[] }>(`/api/public/courses/${courseId}`)
+      .then((r) => { setCourse(r.course); setStaff(r.staff); setProgram(r.program ?? []); })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Curso no disponible'));
   }, [courseId]);
 
@@ -99,6 +101,21 @@ export default function PublicCoursePage() {
             )}
             {course.objetivos_especificos && (
               <p style={{ marginBottom: 12 }}><strong>Aprenderás:</strong> {course.objetivos_especificos}</p>
+            )}
+            {program.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <strong>Programa:</strong>
+                {program.map((m, i) => (
+                  <div key={i} style={{ marginTop: 6 }}>
+                    <span style={{ fontWeight: 600 }}>{m.title}</span>
+                    {m.activities.length > 0 && (
+                      <ul style={{ margin: '2px 0 0 18px', fontSize: 14 }}>
+                        {m.activities.map((a, j) => <li key={j}>{a.title}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
             {staff.length > 0 && (
               <p style={{ marginBottom: 16 }}>
