@@ -135,6 +135,77 @@ export async function addExamQuestion(req: Request, res: Response): Promise<void
   res.status(201).json({ question: rows[0] });
 }
 
+// ---------------------------------------------------------------------------
+// Bulk import of exam questions (JSON)
+// ---------------------------------------------------------------------------
+function normFmt(v: unknown): 'test' | 'vf' | 'abierta' | null {
+  const s = String(v ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (['test', 'opcion_multiple', 'multiple', 'opciones'].includes(s)) return 'test';
+  if (['vf', 'verdadero_falso', 'verdadero/falso', 'verdaderofalso', 'v/f', 'vof'].includes(s)) return 'vf';
+  if (['abierta', 'libre', 'texto'].includes(s)) return 'abierta';
+  return null;
+}
+function toList(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
+  return String(v ?? '').split(/[|;]/).map((x) => x.trim()).filter(Boolean);
+}
+function resolveCorrect(v: unknown, n: number): number | null {
+  const s = String(v ?? '').trim().toUpperCase();
+  const letter = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 }[s as 'A'];
+  if (letter !== undefined && letter < n) return letter;
+  const num = parseInt(s, 10);
+  if (Number.isInteger(num) && num >= 1 && num <= n) return num - 1;
+  return null;
+}
+function resolveVF(v: unknown): number | null {
+  const s = String(v ?? '').trim().toLowerCase();
+  if (['v', 'verdadero', 'true', 'si', 'sí', '1', '0-verdadero'].includes(s) || v === true || v === 0) return 0;
+  if (['f', 'falso', 'false', 'no', '2'].includes(s) || v === false || v === 1) return 1;
+  return null;
+}
+
+export async function importExamQuestions(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  const { questions } = z.object({ questions: z.array(z.record(z.unknown())).min(1, 'Lista vacía') }).parse(req.body);
+
+  const errors: Array<{ fila: number; errores: string[] }> = [];
+  let created = 0;
+
+  for (let i = 0; i < questions.length; i++) {
+    const q = questions[i];
+    const errs: string[] = [];
+    const format = normFmt(q.format ?? q.tipo);
+    const text = String(q.text ?? q.enunciado ?? '').trim();
+    if (!format) errs.push('format inválido (test/vf/abierta)');
+    if (text.length < 3) errs.push('enunciado vacío o muy corto');
+
+    let options: string[] = [];
+    let correctIndex: number | null = null;
+    if (format === 'test') {
+      options = toList(q.options ?? q.opciones);
+      if (options.length < 2) errs.push('faltan opciones (mínimo 2)');
+      const ci = resolveCorrect(q.correcta ?? q.correct, options.length);
+      if (ci === null) errs.push('correcta inválida (A/B/C/D o número)');
+      else correctIndex = ci;
+    } else if (format === 'vf') {
+      options = ['Verdadero', 'Falso'];
+      const ci = resolveVF(q.correcta ?? q.correct);
+      if (ci === null) errs.push('correcta V/F inválida');
+      else correctIndex = ci;
+    }
+
+    if (errs.length > 0) { errors.push({ fila: i + 1, errores: errs }); continue; }
+    await query(
+      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, sort_order)
+       VALUES ($1,$2,$3,$4::jsonb,$5, COALESCE((SELECT MAX(sort_order)+1 FROM exam_questions WHERE exam_id=$1),0))`,
+      [req.params.examId, format, text, JSON.stringify(options), correctIndex],
+    );
+    created += 1;
+  }
+  res.json({ created, total: questions.length, errors });
+}
+
 export async function deleteExamQuestion(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);

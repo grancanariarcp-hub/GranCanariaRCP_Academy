@@ -258,8 +258,8 @@ export default function CourseDetailPage() {
                             <input className="form-input" type="number" min="0" max="100" value={examPass} onChange={(e) => setExamPass(e.target.value)} />
                           </div>
                           <div style={{ flex: 1 }}>
-                            <label className="form-label">Min (opc.)</label>
-                            <input className="form-input" type="number" min="1" placeholder="—" value={examTime} onChange={(e) => setExamTime(e.target.value)} />
+                            <label className="form-label">Minutos</label>
+                            <input className="form-input" type="number" min="1" placeholder="libre" value={examTime} onChange={(e) => setExamTime(e.target.value)} title="Vacío = tiempo libre" />
                           </div>
                         </div>
                       )}

@@ -43,6 +43,10 @@ export default function ExamEditorPage() {
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
   const [correct, setCorrect] = useState(0);
 
+  // JSON import
+  const [jsonText, setJsonText] = useState('');
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   async function load() {
     try {
       const r = await api<{ exam: Exam; questions: ExamQuestion[] }>(`/api/courses/${courseId}/exams/${examId}`, { auth: true });
@@ -102,6 +106,42 @@ export default function ExamEditorPage() {
     load();
   }
 
+  async function importJson() {
+    setImportMsg(null);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      setImportMsg({ ok: false, text: 'El JSON no es válido (revisa comas y corchetes).' });
+      return;
+    }
+    if (!Array.isArray(parsed)) {
+      setImportMsg({ ok: false, text: 'El JSON debe ser una lista [ ... ] de preguntas.' });
+      return;
+    }
+    try {
+      const res = await api<{ created: number; total: number; errors: Array<{ fila: number; errores: string[] }> }>(
+        `/api/courses/${courseId}/exams/${examId}/questions/import`,
+        { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) },
+      );
+      setImportMsg({
+        ok: res.errors.length === 0,
+        text: `Creadas ${res.created} de ${res.total}.` + (res.errors.length ? ` Errores en filas: ${res.errors.map((e) => e.fila).join(', ')}` : ''),
+      });
+      setJsonText('');
+      load();
+    } catch (err) {
+      setImportMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error al importar' });
+    }
+  }
+
+  function loadJsonFile(file: File | undefined) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setJsonText(String(reader.result ?? ''));
+    reader.readAsText(file);
+  }
+
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
   const nav = [{ label: 'Cursos', href: '/admin/cursos', active: true }];
@@ -133,8 +173,8 @@ export default function ExamEditorPage() {
                     <input className="form-input" type="number" min="0" max="100" value={exam.pass_pct} onChange={(e) => setExam({ ...exam, pass_pct: Number(e.target.value) })} />
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
-                    <label className="form-label">Min (opc.)</label>
-                    <input className="form-input" type="number" min="1" value={exam.time_limit_min ?? ''} onChange={(e) => setExam({ ...exam, time_limit_min: e.target.value ? Number(e.target.value) : null })} />
+                    <label className="form-label">Minutos (vacío = libre)</label>
+                    <input className="form-input" type="number" min="1" placeholder="libre" value={exam.time_limit_min ?? ''} onChange={(e) => setExam({ ...exam, time_limit_min: e.target.value ? Number(e.target.value) : null })} />
                   </div>
                 </div>
                 <button className="btn btn-primary btn-small">Guardar configuración</button>
@@ -187,6 +227,35 @@ export default function ExamEditorPage() {
             )}
 
             <button className="btn btn-primary btn-full" onClick={addQuestion} disabled={qText.trim().length < 3}>Añadir pregunta</button>
+          </div>
+
+          {/* Importar por JSON */}
+          <div className="card" style={{ marginTop: 24 }}>
+            <div className="card-header">
+              <div className="card-title">Importar preguntas (JSON)</div>
+              <div className="card-subtitle">Pega el JSON o carga un archivo (ideal para IA)</div>
+            </div>
+            {importMsg && <div className={`alert ${importMsg.ok ? 'alert-success' : 'alert-error'}`}>{importMsg.text}</div>}
+            <div className="info-box" style={{ fontSize: 12, marginBottom: 10 }}>
+              Lista JSON. Cada pregunta: <code>format</code> (test/vf/abierta), <code>text</code>,
+              <code> options</code> y <code>correcta</code> (A/B/C/D) para test, <code>correcta</code> (V/F) para vf.
+            </div>
+            <textarea
+              className="form-input"
+              style={{ height: 120, padding: 10, fontFamily: 'monospace', fontSize: 12 }}
+              placeholder='[{"format":"test","text":"...","options":["a","b"],"correcta":"B"}]'
+              value={jsonText}
+              onChange={(e) => setJsonText(e.target.value)}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+              <label className="btn btn-outline btn-small" style={{ cursor: 'pointer' }}>
+                Cargar .json
+                <input type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={(e) => { loadJsonFile(e.target.files?.[0]); e.target.value = ''; }} />
+              </label>
+              <button className="btn btn-primary btn-small" style={{ marginLeft: 'auto' }} onClick={importJson} disabled={!jsonText.trim()}>
+                Importar
+              </button>
+            </div>
           </div>
         </div>
 
