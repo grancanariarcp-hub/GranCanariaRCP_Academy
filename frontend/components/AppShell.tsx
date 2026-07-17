@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { clearSession, type SessionUser } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface NavItem {
   label: string;
@@ -63,6 +64,7 @@ export function AppShell({
             <h2>{title}</h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <NotificationBell />
             <span className="muted" style={{ fontSize: 13 }}>
               {user.name} · <span className="badge badge-primary">{roleLabel(user.role)}</span>
             </span>

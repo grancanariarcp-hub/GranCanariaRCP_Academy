@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
+import { notify, type UserType } from '../services/notify.js';
 
 /**
  * Foro por curso. Accesible a cualquier usuario autenticado que forme parte del
@@ -105,7 +106,7 @@ export async function createPost(req: Request, res: Response): Promise<void> {
   await assertForumAccess(courseId, req);
   const { body } = replySchema.parse(req.body);
 
-  const t = await query('SELECT closed FROM forum_threads WHERE id = $1 AND course_id = $2', [threadId, courseId]);
+  const t = await query<{ closed: boolean; title: string }>('SELECT closed, title FROM forum_threads WHERE id = $1 AND course_id = $2', [threadId, courseId]);
   if (t.rows.length === 0) throw notFound('Hilo no encontrado');
   if (t.rows[0].closed && !(await isCourseStaff(courseId, req))) throw badRequest('El hilo está cerrado', 'THREAD_CLOSED');
 
@@ -117,6 +118,23 @@ export async function createPost(req: Request, res: Response): Promise<void> {
     );
     await client.query('UPDATE forum_threads SET updated_at = NOW() WHERE id = $1', [threadId]);
   });
+
+  // Avisar a los demás participantes del hilo (autor + quienes respondieron).
+  const me = authorType(req);
+  const parts = await query<{ author_id: string; author_type: UserType }>(
+    `SELECT DISTINCT author_id, author_type FROM (
+        SELECT author_id, author_type FROM forum_posts WHERE thread_id = $1
+        UNION SELECT author_id, author_type FROM forum_threads WHERE id = $1
+      ) x WHERE NOT (author_id = $2 AND author_type = $3)`,
+    [threadId, req.auth!.sub, me],
+  );
+  const title = 'Nueva respuesta en el foro';
+  const b = `${req.auth!.name} respondió en «${t.rows[0].title}»`;
+  for (const p of parts.rows) {
+    const link = p.author_type === 'student' ? `/student/curso/${courseId}` : `/admin/cursos/${courseId}`;
+    await notify({ id: p.author_id, type: p.author_type }, title, b, link).catch(() => { /* no bloquear la respuesta */ });
+  }
+
   res.status(201).json({ ok: true });
 }
 
