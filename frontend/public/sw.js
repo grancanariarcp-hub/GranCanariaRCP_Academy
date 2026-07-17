@@ -5,7 +5,11 @@ const CACHE = 'rcp-academy-v1';
 const CORE = ['/'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).then(() => self.skipWaiting()));
+  // Precache best-effort: si '/' fallara, el install NO debe fallar (si no,
+  // no habría SW activo y Chrome no ofrecería "Instalar app").
+  event.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(CORE)).catch(() => {}).then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (event) => {
