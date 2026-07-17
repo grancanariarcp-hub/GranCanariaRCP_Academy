@@ -1,154 +1,134 @@
 # 🫀 GranCanaria RCP Academy — Plan Maestro
 
-**Versión:** 2.0 · **Actualizado:** 2026-07-17
+**Versión:** 3.0 · **Actualizado:** 2026-07-17
 **Autor de producto:** Federico Lübbe (Dr.) · **Desarrollo:** Claude Code
 
-Este documento sustituye a los planes anteriores (enero 2026). Incorpora el
-estado real desplegado, las decisiones técnicas tomadas y los nuevos requisitos:
-**segmentación por público (niños / jóvenes / adultos)** y **tipos de pregunta
-(teórica vs. caso clínico)**.
+> **Cambio de rumbo (v3):** el proyecto crece de "plataforma de tests" a un
+> **CAMPUS VIRTUAL de formación médica acreditada (LMS)**: cursos, matrícula,
+> módulos, exámenes, foro, seguimiento de tiempo, calificaciones, certificados
+> (con **CFC**) y pagos. Se construye **a medida y por fases**, reutilizando la
+> base ya creada. Cursos **gratis primero**; **pagos (Stripe) en la Fase G**.
 
 ---
 
-## 1. Estado actual (lo que YA existe y está en producción)
+## 1. Estado actual (ya hecho y en producción)
 
-**Fase 1 — Infraestructura + Autenticación: COMPLETADA y EN VIVO.**
+- **Fase 1 — Infra + Auth:** ✅ desplegado (Vercel + Render + Neon + R2 + campus.grancanariarcp.es).
+- **Fase 2 — Banco de preguntas:** ✅ modelo enriquecido (nivel × público × tipo × dificultad),
+  pantalla de crear preguntas, **documentos de referencia en R2** con referencia
+  **documento + página**. ⏳ *Falta rematar la carga masiva (Excel) — se reutiliza en los exámenes.*
+- Roles actuales: `super_admin`, `institution_admin`, `student`.
+- Decisiones firmes: sin Firebase (JWT propio); Neon (no ElephantSQL); UUID; migraciones (`db:migrate`).
 
-- Frontend Next.js 14 → **campus.grancanariarcp.es** (Vercel)
-- Backend Express + TypeScript → **api / onrender.com** (Render)
-- Base de datos PostgreSQL → **Neon**
-- Roles: `super_admin` (Federico), `institution_admin`, `student`
-- Logins: admin + alumno (3 métodos: registro, email+contraseña, código de acceso)
-- Seguridad: JWT, bcrypt, rate limiting, CORS, cabeceras (helmet)
-- **RGPD**: hash de identidad irreversible para menores, logs de auditoría
-- Panel super admin (estadísticas, instituciones, auditoría)
-- Marca: logo Gran Canaria RCP en favicon, logins y panel
-
-### Decisiones técnicas tomadas (y por qué)
-
-| Tema | Decisión | Motivo |
-|------|----------|--------|
-| Autenticación | Sistema propio JWT + bcrypt (sin Firebase) | Menos dependencias y coste; suficiente y robusto |
-| Base de datos | Neon (no ElephantSQL) | ElephantSQL cerró en 2025 |
-| IDs | UUID (no enteros SERIAL) | Más seguro y escalable; evita enumeración |
-| Rol extra | `super_admin` para Federico | Control total sobre todo el sistema |
-| CSS | Design system propio (paleta médica azul acero) | Coherente con la guía corporativa |
-
-> ⚠️ Los scripts antiguos (`Setup_Scripts.ps1`, el `schema.sql` de enero) **no
-> deben ejecutarse**: usan sintaxis MySQL inválida en PostgreSQL y machacarían lo actual.
+Todo esto **son piezas del campus**: los logins/roles, el banco de preguntas y los
+documentos en R2 se convierten en los **exámenes y materiales** de los cursos.
 
 ---
 
-## 2. El modelo de preguntas (NÚCLEO del producto)
-
-Cada pregunta se clasifica por **cuatro dimensiones independientes**, lo que da
-enorme flexibilidad para generar tests a medida:
-
-| Dimensión | Valores | Para qué sirve |
-|-----------|---------|----------------|
-| **Nivel** | `SVB` · `SVI` · `SVA` | Profundidad del temario |
-| **Público** ⭐nuevo | `niños` · `jóvenes` · `adultos` (uno o varios) | A quién va dirigida |
-| **Tipo** ⭐nuevo | `teórica` · `caso_clínico` | Cómo evalúa |
-| **Dificultad** | `fácil` · `media` · `difícil` | Progresión |
-
-### 2.1 Público objetivo (propuesta de rangos — ajústalos tú)
-
-| Público | Edad orientativa | Enfoque didáctico |
-|---------|------------------|-------------------|
-| 👶 **Niños** | 6–11 (primaria) | RCP adaptada: reconocer, pedir ayuda, llamar 112, compresiones básicas |
-| 🧑 **Jóvenes** | 12–17 (ESO/Bach.) | SVB completo |
-| 👨 **Adultos** | 18+ | SVB / SVI / SVA según formación |
-
-> Una misma pregunta puede marcarse para **varios públicos** (p. ej. una técnica
-> de SVB válida para jóvenes y adultos), evitando duplicar contenido.
-
-### 2.2 Tipos de pregunta
-
-- 📘 **Teórica / técnica** — conocimiento directo.
-  *Ej.: «¿Frecuencia de compresiones en el adulto?»*
-- 🩺 **Caso clínico** — un escenario que el alumno debe interpretar; evalúa si
-  **extrae la información del contexto** y **reconoce la situación**.
-  *Ej.: «Encuentras a un hombre de 60 años en la calle, no responde y no respira
-  con normalidad. ¿Cuál es tu PRIMER paso?»* (usa el campo *contexto clínico*).
-
-### 2.3 Campos de cada pregunta (esquema enriquecido)
-
-```
-- nivel           SVB | SVI | SVA
-- públicos        [niños, jóvenes, adultos]        ⭐ nuevo
-- tipo            teórica | caso_clínico           ⭐ nuevo
-- dificultad      1..3
-- enunciado       (texto de la pregunta)
-- contexto_clínico(texto del escenario, solo en casos clínicos) ⭐ nuevo
-- opciones        [A, B, C, D]
-- correcta        índice de la opción correcta
-- explicación     por qué es correcta (debriefing)
-- fuente_ERC      capítulo / sección / página / enlace ⭐ nuevo
-- fuente_plan_nacional  ⭐ nuevo
-- vídeo_url       (YouTube u otro) ⭐ nuevo
-- flashcard       frase clave para recordar ⭐ nuevo
-- etiquetas       [parada, desfibrilación, ...] ⭐ nuevo
-- crítica         (marca preguntas prioritarias) ⭐ nuevo
-```
+## 2. Público por edad (confirmado)
+👶 Niños 6–11 · 🧑 Jóvenes 12–17 · 👨 Adultos 18+. Una pregunta puede servir a varios.
+Tipos de pregunta: 📘 teórica · 🩺 caso clínico · (nuevos para cursos) ✔️ verdadero/falso · ✍️ abierta.
 
 ---
 
-## 3. Hoja de ruta (fases restantes)
+## 3. El Campus (visión funcional)
 
-### ▶️ Fase 2 — Motor de test + banco de preguntas enriquecido *(SIGUIENTE)*
-- Migrar el modelo de preguntas a las 4 dimensiones (nivel, público, tipo, dificultad) + campos ricos. ✅ HECHO
-- **Pantalla de super admin para crear/editar preguntas** (crear una a una). ✅ HECHO
-- **Documentos de referencia en R2** + referencia documento+página en cada pregunta. ✅ HECHO
-- **Carga masiva de preguntas** ⭐ (pendiente): subir muchas preguntas de golpe desde una
-  **plantilla (CSV/Excel)**. Cada fila incluye una columna con **el documento y la página**
-  que le corresponde, de modo que se referencien automáticamente al importarlas.
-  Entregable: una plantilla descargable + validación al importar (avisa de filas con errores).
-- **Motor de test** (pendiente): elegir filtros (nivel/público/tipo) → responder → **debriefing**
-  inmediato (explicación + referencia de página + vídeo + flashcard) → resultado.
-- Guardar respuestas de forma anónima.
+### 3.1 Roles
+- **super_admin** (Federico): todo. Edita las **taxonomías** (temas, subtemas, públicos objetivo).
+- **profesor** (nuevo): crea y gestiona sus cursos.
+- **alumno**: se matricula, estudia, hace exámenes, descarga certificados.
 
-### Fase 3 — Progreso personal
-- Historial del alumno, % de aciertos, evolución.
-- **«Practica tus errores»**: test solo con las preguntas falladas.
-- Vídeos incrustados.
+### 3.2 Crear curso (profesor)
+Al pulsar **"Crear nuevo curso"** se pide:
+- Nombre, duración (horas), **modalidad** (online / mixto / presencial).
+- **Tema** (desplegable editable por super_admin; base: **RCP, Medicina Intensiva, Emergencias**).
+- **Subtema** (desplegable editable por super_admin; base: **SVB, SVA, SVI, Respiratorio, Cardiológico, Neurocrítico**).
+- Objetivo general, objetivos específicos.
+- **Público objetivo** (Médicos, Enfermeros, Estudiantes de Medicina, Estudiantes de Enfermería…).
+- **Miniatura** (imagen opcional en R2; si no hay, una genérica por tema).
+- Al crearse: se generan automáticamente una **Bienvenida** y un **módulo**.
 
-### Fase 4 — Panel de institución
-- Importar alumnos (CSV) → generar **apodos anónimos + códigos/QR**.
-- Estadísticas de grupo **anónimas** (top por apodo, medias por nivel).
-- Informes exportables.
+### 3.3 Estructura del curso
+- **Módulos** (añadir/eliminar con "Editar"). Cada módulo → **actividades**:
+  incluir **documento**, **vídeo**, **enlace/URL**, **crear test** o **crear examen**.
+- Cada actividad puede ser **obligatoria de ver** para avanzar (o no).
+- **Exámenes**: pre-test, test por unidad y **examen final**. Al crear examen:
+  añadir preguntas (importar o una a una), tipo **test / verdadero-falso / abierta**
+  (en test y V/F se marca la correcta) → definir **nº de intentos** y **% de aprobado**
+  y **tiempo por intento** → "Confirmo crear test/examen".
+- **Configuración del curso**: fechas de inicio/fin de cada módulo, del curso, y
+  ventana para el **examen final**.
 
-### Fase 5 — Desafíos, rankings y niveles SVI/SVA
-- Retos temporales entre alumnos/grupos, ranking anónimo.
-- Recomendación de curso si el rendimiento < 70 %.
+### 3.4 Matrícula (desde el login)
+- En el login se ven **fichas de los cursos con matrícula abierta**.
+- Al pulsar una ficha: **registrarse** (si es nuevo) o **matricularse** directo (si ya existe).
+- Curso **gratis** → matriculado al momento. Curso **de pago** → pasarela (Stripe, Fase G) → al pagar, matriculado.
+- Alumno: pestaña **"Mis cursos"** (activos y realizados).
 
-### Fase 6 — Hooks de maniquíes (futuro)
-- Endpoint para recibir datos WiFi de maniquíes (calidad de compresiones, etc.).
+### 3.5 Seguimiento, foro y calificaciones
+- **Tiempo dedicado**: el alumno y el profesor lo ven.
+- **Foro** por curso: comentar dudas entre todos o **solo al profesor**.
+- Dashboard del profesor por curso → pestaña **"Calificaciones"**: nota de cada test/examen,
+  horas por alumno y nº de intentos.
+
+### 3.6 Certificado (al aprobar)
+Se activa el botón **"Descargar certificado"** cuando el alumno **completa todas las actividades**,
+dedica el **tiempo mínimo** y **aprueba**. Se genera en **PDF A4 apaisado**.
+
+Pestaña **"Configurar certificado"** (profesor):
+- Autocompletadas: **nombre del curso**, **duración total en horas**, **periodo**.
+- A definir: **quién certifica**.
+- **Firmantes**: 2 celdas (Nombre y Apellidos + cargo). Si se dejan vacías, no aparecen.
+- **Imagen de fondo** del certificado (opcional, R2).
+- **CFC**: si se otorgaron/están en trámite y cuántos + imagen de los CFC si están otorgados.
+
+**Texto del certificado:**
+> **XXXXXX** Certifica que: **Nombre y Apellidos** APROBÓ el curso **XXXXXXX**, que se
+> desarrolló *online / mixto / presencial* entre **xx/xx/xxxx** y **xx/xx/xxxx** con un
+> total de **x** horas.
+
+(Nombre y Apellidos vienen del **registro del alumno**; el resto, de la **ficha del curso**.)
 
 ---
 
-## 4. Recomendaciones para una app robusta y escalable
-
-**Ingeniería / operación**
-- 🧪 **Tests automáticos + CI** (Vitest + Supertest + GitHub Actions).
-- 💳 **Backend de pago** cuando haya usuarios reales (Render gratis "duerme" ~50 s).
-- 🔔 **Monitorización de errores** (Sentry) y logs.
-- 💾 **Copias de seguridad** de la base de datos (Neon).
-
-**Seguridad / RGPD (crítico: datos de menores)**
-- Mantener **anonimato** del alumnado (apodos, no nombres).
-- **Consentimiento / términos** y **política de retención** de datos.
-- Añadir **cambio de contraseña** (hoy no existe).
-
-**Producto / contenido**
-- Empezar por **SVB de calidad** antes que mucho volumen.
-- Herramienta propia de autoría de preguntas + validación pedagógica (tú).
-- Medir desde el inicio (nº de tests, % aciertos por nivel/público).
+## 4. Arquitectura técnica (qué añadimos)
+Nuevas tablas principales: `courses`, `modules`, `activities`, `enrollments`,
+`exams`, `exam_questions`, `attempts`, `taxonomies` (temas/subtemas/públicos),
+`time_logs`, `forum_threads`/`forum_posts`, `certificate_configs`/`certificates`,
+`payments`. Archivos (miniaturas, fondos de certificado, materiales) → **R2**.
+Certificados PDF → generación en el servidor (fondo + texto + firmantes).
 
 ---
 
-## 5. Próximo paso inmediato
+## 5. Roadmap del Campus (por fases)
 
-Construir la **Fase 2**: modelo de preguntas enriquecido + pantalla para crear
-preguntas (con público y tipo) + motor de test con debriefing. Esto convierte la
-plataforma de «web con login» a «herramienta de formación real» y te permite
-empezar a cargar tu contenido médico.
+| Fase | Entrega |
+|------|---------|
+| **C0** | *(remate)* Carga masiva de preguntas (Excel) — reutilizable en exámenes |
+| **A** | Rol **profesor** + taxonomías editables + **crear curso** + dashboard del profesor |
+| **B** | **Módulos y actividades** (documentos/vídeos/enlaces, obligatoriedad) |
+| **C** | **Exámenes** (reutiliza banco de preguntas; añade V/F y abierta; intentos, % aprobado, tiempo) |
+| **D** | **Matrícula gratis** desde el login + "Mis cursos" + fechas de curso/módulo/examen |
+| **E** | **Tiempo dedicado** + **calificaciones** del profesor + condición de aprobado |
+| **F** | **Certificados** PDF (con CFC) al aprobar |
+| **G** | **Pagos (Stripe)** para cursos de pago |
+| **H** | **Foro** del curso |
+
+> Con **A→F** ya hay un curso real de principio a fin (crear → matricular → estudiar
+> → examen → certificado). **G y H** se añaden después.
+
+---
+
+## 6. Recomendaciones de escalabilidad
+- Construir **por fases** con un ciclo completo pronto (A→F) y luego enriquecer.
+- **Tests automáticos + CI** para no romper nada al crecer.
+- **Backend de pago** (~7€/mes) cuando haya alumnos reales (Render gratis "duerme").
+- **Monitorización** (Sentry) + **copias de seguridad** (Neon).
+- **RGPD**: consentimiento/términos, anonimato donde aplique, retención de datos.
+- Reutilizar R2 para todos los archivos; certificados PDF generados bajo demanda.
+
+---
+
+## 7. Próximo paso
+Rematar **C0** (carga masiva de preguntas, ya casi lista) y arrancar **Fase A**
+(rol profesor + crear curso + dashboard del profesor).
