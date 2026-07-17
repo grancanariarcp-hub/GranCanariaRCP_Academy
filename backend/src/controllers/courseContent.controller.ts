@@ -1,33 +1,12 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../config/database.js';
-import { badRequest, forbidden, notFound } from '../utils/httpError.js';
+import { badRequest, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { assertEditor, assertDirector } from '../services/courseAuth.js';
 
-/**
- * Editing the inside of a course: modules, activities and staff.
- * - "editor"  = super_admin or any staff member (director/instructor)
- * - "director" = super_admin or a director of the course
- */
-async function roleInCourse(courseId: string, userId: string): Promise<string | null> {
-  const { rows } = await query<{ role: string }>(
-    'SELECT role FROM course_staff WHERE course_id = $1 AND user_id = $2',
-    [courseId, userId],
-  );
-  return rows[0]?.role ?? null;
-}
-
-async function assertEditor(req: Request): Promise<void> {
-  if (req.auth!.role === 'super_admin') return;
-  const role = await roleInCourse(req.params.id, req.auth!.sub);
-  if (!role) throw forbidden('No formas parte de este curso');
-}
-async function assertDirector(req: Request): Promise<void> {
-  if (req.auth!.role === 'super_admin') return;
-  const role = await roleInCourse(req.params.id, req.auth!.sub);
-  if (role !== 'director') throw forbidden('Solo un director del curso puede hacer esto');
-}
+/** Editing the inside of a course: modules, activities and staff. */
 
 // ---------------------------------------------------------------------------
 // Course update (publish, open enrollment, dates, basics) — director only

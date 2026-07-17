@@ -109,7 +109,7 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
       [id],
     ),
     query<{ module_id: string }>(
-      `SELECT a.id, a.module_id, a.type, a.title, a.url, a.is_mandatory, a.document_id, d.title AS document_title
+      `SELECT a.id, a.module_id, a.type, a.title, a.url, a.is_mandatory, a.document_id, a.exam_id, d.title AS document_title
        FROM activities a
        LEFT JOIN documents d ON d.id = a.document_id
        WHERE a.module_id IN (SELECT id FROM modules WHERE course_id = $1)

@@ -9,11 +9,12 @@ import { api, ApiError } from '@/lib/api';
 
 interface Activity {
   id: string;
-  type: 'documento' | 'video' | 'enlace';
+  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen';
   title: string;
   url: string | null;
   is_mandatory: boolean;
   document_title: string | null;
+  exam_id: string | null;
 }
 interface Module {
   id: string;
@@ -37,7 +38,7 @@ interface Course {
   enrollment_open: boolean;
 }
 
-const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗' };
+const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓' };
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -52,10 +53,13 @@ export default function CourseDetailPage() {
 
   const [newModule, setNewModule] = useState('');
   const [addingTo, setAddingTo] = useState<string | null>(null); // moduleId
-  const [actType, setActType] = useState<'documento' | 'video' | 'enlace'>('documento');
+  const [actType, setActType] = useState<'documento' | 'video' | 'enlace' | 'test' | 'examen'>('documento');
   const [actTitle, setActTitle] = useState('');
   const [actUrl, setActUrl] = useState('');
   const [actDoc, setActDoc] = useState('');
+  const [examAttempts, setExamAttempts] = useState('1');
+  const [examPass, setExamPass] = useState('60');
+  const [examTime, setExamTime] = useState('');
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'director' | 'instructor'>('instructor');
@@ -101,16 +105,31 @@ export default function CourseDetailPage() {
   }
   async function addActivity(moduleId: string) {
     try {
-      await api(`/api/courses/${courseId}/modules/${moduleId}/activities`, {
-        method: 'POST',
-        auth: true,
-        body: JSON.stringify({
-          type: actType,
-          title: actTitle,
-          url: actType !== 'documento' ? actUrl : undefined,
-          documentId: actType === 'documento' ? actDoc : undefined,
-        }),
-      });
+      if (actType === 'test' || actType === 'examen') {
+        // Exams are created through their own endpoint (and get their own activity).
+        await api(`/api/courses/${courseId}/modules/${moduleId}/exams`, {
+          method: 'POST',
+          auth: true,
+          body: JSON.stringify({
+            title: actTitle,
+            kind: actType,
+            attemptsAllowed: Number(examAttempts) || 1,
+            passPct: Number(examPass) || 60,
+            timeLimitMin: examTime ? Number(examTime) : null,
+          }),
+        });
+      } else {
+        await api(`/api/courses/${courseId}/modules/${moduleId}/activities`, {
+          method: 'POST',
+          auth: true,
+          body: JSON.stringify({
+            type: actType,
+            title: actTitle,
+            url: actType !== 'documento' ? actUrl : undefined,
+            documentId: actType === 'documento' ? actDoc : undefined,
+          }),
+        });
+      }
       setAddingTo(null); setActTitle(''); setActUrl(''); setActDoc('');
       load();
     } catch (err) {
@@ -197,7 +216,12 @@ export default function CourseDetailPage() {
                     {m.activities.map((a) => (
                       <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 14 }}>
                         <span>{TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}</span>
-                        <button className="btn btn-outline btn-small" onClick={() => deleteActivity(a.id)}>✕</button>
+                        <span style={{ display: 'flex', gap: 6 }}>
+                          {a.exam_id && (
+                            <Link className="btn btn-outline btn-small" href={`/admin/cursos/${courseId}/examen/${a.exam_id}`}>Editar</Link>
+                          )}
+                          <button className="btn btn-outline btn-small" onClick={() => deleteActivity(a.id)}>✕</button>
+                        </span>
                       </div>
                     ))}
                     {m.activities.length === 0 && <div className="muted" style={{ fontSize: 13 }}>Sin actividades</div>}
@@ -206,23 +230,42 @@ export default function CourseDetailPage() {
                   {/* form añadir actividad */}
                   {addingTo === m.id && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--gray-300)' }}>
-                      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                        {(['documento', 'video', 'enlace'] as const).map((t) => (
+                      <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
+                        {(['documento', 'video', 'enlace', 'test', 'examen'] as const).map((t) => (
                           <button key={t} type="button" className={`tab ${actType === t ? 'active' : ''}`} style={{ flex: 'unset', padding: '6px 10px' }} onClick={() => setActType(t)}>
                             {TYPE_ICON[t]} {t}
                           </button>
                         ))}
                       </div>
-                      <input className="form-input" placeholder="Título de la actividad" value={actTitle} onChange={(e) => setActTitle(e.target.value)} style={{ marginBottom: 8 }} />
-                      {actType === 'documento' ? (
+                      <input className="form-input" placeholder={actType === 'test' || actType === 'examen' ? 'Título del examen' : 'Título de la actividad'} value={actTitle} onChange={(e) => setActTitle(e.target.value)} style={{ marginBottom: 8 }} />
+                      {actType === 'documento' && (
                         <select className="form-select" value={actDoc} onChange={(e) => setActDoc(e.target.value)} style={{ marginBottom: 8 }}>
                           <option value="">Elige un documento…</option>
                           {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
                         </select>
-                      ) : (
+                      )}
+                      {(actType === 'video' || actType === 'enlace') && (
                         <input className="form-input" placeholder="https://…" value={actUrl} onChange={(e) => setActUrl(e.target.value)} style={{ marginBottom: 8 }} />
                       )}
-                      <button className="btn btn-primary btn-small btn-full" onClick={() => addActivity(m.id)} disabled={!actTitle.trim()}>Añadir</button>
+                      {(actType === 'test' || actType === 'examen') && (
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                          <div style={{ flex: 1 }}>
+                            <label className="form-label">Intentos</label>
+                            <input className="form-input" type="number" min="1" value={examAttempts} onChange={(e) => setExamAttempts(e.target.value)} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label className="form-label">% aprobado</label>
+                            <input className="form-input" type="number" min="0" max="100" value={examPass} onChange={(e) => setExamPass(e.target.value)} />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label className="form-label">Min (opc.)</label>
+                            <input className="form-input" type="number" min="1" placeholder="—" value={examTime} onChange={(e) => setExamTime(e.target.value)} />
+                          </div>
+                        </div>
+                      )}
+                      <button className="btn btn-primary btn-small btn-full" onClick={() => addActivity(m.id)} disabled={!actTitle.trim()}>
+                        {actType === 'test' || actType === 'examen' ? 'Crear examen' : 'Añadir'}
+                      </button>
                     </div>
                   )}
                 </div>
