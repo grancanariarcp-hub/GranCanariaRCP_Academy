@@ -9,6 +9,7 @@ import {
 import {
   startExam, submitExam, reviewAttempt, listMyAttempts,
 } from '../controllers/examAttempt.controller.js';
+import { studentCertificate } from '../controllers/certificate.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -23,6 +24,7 @@ router.get('/available-courses', asyncHandler(listAvailableCourses));
 router.post('/enroll/:courseId', asyncHandler(enrollCourse));
 router.get('/courses', asyncHandler(listMyCourses));
 router.get('/courses/:courseId', asyncHandler(getMyCourseContent));
+router.get('/courses/:courseId/certificate', asyncHandler(studentCertificate));
 
 // Exámenes (realizar / revisar)
 router.get('/exams/:examId/attempts', asyncHandler(listMyAttempts));

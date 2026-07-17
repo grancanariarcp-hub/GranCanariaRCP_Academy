@@ -122,5 +122,11 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
   );
   const acts = await withImageUrls(activities.rows);
   const mods = modules.rows.map((m) => ({ ...m, activities: acts.filter((a) => a.module_id === m.id) }));
-  res.json({ course: course.rows[0], modules: mods });
+
+  const passed = await query(
+    `SELECT 1 FROM exam_attempts a JOIN exams e ON e.id = a.exam_id JOIN modules m ON m.id = e.module_id
+     WHERE m.course_id = $1 AND a.student_id = $2 AND a.passed = TRUE LIMIT 1`,
+    [courseId, req.auth!.sub],
+  );
+  res.json({ course: course.rows[0], modules: mods, certificateAvailable: passed.rows.length > 0 });
 }

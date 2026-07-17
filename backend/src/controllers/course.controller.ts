@@ -156,6 +156,8 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
     activities: acts.filter((a) => a.module_id === m.id),
   }));
 
-  const [courseWithThumb] = await presignKeys(course.rows, 'thumbnail_key', 'thumbnail_url');
-  res.json({ course: courseWithThumb, modules: modulesWithActivities, staff: staff.rows });
+  let [courseFull] = await presignKeys(course.rows, 'thumbnail_key', 'thumbnail_url');
+  [courseFull] = await presignKeys([courseFull], 'cert_bg_key', 'cert_bg_url');
+  [courseFull] = await presignKeys([courseFull], 'cfc_image_key', 'cfc_image_url');
+  res.json({ course: courseFull, modules: modulesWithActivities, staff: staff.rows });
 }

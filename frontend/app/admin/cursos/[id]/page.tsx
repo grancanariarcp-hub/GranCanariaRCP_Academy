@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
-import { api, ApiError, uploadFile } from '@/lib/api';
+import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
 
 interface Activity {
   id: string;
@@ -42,6 +42,13 @@ interface Course {
   acreditacion: string | null;
   cfc: string | null;
   thumbnail_url?: string;
+  certifica: string | null;
+  firmante1_nombre: string | null;
+  firmante1_cargo: string | null;
+  firmante2_nombre: string | null;
+  firmante2_cargo: string | null;
+  cert_bg_url?: string;
+  cfc_image_url?: string;
 }
 
 const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
@@ -64,6 +71,14 @@ export default function CourseDetailPage() {
   const [fAcred, setFAcred] = useState('');
   const [fCfc, setFCfc] = useState('');
   const [fichaMsg, setFichaMsg] = useState<string | null>(null);
+
+  // Certificado
+  const [certifica, setCertifica] = useState('');
+  const [f1n, setF1n] = useState('');
+  const [f1c, setF1c] = useState('');
+  const [f2n, setF2n] = useState('');
+  const [f2c, setF2c] = useState('');
+  const [certMsg, setCertMsg] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null); // moduleId
   const [actType, setActType] = useState<'documento' | 'video' | 'enlace' | 'texto' | 'imagen' | 'test' | 'examen'>('documento');
   const [actTitle, setActTitle] = useState('');
@@ -88,6 +103,11 @@ export default function CourseDetailPage() {
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
+      setCertifica(c.course.certifica ?? '');
+      setF1n(c.course.firmante1_nombre ?? '');
+      setF1c(c.course.firmante1_cargo ?? '');
+      setF2n(c.course.firmante2_nombre ?? '');
+      setF2c(c.course.firmante2_cargo ?? '');
       setModules(c.modules);
       setStaff(c.staff);
       setDocs(d.documents);
@@ -126,6 +146,36 @@ export default function CourseDetailPage() {
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al subir la miniatura');
+    }
+  }
+
+  async function saveCert() {
+    setCertMsg(null);
+    try {
+      await api(`/api/courses/${courseId}`, {
+        method: 'PATCH', auth: true,
+        body: JSON.stringify({ certifica, firmante1Nombre: f1n, firmante1Cargo: f1c, firmante2Nombre: f2n, firmante2Cargo: f2c }),
+      });
+      setCertMsg('Datos del certificado guardados ✅');
+      load();
+    } catch (err) {
+      setCertMsg(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
+  async function uploadCertImg(kind: 'background' | 'cfc-image', file: File | undefined) {
+    if (!file) return;
+    try {
+      await uploadFile(`/api/courses/${courseId}/certificate/${kind}`, file);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al subir la imagen');
+    }
+  }
+  async function previewCert() {
+    try {
+      await downloadFile(`/api/courses/${courseId}/certificate/preview`, 'previsualizacion-certificado.pdf');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al previsualizar');
     }
   }
 
@@ -278,6 +328,48 @@ export default function CourseDetailPage() {
                 </div>
                 <button className="btn btn-primary btn-small" onClick={saveFicha}>Guardar ficha</button>
               </div>
+            </div>
+          </div>
+
+          {/* Certificado */}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <div className="card-title">Certificado</div>
+              <div className="card-subtitle">Se genera al aprobar el curso. Si no subes fondo, será blanco.</div>
+            </div>
+            {certMsg && <div className={`alert ${certMsg.includes('✅') ? 'alert-success' : 'alert-error'}`}>{certMsg}</div>}
+            <div className="form-group">
+              <label className="form-label">Quién certifica</label>
+              <input className="form-input" placeholder="Ej.: GranCanaria RCP Academy" value={certifica} onChange={(e) => setCertifica(e.target.value)} />
+            </div>
+            <div className="grid grid-2" style={{ gap: 12 }}>
+              <div>
+                <div className="form-group"><label className="form-label">Firmante 1 · nombre</label><input className="form-input" value={f1n} onChange={(e) => setF1n(e.target.value)} /></div>
+                <div className="form-group"><label className="form-label">Firmante 1 · cargo</label><input className="form-input" value={f1c} onChange={(e) => setF1c(e.target.value)} /></div>
+              </div>
+              <div>
+                <div className="form-group"><label className="form-label">Firmante 2 · nombre</label><input className="form-input" value={f2n} onChange={(e) => setF2n(e.target.value)} /></div>
+                <div className="form-group"><label className="form-label">Firmante 2 · cargo</label><input className="form-input" value={f2c} onChange={(e) => setF2c(e.target.value)} /></div>
+              </div>
+            </div>
+            <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Si un firmante queda vacío, no aparece en el certificado. Los CFC y las fechas se toman de la ficha del curso.</p>
+
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+              <label className="btn btn-outline btn-small" style={{ cursor: 'pointer' }}>
+                {course.cert_bg_url ? 'Cambiar fondo' : 'Subir fondo'}
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadCertImg('background', e.target.files?.[0]); e.target.value = ''; }} />
+              </label>
+              <label className="btn btn-outline btn-small" style={{ cursor: 'pointer' }}>
+                {course.cfc_image_url ? 'Cambiar imagen CFC' : 'Subir imagen CFC'}
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadCertImg('cfc-image', e.target.files?.[0]); e.target.value = ''; }} />
+              </label>
+              {course.cert_bg_url && <span className="badge badge-success">Fondo ✓</span>}
+              {course.cfc_image_url && <span className="badge badge-success">CFC ✓</span>}
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-primary btn-small" onClick={saveCert}>Guardar datos</button>
+              <button className="btn btn-outline btn-small" onClick={previewCert}>👁️ Ver previsualización</button>
             </div>
           </div>
 

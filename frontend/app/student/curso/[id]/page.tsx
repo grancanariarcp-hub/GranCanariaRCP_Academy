@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, downloadFile } from '@/lib/api';
 
 interface Activity {
   id: string;
@@ -38,15 +38,24 @@ export default function StudentCoursePage() {
   const user = useSession(['student'], '/login/student');
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
+  const [certAvailable, setCertAvailable] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    api<{ course: Course; modules: Module[] }>(`/api/student/courses/${courseId}`, { auth: true })
-      .then((r) => { setCourse(r.course); setModules(r.modules); })
+    api<{ course: Course; modules: Module[]; certificateAvailable: boolean }>(`/api/student/courses/${courseId}`, { auth: true })
+      .then((r) => { setCourse(r.course); setModules(r.modules); setCertAvailable(r.certificateAvailable); })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Error cargando el curso'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function downloadCertificate() {
+    try {
+      await downloadFile(`/api/student/courses/${courseId}/certificate`, 'certificado-grancanaria-rcp.pdf');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al generar el certificado');
+    }
+  }
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
@@ -54,6 +63,13 @@ export default function StudentCoursePage() {
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={[{ label: 'Inicio', href: '/student', active: true }]}>
       <p style={{ marginBottom: 16 }}><Link href="/student">← Volver a mis cursos</Link></p>
       {error && <div className="alert alert-error">{error}</div>}
+
+      {certAvailable && (
+        <div className="card" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span>🎉 <strong>¡Has aprobado!</strong> Ya puedes descargar tu certificado.</span>
+          <button className="btn btn-primary" onClick={downloadCertificate}>📄 Descargar certificado</button>
+        </div>
+      )}
 
       {course?.objetivo_general && (
         <div className="info-box" style={{ marginBottom: 24 }}>{course.objetivo_general}</div>

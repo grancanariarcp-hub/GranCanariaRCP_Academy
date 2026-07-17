@@ -70,3 +70,10 @@ export async function presignedGetUrl(key: string, expiresIn = 600): Promise<str
 export async function deleteObject(key: string): Promise<void> {
   await s3().send(new DeleteObjectCommand({ Bucket: env.r2.bucket, Key: key }));
 }
+
+/** Download an object into a Buffer (e.g. a certificate background image). */
+export async function getObjectBuffer(key: string): Promise<Buffer> {
+  const out = await s3().send(new GetObjectCommand({ Bucket: env.r2.bucket, Key: key }));
+  const bytes = await out.Body!.transformToByteArray();
+  return Buffer.from(bytes);
+}

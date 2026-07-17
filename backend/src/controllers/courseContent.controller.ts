@@ -24,6 +24,11 @@ const updateCourseSchema = z.object({
   acreditacion: z.string().max(200).optional(),
   cfc: z.string().max(120).optional(),
   durationHours: z.number().positive().max(1000).optional(),
+  certifica: z.string().max(200).optional(),
+  firmante1Nombre: z.string().max(160).optional(),
+  firmante1Cargo: z.string().max(160).optional(),
+  firmante2Nombre: z.string().max(160).optional(),
+  firmante2Cargo: z.string().max(160).optional(),
 });
 
 export async function updateCourse(req: Request, res: Response): Promise<void> {
@@ -33,6 +38,8 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     title: d.title, status: d.status, enrollment_open: d.enrollmentOpen,
     starts_at: d.startsAt, ends_at: d.endsAt, final_exam_start: d.finalExamStart, final_exam_end: d.finalExamEnd,
     resumen: d.resumen, acreditacion: d.acreditacion, cfc: d.cfc, duration_hours: d.durationHours,
+    certifica: d.certifica, firmante1_nombre: d.firmante1Nombre, firmante1_cargo: d.firmante1Cargo,
+    firmante2_nombre: d.firmante2Nombre, firmante2_cargo: d.firmante2Cargo,
   };
   const fields: string[] = [];
   const params: unknown[] = [];

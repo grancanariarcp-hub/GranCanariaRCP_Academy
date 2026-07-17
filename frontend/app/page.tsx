@@ -29,7 +29,9 @@ export default function Home() {
         {/* Cabecera */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <img src="/logo-horizontal.png" alt="Gran Canaria RCP" style={{ maxWidth: 320, width: '100%' }} />
-          <p className="muted" style={{ marginTop: 4 }}>Campus de formación</p>
+          <p style={{ marginTop: 10, fontSize: 22, fontWeight: 700, color: 'var(--primary-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            Campus de formación
+          </p>
         </div>
 
         {/* Accesos */}
@@ -63,7 +65,7 @@ export default function Home() {
           </Link>
         </div>
         <div style={{ maxWidth: 720, margin: '0 auto 32px', textAlign: 'center' }}>
-          <Link href="/registro" className="btn btn-primary">✍️ Registrarse</Link>
+          <Link href="/registro" className="btn" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', boxShadow: 'var(--shadow-sm)' }}>✍️ Registrarse</Link>
         </div>
 
         {/* Cursos con matrícula abierta */}
