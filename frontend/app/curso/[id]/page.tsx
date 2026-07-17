@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
+import { temaPalette } from '@/lib/temaColors';
 
 interface Course {
   id: string;
@@ -69,14 +70,18 @@ export default function PublicCoursePage() {
         {!course ? (
           !error && <div className="muted">Cargando…</div>
         ) : (
-          <div className="card">
-            {course.thumbnail_url && (
+          <div className="card" style={{ padding: 0, overflow: 'hidden', borderTop: `6px solid ${temaPalette(course.tema).main}` }}>
+            {course.thumbnail_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={course.thumbnail_url} alt="" style={{ width: '100%', maxHeight: 240, objectFit: 'cover', borderRadius: 8, marginBottom: 16 }} />
+              <img src={course.thumbnail_url} alt="" style={{ width: '100%', maxHeight: 240, objectFit: 'cover' }} />
+            ) : (
+              <div style={{ height: 120, background: temaPalette(course.tema).grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 54 }}>{temaPalette(course.tema).icon}</div>
             )}
+            <div style={{ padding: 24 }}>
+            {course.tema && <span className="badge" style={{ background: temaPalette(course.tema).main, color: '#fff', marginBottom: 8 }}>{temaPalette(course.tema).icon} {course.tema}</span>}
             <h1 style={{ marginBottom: 6 }}>{course.title}</h1>
             <div className="muted" style={{ marginBottom: 16 }}>
-              {[course.tema, course.subtema, course.modality].filter(Boolean).join(' · ')}
+              {[course.subtema, course.modality].filter(Boolean).join(' · ')}
             </div>
 
             {course.resumen && <p style={{ marginBottom: 16 }}>{course.resumen}</p>}
@@ -146,6 +151,7 @@ export default function PublicCoursePage() {
                 Para matricularte, <Link href="/login">accede</Link> o <Link href="/registro">regístrate</Link>.
               </div>
             )}
+            </div>
           </div>
         )}
         <p style={{ textAlign: 'center', marginTop: 24 }}><AppVersion /></p>

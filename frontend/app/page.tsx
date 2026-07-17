@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
+import { temaPalette } from '@/lib/temaColors';
 
 interface OpenCourse {
   id: string;
@@ -15,14 +16,32 @@ interface OpenCourse {
   price_cents: number;
   thumbnail_url?: string;
   enrollment_open: boolean;
+  publico_objetivo: string[];
+  cfc: string | null;
 }
 
 export default function Home() {
   const [courses, setCourses] = useState<OpenCourse[]>([]);
+  const [fMatricula, setFMatricula] = useState<'todas' | 'abierta' | 'proximamente'>('todas');
+  const [fTema, setFTema] = useState('');
+  const [fPublico, setFPublico] = useState('');
+  const [fCfc, setFCfc] = useState(false);
 
   useEffect(() => {
     api<{ courses: OpenCourse[] }>('/api/public/courses').then((r) => setCourses(r.courses)).catch(() => {});
   }, []);
+
+  const temas = useMemo(() => [...new Set(courses.map((c) => c.tema).filter(Boolean) as string[])].sort(), [courses]);
+  const publicos = useMemo(() => [...new Set(courses.flatMap((c) => c.publico_objetivo || []))].sort(), [courses]);
+
+  const filtered = courses.filter((c) => {
+    if (fMatricula === 'abierta' && !c.enrollment_open) return false;
+    if (fMatricula === 'proximamente' && c.enrollment_open) return false;
+    if (fTema && c.tema !== fTema) return false;
+    if (fPublico && !(c.publico_objetivo || []).includes(fPublico)) return false;
+    if (fCfc && !c.cfc) return false;
+    return true;
+  });
 
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
@@ -83,35 +102,73 @@ export default function Home() {
           </Link>
         </div>
 
-        {/* Cursos con matrícula abierta */}
-        <h2 style={{ textAlign: 'center', marginBottom: 16 }}>Cursos disponibles</h2>
+        {/* Cursos */}
+        <h2 style={{ textAlign: 'center', marginBottom: 12 }}>Cursos disponibles</h2>
+
+        {courses.length > 0 && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 18 }}>
+            <select className="form-select" style={{ width: 'auto' }} value={fMatricula} onChange={(e) => setFMatricula(e.target.value as typeof fMatricula)}>
+              <option value="todas">Todas las matrículas</option>
+              <option value="abierta">Matrícula abierta</option>
+              <option value="proximamente">Próximamente</option>
+            </select>
+            {temas.length > 0 && (
+              <select className="form-select" style={{ width: 'auto' }} value={fTema} onChange={(e) => setFTema(e.target.value)}>
+                <option value="">Todos los temas</option>
+                {temas.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            )}
+            {publicos.length > 0 && (
+              <select className="form-select" style={{ width: 'auto' }} value={fPublico} onChange={(e) => setFPublico(e.target.value)}>
+                <option value="">Cualquier público</option>
+                {publicos.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            )}
+            <label className="btn btn-outline btn-small" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input type="checkbox" checked={fCfc} onChange={(e) => setFCfc(e.target.checked)} /> Con CFC
+            </label>
+          </div>
+        )}
+
         {courses.length === 0 ? (
-          <p className="muted" style={{ textAlign: 'center' }}>Pronto habrá cursos con matrícula abierta.</p>
+          <p className="muted" style={{ textAlign: 'center' }}>Pronto habrá cursos disponibles.</p>
+        ) : filtered.length === 0 ? (
+          <p className="muted" style={{ textAlign: 'center' }}>Ningún curso coincide con los filtros.</p>
         ) : (
           <div className="grid grid-4">
-            {courses.map((c) => (
-              <Link key={c.id} href={`/curso/${c.id}`} className="card" style={{ textDecoration: 'none', position: 'relative' }}>
-                {!c.enrollment_open && (
-                  <span className="badge" style={{ position: 'absolute', top: 8, right: 8, background: 'var(--secondary-dark)', color: '#fff' }}>Próximamente</span>
-                )}
-                {c.thumbnail_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: 80, objectFit: 'cover', borderRadius: 6, marginBottom: 8 }} />
-                )}
-                <div style={{ fontWeight: 600 }}>{c.title}</div>
-                <div className="muted" style={{ fontSize: 13, margin: '6px 0' }}>
-                  {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')}
-                  {c.duration_hours ? ` · ${c.duration_hours} h` : ''}
-                </div>
-                {!c.enrollment_open ? (
-                  <span className="badge badge-warning">Matrícula cerrada</span>
-                ) : c.price_cents > 0 ? (
-                  <span className="badge badge-primary">{(c.price_cents / 100).toFixed(2)} €</span>
-                ) : (
-                  <span className="badge badge-success">Gratis · matrícula abierta</span>
-                )}
-              </Link>
-            ))}
+            {filtered.map((c) => {
+              const pal = temaPalette(c.tema);
+              return (
+                <Link key={c.id} href={`/curso/${c.id}`} className="card" style={{ textDecoration: 'none', position: 'relative', padding: 0, overflow: 'hidden', borderTop: `4px solid ${pal.main}` }}>
+                  {/* Cabecera de color por tema (o miniatura si la hay) */}
+                  {c.thumbnail_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: 90, objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ height: 72, background: pal.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>{pal.icon}</div>
+                  )}
+                  {!c.enrollment_open && (
+                    <span className="badge" style={{ position: 'absolute', top: 8, right: 8, background: 'var(--secondary-dark)', color: '#fff' }}>Próximamente</span>
+                  )}
+                  <div style={{ padding: 12 }}>
+                    {c.tema && <span className="badge" style={{ background: pal.main, color: '#fff', fontSize: 11 }}>{pal.icon} {c.tema}</span>}
+                    <div style={{ fontWeight: 600, marginTop: 6 }}>{c.title}</div>
+                    <div className="muted" style={{ fontSize: 12, margin: '4px 0 8px' }}>
+                      {[c.subtema, c.modality].filter(Boolean).join(' · ')}
+                      {c.duration_hours ? ` · ${c.duration_hours} h` : ''}
+                      {c.cfc ? ' · CFC' : ''}
+                    </div>
+                    {!c.enrollment_open ? (
+                      <span className="badge badge-warning">Matrícula cerrada</span>
+                    ) : c.price_cents > 0 ? (
+                      <span className="badge badge-primary">{(c.price_cents / 100).toFixed(2)} €</span>
+                    ) : (
+                      <span className="badge badge-success">Gratis · abierta</span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
 

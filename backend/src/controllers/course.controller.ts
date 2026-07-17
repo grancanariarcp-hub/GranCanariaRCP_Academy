@@ -76,7 +76,7 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
  */
 export async function listOpenCourses(_req: Request, res: Response): Promise<void> {
   const { rows } = await query(
-    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, resumen, thumbnail_key, enrollment_open
+    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, resumen, thumbnail_key, enrollment_open, cfc
      FROM courses WHERE status = 'publicado'
      ORDER BY enrollment_open DESC, created_at DESC`,
   );
