@@ -96,9 +96,15 @@ enorme flexibilidad para generar tests a medida:
 ## 3. Hoja de ruta (fases restantes)
 
 ### ▶️ Fase 2 — Motor de test + banco de preguntas enriquecido *(SIGUIENTE)*
-- Migrar el modelo de preguntas a las 4 dimensiones (nivel, público, tipo, dificultad) + campos ricos.
-- **Pantalla de super admin para crear/editar preguntas** (así Federico carga contenido sin depender del desarrollo) + carga masiva por archivo.
-- **Motor de test**: elegir filtros (nivel/público/tipo) → responder → **debriefing** inmediato (explicación + fuente + vídeo + flashcard) → resultado.
+- Migrar el modelo de preguntas a las 4 dimensiones (nivel, público, tipo, dificultad) + campos ricos. ✅ HECHO
+- **Pantalla de super admin para crear/editar preguntas** (crear una a una). ✅ HECHO
+- **Documentos de referencia en R2** + referencia documento+página en cada pregunta. ✅ HECHO
+- **Carga masiva de preguntas** ⭐ (pendiente): subir muchas preguntas de golpe desde una
+  **plantilla (CSV/Excel)**. Cada fila incluye una columna con **el documento y la página**
+  que le corresponde, de modo que se referencien automáticamente al importarlas.
+  Entregable: una plantilla descargable + validación al importar (avisa de filas con errores).
+- **Motor de test** (pendiente): elegir filtros (nivel/público/tipo) → responder → **debriefing**
+  inmediato (explicación + referencia de página + vídeo + flashcard) → resultado.
 - Guardar respuestas de forma anónima.
 
 ### Fase 3 — Progreso personal
