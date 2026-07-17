@@ -183,6 +183,7 @@ export default function PreguntasPage() {
       nav={[
         { label: 'Resumen', href: '/admin' },
         { label: 'Preguntas', href: '/admin/preguntas', active: true },
+        { label: 'Bancos', href: '/admin/bancos' },
         { label: 'Documentos', href: '/admin/documentos' },
       ]}
     >

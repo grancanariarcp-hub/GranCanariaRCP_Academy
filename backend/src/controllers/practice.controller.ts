@@ -11,33 +11,41 @@ import { badRequest } from '../utils/httpError.js';
 
 const startSchema = z.object({
   mode: z.enum(['aleatorio', 'tema', 'fallos']).default('aleatorio'),
+  bankId: z.string().uuid().optional(),
   category: z.string().optional(),
-  count: z.number().int().min(1).max(50).default(10),
+  tema: z.string().optional(),
+  count: z.number().int().min(1).max(100).default(10),
 });
 
 export async function startPractice(req: Request, res: Response): Promise<void> {
-  const { mode, category, count } = startSchema.parse(req.body);
+  const { mode, bankId, category, tema, count } = startSchema.parse(req.body);
   const uid = req.auth!.sub;
 
   let sql: string;
   let params: unknown[];
   if (mode === 'fallos') {
+    // Failed pool = questions whose latest answer was incorrect (optionally within a bank).
     sql = `
       WITH latest AS (
         SELECT DISTINCT ON (question_id) question_id, is_correct
         FROM answer_log WHERE user_id = $1 ORDER BY question_id, answered_at DESC
       )
-      SELECT q.id, q.category, q.text, q.options
+      SELECT q.id, q.category, q.tema, q.text, q.options
       FROM questions q JOIN latest l ON l.question_id = q.id AND l.is_correct = FALSE
-      WHERE q.is_active = TRUE
+      WHERE q.is_active = TRUE ${bankId ? 'AND q.bank_id = $3' : ''}
       ORDER BY RANDOM() LIMIT $2`;
-    params = [uid, count];
-  } else if (mode === 'tema' && category) {
-    sql = 'SELECT id, category, text, options FROM questions WHERE is_active = TRUE AND category = $1 ORDER BY RANDOM() LIMIT $2';
-    params = [category, count];
+    params = bankId ? [uid, count, bankId] : [uid, count];
   } else {
-    sql = 'SELECT id, category, text, options FROM questions WHERE is_active = TRUE ORDER BY RANDOM() LIMIT $1';
-    params = [count];
+    const conds = ['is_active = TRUE'];
+    const p: unknown[] = [];
+    if (bankId) { p.push(bankId); conds.push(`bank_id = $${p.length}`); }
+    if (mode === 'tema') {
+      if (tema) { p.push(tema); conds.push(`tema = $${p.length}`); }
+      else if (category) { p.push(category); conds.push(`category = $${p.length}`); }
+    }
+    p.push(count);
+    sql = `SELECT id, category, tema, text, options FROM questions WHERE ${conds.join(' AND ')} ORDER BY RANDOM() LIMIT $${p.length}`;
+    params = p;
   }
   const { rows } = await query(sql, params);
   if (rows.length === 0) {

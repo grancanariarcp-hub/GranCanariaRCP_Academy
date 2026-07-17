@@ -94,6 +94,7 @@ export default function AdminDashboard() {
         { label: 'Resumen', href: '/admin', active: true },
         { label: 'Cursos', href: '/admin/cursos' },
         { label: 'Preguntas', href: '/admin/preguntas' },
+        { label: 'Bancos', href: '/admin/bancos' },
         { label: 'Desafíos', href: '/admin/desafios' },
         { label: 'Documentos', href: '/admin/documentos' },
         { label: 'Profesores', href: '/admin/profesores' },

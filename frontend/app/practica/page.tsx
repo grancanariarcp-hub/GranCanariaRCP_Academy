@@ -27,6 +27,12 @@ export default function PracticaPage() {
   const [category, setCategory] = useState('SVB');
   const [count, setCount] = useState('10');
 
+  // Banco (RCP por defecto; OPE/MIR cuando el super admin los sube)
+  const [banks, setBanks] = useState<Array<{ id: string; name: string; kind: string }>>([]);
+  const [bankId, setBankId] = useState('');
+  const [bankTemas, setBankTemas] = useState<Array<{ tema: string; questions: string }>>([]);
+  const [tema, setTema] = useState('');
+
   const [questions, setQuestions] = useState<Q[]>([]);
   const [answers, setAnswers] = useState<Record<string, number | null>>({});
   const [feedback, setFeedback] = useState<Feedback[] | null>(null);
@@ -39,14 +45,34 @@ export default function PracticaPage() {
       /* ignore */
     }
   }
-  useEffect(() => { if (user) loadStats(); /* eslint-disable-next-line */ }, []);
+  async function loadBanks() {
+    try {
+      setBanks((await api<{ banks: Array<{ id: string; name: string; kind: string }> }>('/api/public/banks')).banks);
+    } catch { /* ignore */ }
+  }
+  useEffect(() => { if (user) { loadStats(); loadBanks(); } /* eslint-disable-next-line */ }, []);
+
+  // Al elegir un banco concreto, cargar sus temas para el selector.
+  useEffect(() => {
+    setTema('');
+    if (!bankId) { setBankTemas([]); return; }
+    api<{ temas: Array<{ tema: string; questions: string }> }>(`/api/public/banks/${bankId}/temas`)
+      .then((r) => setBankTemas(r.temas))
+      .catch(() => setBankTemas([]));
+  }, [bankId]);
 
   async function start() {
     setError(null);
     try {
       const r = await api<{ questions: Q[] }>('/api/practice/start', {
         method: 'POST', auth: true,
-        body: JSON.stringify({ mode, category: mode === 'tema' ? category : undefined, count: Number(count) }),
+        body: JSON.stringify({
+          mode,
+          bankId: bankId || undefined,
+          category: mode === 'tema' && !bankId ? category : undefined,
+          tema: mode === 'tema' && bankId ? tema || undefined : undefined,
+          count: Number(count),
+        }),
       });
       setQuestions(r.questions);
       setAnswers(Object.fromEntries(r.questions.map((q) => [q.id, null])));
@@ -121,8 +147,17 @@ export default function PracticaPage() {
                   <button className={`tab ${mode === 'tema' ? 'active' : ''}`} onClick={() => setMode('tema')}>📂 Por tema</button>
                   <button className={`tab ${mode === 'fallos' ? 'active' : ''}`} onClick={() => setMode('fallos')}>❗ Solo mis fallos</button>
                 </div>
+                <div className="form-group">
+                  <label className="form-label">Banco de preguntas</label>
+                  <select className="form-select" value={bankId} onChange={(e) => setBankId(e.target.value)}>
+                    <option value="">RCP y primeros auxilios (general)</option>
+                    {banks.filter((b) => b.kind !== 'rcp').map((b) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="grid grid-2" style={{ gap: 12 }}>
-                  {mode === 'tema' && (
+                  {mode === 'tema' && !bankId && (
                     <div className="form-group">
                       <label className="form-label">Tema</label>
                       <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
@@ -130,9 +165,20 @@ export default function PracticaPage() {
                       </select>
                     </div>
                   )}
+                  {mode === 'tema' && bankId && (
+                    <div className="form-group">
+                      <label className="form-label">Tema {bankTemas.length === 0 && '(sin temas)'}</label>
+                      <select className="form-select" value={tema} onChange={(e) => setTema(e.target.value)}>
+                        <option value="">Todos los temas</option>
+                        {bankTemas.map((t) => (
+                          <option key={t.tema} value={t.tema}>{t.tema} ({t.questions})</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="form-group">
                     <label className="form-label">Nº de preguntas</label>
-                    <input className="form-input" type="number" min="1" max="50" value={count} onChange={(e) => setCount(e.target.value)} />
+                    <input className="form-input" type="number" min="1" max="100" value={count} onChange={(e) => setCount(e.target.value)} />
                   </div>
                 </div>
                 <button className="btn btn-primary btn-full" onClick={start}>Empezar</button>

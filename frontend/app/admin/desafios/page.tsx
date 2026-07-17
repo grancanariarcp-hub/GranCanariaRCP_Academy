@@ -70,6 +70,7 @@ export default function AdminDesafiosPage() {
         { label: 'Resumen', href: '/admin' },
         { label: 'Cursos', href: '/admin/cursos' },
         { label: 'Preguntas', href: '/admin/preguntas' },
+        { label: 'Bancos', href: '/admin/bancos' },
         { label: 'Desafíos', href: '/admin/desafios', active: true },
         { label: 'Profesores', href: '/admin/profesores' },
       ]}
