@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
@@ -205,7 +206,7 @@ export default function CursosPage() {
               <tbody>
                 {courses.map((c) => (
                   <tr key={c.id}>
-                    <td>{c.title}</td>
+                    <td><Link href={`/admin/cursos/${c.id}`}>{c.title}</Link></td>
                     <td style={{ fontSize: 12 }}>{[c.tema, c.subtema].filter(Boolean).join(' · ') || '—'}</td>
                     <td>{c.modules}</td>
                     <td>

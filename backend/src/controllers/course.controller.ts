@@ -100,15 +100,28 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
   await assertCanAccess(id, req);
 
-  const [modules, staff] = await Promise.all([
-    query('SELECT id, title, sort_order, is_mandatory, starts_at, ends_at FROM modules WHERE course_id = $1 ORDER BY sort_order', [id]),
+  const [modules, staff, activities] = await Promise.all([
+    query<{ id: string }>('SELECT id, title, sort_order, is_mandatory, starts_at, ends_at FROM modules WHERE course_id = $1 ORDER BY sort_order', [id]),
     query(
       `SELECT u.id, u.name, u.email, cs.role
        FROM course_staff cs JOIN users u ON u.id = cs.user_id
        WHERE cs.course_id = $1`,
       [id],
     ),
+    query<{ module_id: string }>(
+      `SELECT a.id, a.module_id, a.type, a.title, a.url, a.is_mandatory, a.document_id, d.title AS document_title
+       FROM activities a
+       LEFT JOIN documents d ON d.id = a.document_id
+       WHERE a.module_id IN (SELECT id FROM modules WHERE course_id = $1)
+       ORDER BY a.sort_order`,
+      [id],
+    ),
   ]);
 
-  res.json({ course: course.rows[0], modules: modules.rows, staff: staff.rows });
+  const modulesWithActivities = modules.rows.map((m) => ({
+    ...m,
+    activities: activities.rows.filter((a) => a.module_id === m.id),
+  }));
+
+  res.json({ course: course.rows[0], modules: modulesWithActivities, staff: staff.rows });
 }
