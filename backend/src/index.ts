@@ -14,6 +14,7 @@ import publicRoutes from './routes/public.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import challengesRoutes from './routes/challenges.routes.js';
 import practiceRoutes from './routes/practice.routes.js';
+import forumRoutes from './routes/forum.routes.js';
 
 const app = express();
 
@@ -64,6 +65,7 @@ app.use('/api/public', publicRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/challenges', challengesRoutes);
 app.use('/api/practice', practiceRoutes);
+app.use('/api/forum', forumRoutes);
 
 // 404 + central error handler (must be last)
 app.use(notFoundHandler);

@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
+import { CourseForum } from '@/components/CourseForum';
 import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
 
 interface Activity {
@@ -515,6 +516,10 @@ export default function CourseDetailPage() {
           </div>
         </>
       )}
+
+      <div className="card" style={{ marginTop: 24 }}>
+        <CourseForum courseId={courseId} />
+      </div>
     </AppShell>
   );
 }
