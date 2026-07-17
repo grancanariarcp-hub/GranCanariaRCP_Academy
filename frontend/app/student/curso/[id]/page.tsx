@@ -9,9 +9,11 @@ import { api, ApiError } from '@/lib/api';
 
 interface Activity {
   id: string;
-  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen';
+  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen' | 'texto' | 'imagen';
   title: string;
   url: string | null;
+  body: string | null;
+  image_url?: string;
   document_title: string | null;
   exam_id: string | null;
 }
@@ -28,7 +30,7 @@ interface Course {
   objetivo_general: string | null;
 }
 
-const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓' };
+const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
 
 export default function StudentCoursePage() {
   const params = useParams();
@@ -64,15 +66,29 @@ export default function StudentCoursePage() {
             <div className="muted">Este módulo aún no tiene contenido.</div>
           ) : (
             m.activities.map((a) => (
-              <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--gray-200)' }}>
-                <span>{TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}</span>
-                {(a.type === 'video' || a.type === 'enlace') && a.url ? (
-                  <a className="btn btn-primary btn-small" href={a.url} target="_blank" rel="noreferrer">Abrir</a>
-                ) : a.type === 'documento' ? (
-                  <span className="badge badge-primary">Documento</span>
-                ) : (a.type === 'test' || a.type === 'examen') ? (
-                  <span className="badge badge-warning">Examen (próximamente)</span>
-                ) : null}
+              <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--gray-200)' }}>
+                {a.type === 'texto' ? (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{TYPE_ICON.texto} {a.title}</div>
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{a.body}</div>
+                  </div>
+                ) : a.type === 'imagen' ? (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>{TYPE_ICON.imagen} {a.title}</div>
+                    {a.image_url && <img src={a.image_url} alt={a.title} style={{ maxWidth: '100%', borderRadius: 8 }} />}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>{TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}</span>
+                    {(a.type === 'video' || a.type === 'enlace') && a.url ? (
+                      <a className="btn btn-primary btn-small" href={a.url} target="_blank" rel="noreferrer">Abrir</a>
+                    ) : a.type === 'documento' ? (
+                      <span className="badge badge-primary">Documento</span>
+                    ) : (a.type === 'test' || a.type === 'examen') ? (
+                      <span className="badge badge-warning">Examen (próximamente)</span>
+                    ) : null}
+                  </div>
+                )}
               </div>
             ))
           )}

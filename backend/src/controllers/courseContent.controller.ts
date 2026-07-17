@@ -5,6 +5,7 @@ import { badRequest, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { assertEditor, assertDirector } from '../services/courseAuth.js';
+import { r2Configured, buildKey, uploadObject } from '../services/r2.js';
 
 /** Editing the inside of a course: modules, activities and staff. */
 
@@ -85,10 +86,11 @@ export async function deleteModule(req: Request, res: Response): Promise<void> {
 // Activities
 // ---------------------------------------------------------------------------
 const addActivitySchema = z.object({
-  type: z.enum(['documento', 'video', 'enlace']),
+  type: z.enum(['documento', 'video', 'enlace', 'texto']),
   title: z.string().min(2).max(200),
   documentId: z.string().uuid().optional(),
   url: z.string().url('URL no válida').optional(),
+  body: z.string().optional(),
   isMandatory: z.boolean().optional().default(false),
 });
 
@@ -102,12 +104,37 @@ export async function addActivity(req: Request, res: Response): Promise<void> {
 
   if (d.type === 'documento' && !d.documentId) throw badRequest('Elige un documento', 'NO_DOCUMENT');
   if ((d.type === 'video' || d.type === 'enlace') && !d.url) throw badRequest('Falta la URL', 'NO_URL');
+  if (d.type === 'texto' && (!d.body || d.body.trim().length === 0)) throw badRequest('Escribe el texto', 'NO_BODY');
 
   const { rows } = await query(
-    `INSERT INTO activities (module_id, type, title, document_id, url, is_mandatory, sort_order)
-     VALUES ($1, $2, $3, $4, $5, $6, COALESCE((SELECT MAX(sort_order) + 1 FROM activities WHERE module_id = $1), 0))
-     RETURNING id, type, title, document_id, url, is_mandatory`,
-    [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.isMandatory],
+    `INSERT INTO activities (module_id, type, title, document_id, url, body, is_mandatory, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE((SELECT MAX(sort_order) + 1 FROM activities WHERE module_id = $1), 0))
+     RETURNING id, type, title, document_id, url, body, is_mandatory`,
+    [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.body ?? null, d.isMandatory],
+  );
+  res.status(201).json({ activity: rows[0] });
+}
+
+/** Add an image activity (multipart: file + title). Stores the image in R2. */
+export async function addImageActivity(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  if (!r2Configured()) throw badRequest('El almacén de imágenes no está configurado', 'R2_NOT_CONFIGURED');
+  const file = req.file;
+  if (!file) throw badRequest('Falta la imagen', 'NO_FILE');
+  if (!file.mimetype.startsWith('image/')) throw badRequest('El archivo debe ser una imagen', 'NOT_IMAGE');
+
+  const mod = await query('SELECT 1 FROM modules WHERE id = $1 AND course_id = $2', [req.params.moduleId, req.params.id]);
+  if (mod.rows.length === 0) throw notFound('Módulo no encontrado');
+
+  const title = String(req.body.title ?? file.originalname).slice(0, 200);
+  const key = buildKey(file.originalname, 'images');
+  await uploadObject(key, file.buffer, file.mimetype);
+
+  const { rows } = await query(
+    `INSERT INTO activities (module_id, type, title, image_key, is_mandatory, sort_order)
+     VALUES ($1, 'imagen', $2, $3, FALSE, COALESCE((SELECT MAX(sort_order) + 1 FROM activities WHERE module_id = $1), 0))
+     RETURNING id, type, title, image_key`,
+    [req.params.moduleId, title, key],
   );
   res.status(201).json({ activity: rows[0] });
 }

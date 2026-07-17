@@ -30,9 +30,20 @@ function s3(): S3Client {
 export const r2Configured = () => env.r2.configured;
 
 /** Build a collision-free object key that keeps the original file name readable. */
-export function buildKey(originalName: string): string {
+export function buildKey(originalName: string, prefix = 'docs'): string {
   const safe = originalName.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80);
-  return `docs/${crypto.randomBytes(8).toString('hex')}-${safe}`;
+  return `${prefix}/${crypto.randomBytes(8).toString('hex')}-${safe}`;
+}
+
+/**
+ * Attach a short-lived image URL to rows that carry an `image_key`.
+ * No-op when R2 isn't configured (returns rows unchanged).
+ */
+export async function withImageUrls<T extends { image_key?: string | null }>(rows: T[]): Promise<(T & { image_url?: string })[]> {
+  if (!env.r2.configured) return rows;
+  return Promise.all(
+    rows.map(async (r) => (r.image_key ? { ...r, image_url: await presignedGetUrl(r.image_key, 3600) } : r)),
+  );
 }
 
 export async function uploadObject(key: string, body: Buffer, contentType: string): Promise<void> {

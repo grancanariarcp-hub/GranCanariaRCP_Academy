@@ -3,6 +3,7 @@ import { query } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { withImageUrls } from '../services/r2.js';
 
 /**
  * Basic student dashboard payload: their profile summary + progress.
@@ -112,13 +113,14 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
 
   const modules = await query<{ id: string }>('SELECT id, title, sort_order FROM modules WHERE course_id = $1 ORDER BY sort_order', [courseId]);
-  const activities = await query<{ module_id: string }>(
-    `SELECT a.id, a.module_id, a.type, a.title, a.url, a.document_id, a.exam_id, d.title AS document_title
+  const activities = await query<{ module_id: string; image_key: string | null }>(
+    `SELECT a.id, a.module_id, a.type, a.title, a.url, a.body, a.image_key, a.document_id, a.exam_id, d.title AS document_title
      FROM activities a LEFT JOIN documents d ON d.id = a.document_id
      WHERE a.module_id IN (SELECT id FROM modules WHERE course_id = $1)
      ORDER BY a.sort_order`,
     [courseId],
   );
-  const mods = modules.rows.map((m) => ({ ...m, activities: activities.rows.filter((a) => a.module_id === m.id) }));
+  const acts = await withImageUrls(activities.rows);
+  const mods = modules.rows.map((m) => ({ ...m, activities: acts.filter((a) => a.module_id === m.id) }));
   res.json({ course: course.rows[0], modules: mods });
 }

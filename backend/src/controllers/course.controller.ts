@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
 import { forbidden, notFound } from '../utils/httpError.js';
+import { withImageUrls } from '../services/r2.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 
@@ -134,8 +135,8 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
        WHERE cs.course_id = $1`,
       [id],
     ),
-    query<{ module_id: string }>(
-      `SELECT a.id, a.module_id, a.type, a.title, a.url, a.is_mandatory, a.document_id, a.exam_id, d.title AS document_title
+    query<{ module_id: string; image_key: string | null }>(
+      `SELECT a.id, a.module_id, a.type, a.title, a.url, a.body, a.image_key, a.is_mandatory, a.document_id, a.exam_id, d.title AS document_title
        FROM activities a
        LEFT JOIN documents d ON d.id = a.document_id
        WHERE a.module_id IN (SELECT id FROM modules WHERE course_id = $1)
@@ -144,9 +145,10 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
     ),
   ]);
 
+  const acts = await withImageUrls(activities.rows);
   const modulesWithActivities = modules.rows.map((m) => ({
     ...m,
-    activities: activities.rows.filter((a) => a.module_id === m.id),
+    activities: acts.filter((a) => a.module_id === m.id),
   }));
 
   res.json({ course: course.rows[0], modules: modulesWithActivities, staff: staff.rows });

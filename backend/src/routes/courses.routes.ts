@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { createCourse, listCourses, getCourse } from '../controllers/course.controller.js';
+import multer from 'multer';
 import {
   updateCourse, addModule, updateModule, deleteModule,
-  addActivity, deleteActivity, inviteStaff, removeStaff,
+  addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
 } from '../controllers/courseContent.controller.js';
 import {
   createExam, getExam, updateExam, addExamQuestion, importExamQuestions, deleteExamQuestion,
@@ -12,6 +13,9 @@ import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = Router();
+// Images kept in memory then streamed to R2. 10 MB ceiling.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
 router.use(requireAuth, requireRole('super_admin', 'profesor'));
 
 router.get('/', asyncHandler(listCourses));
@@ -26,6 +30,7 @@ router.delete('/:id/modules/:moduleId', asyncHandler(deleteModule));
 
 // Activities
 router.post('/:id/modules/:moduleId/activities', asyncHandler(addActivity));
+router.post('/:id/modules/:moduleId/activities/image', upload.single('file'), asyncHandler(addImageActivity));
 router.delete('/:id/activities/:activityId', asyncHandler(deleteActivity));
 
 // Staff (directores / instructores)

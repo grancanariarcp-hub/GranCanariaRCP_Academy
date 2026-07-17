@@ -5,13 +5,15 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, uploadFile } from '@/lib/api';
 
 interface Activity {
   id: string;
-  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen';
+  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen' | 'texto' | 'imagen';
   title: string;
   url: string | null;
+  body: string | null;
+  image_url?: string;
   is_mandatory: boolean;
   document_title: string | null;
   exam_id: string | null;
@@ -38,7 +40,7 @@ interface Course {
   enrollment_open: boolean;
 }
 
-const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓' };
+const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
 
 export default function CourseDetailPage() {
   const params = useParams();
@@ -53,10 +55,11 @@ export default function CourseDetailPage() {
 
   const [newModule, setNewModule] = useState('');
   const [addingTo, setAddingTo] = useState<string | null>(null); // moduleId
-  const [actType, setActType] = useState<'documento' | 'video' | 'enlace' | 'test' | 'examen'>('documento');
+  const [actType, setActType] = useState<'documento' | 'video' | 'enlace' | 'texto' | 'imagen' | 'test' | 'examen'>('documento');
   const [actTitle, setActTitle] = useState('');
   const [actUrl, setActUrl] = useState('');
   const [actDoc, setActDoc] = useState('');
+  const [actBody, setActBody] = useState('');
   const [examAttempts, setExamAttempts] = useState('1');
   const [examPass, setExamPass] = useState('60');
   const [examTime, setExamTime] = useState('');
@@ -125,15 +128,27 @@ export default function CourseDetailPage() {
           body: JSON.stringify({
             type: actType,
             title: actTitle,
-            url: actType !== 'documento' ? actUrl : undefined,
+            url: actType === 'video' || actType === 'enlace' ? actUrl : undefined,
             documentId: actType === 'documento' ? actDoc : undefined,
+            body: actType === 'texto' ? actBody : undefined,
           }),
         });
       }
-      setAddingTo(null); setActTitle(''); setActUrl(''); setActDoc('');
+      setAddingTo(null); setActTitle(''); setActUrl(''); setActDoc(''); setActBody('');
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al añadir actividad');
+    }
+  }
+
+  async function uploadImageActivity(moduleId: string, file: File | undefined) {
+    if (!file) return;
+    try {
+      await uploadFile(`/api/courses/${courseId}/modules/${moduleId}/activities/image`, file, { title: actTitle || file.name });
+      setAddingTo(null); setActTitle('');
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al subir la imagen');
     }
   }
   async function deleteActivity(activityId: string) {
@@ -215,7 +230,10 @@ export default function CourseDetailPage() {
                   <div style={{ marginTop: 8 }}>
                     {m.activities.map((a) => (
                       <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 14 }}>
-                        <span>{TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}</span>
+                        <span>
+                          {TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}
+                          {a.type === 'imagen' && a.image_url && <img src={a.image_url} alt="" style={{ height: 24, marginLeft: 8, borderRadius: 4, verticalAlign: 'middle' }} />}
+                        </span>
                         <span style={{ display: 'flex', gap: 6 }}>
                           {a.exam_id && (
                             <Link className="btn btn-outline btn-small" href={`/admin/cursos/${courseId}/examen/${a.exam_id}`}>Editar</Link>
@@ -231,7 +249,7 @@ export default function CourseDetailPage() {
                   {addingTo === m.id && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--gray-300)' }}>
                       <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-                        {(['documento', 'video', 'enlace', 'test', 'examen'] as const).map((t) => (
+                        {(['documento', 'texto', 'imagen', 'video', 'enlace', 'test', 'examen'] as const).map((t) => (
                           <button key={t} type="button" className={`tab ${actType === t ? 'active' : ''}`} style={{ flex: 'unset', padding: '6px 10px' }} onClick={() => setActType(t)}>
                             {TYPE_ICON[t]} {t}
                           </button>
@@ -246,6 +264,15 @@ export default function CourseDetailPage() {
                       )}
                       {(actType === 'video' || actType === 'enlace') && (
                         <input className="form-input" placeholder="https://…" value={actUrl} onChange={(e) => setActUrl(e.target.value)} style={{ marginBottom: 8 }} />
+                      )}
+                      {actType === 'texto' && (
+                        <textarea className="form-input" style={{ height: 90, padding: 10, marginBottom: 8 }} placeholder="Escribe el contenido…" value={actBody} onChange={(e) => setActBody(e.target.value)} />
+                      )}
+                      {actType === 'imagen' && (
+                        <label className="btn btn-primary btn-small btn-full" style={{ cursor: 'pointer', marginBottom: 8 }}>
+                          🖼️ Elegir imagen y subir
+                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadImageActivity(m.id, e.target.files?.[0]); e.target.value = ''; }} />
+                        </label>
                       )}
                       {(actType === 'test' || actType === 'examen') && (
                         <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
@@ -263,9 +290,11 @@ export default function CourseDetailPage() {
                           </div>
                         </div>
                       )}
-                      <button className="btn btn-primary btn-small btn-full" onClick={() => addActivity(m.id)} disabled={!actTitle.trim()}>
-                        {actType === 'test' || actType === 'examen' ? 'Crear examen' : 'Añadir'}
-                      </button>
+                      {actType !== 'imagen' && (
+                        <button className="btn btn-primary btn-small btn-full" onClick={() => addActivity(m.id)} disabled={!actTitle.trim()}>
+                          {actType === 'test' || actType === 'examen' ? 'Crear examen' : 'Añadir'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
