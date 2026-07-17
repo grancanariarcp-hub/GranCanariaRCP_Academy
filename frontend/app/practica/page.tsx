@@ -15,7 +15,10 @@ interface Stats {
   remaining: number;
   accuracyPct: number | null;
   daily: Array<{ day: string; answered: number; correct: number }>;
+  totalHours: number;
+  hoursDaily: Array<{ day: string; hours: number }>;
 }
+interface FailedGeneral { id: string; tema: string | null; category: string | null; text: string; fallos: string; respuestas: string; pct_fallo: string }
 
 export default function PracticaPage() {
   const user = typeof window !== 'undefined' ? getUser() : null;
@@ -39,6 +42,9 @@ export default function PracticaPage() {
   const [simTimed, setSimTimed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [passPct, setPassPct] = useState<number | null>(null);
+  const [startedAt, setStartedAt] = useState(0);
+  const [failedGeneral, setFailedGeneral] = useState<FailedGeneral[]>([]);
+  const [showFailed, setShowFailed] = useState(false);
   const selectedBank = banks.find((b) => b.id === bankId) || null;
 
   const [questions, setQuestions] = useState<Q[]>([]);
@@ -57,6 +63,15 @@ export default function PracticaPage() {
     try {
       setBanks((await api<{ banks: Bank[] }>('/api/public/banks')).banks);
     } catch { /* ignore */ }
+  }
+  async function loadFailedGeneral() {
+    try {
+      const qs = bankId ? `?bankId=${bankId}` : '';
+      setFailedGeneral((await api<{ questions: FailedGeneral[] }>(`/api/practice/failed-general${qs}`, { auth: true })).questions);
+      setShowFailed(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error');
+    }
   }
   useEffect(() => { if (user) { loadStats(); loadBanks(); } /* eslint-disable-next-line */ }, []);
 
@@ -94,6 +109,7 @@ export default function PracticaPage() {
       });
       setQuestions(r.questions);
       setAnswers(Object.fromEntries(r.questions.map((q) => [q.id, null])));
+      setStartedAt(Date.now());
       setPhase('taking');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al empezar');
@@ -115,6 +131,7 @@ export default function PracticaPage() {
       setSimTimed(timed);
       setTimeLeft(timed ? selectedBank.sim_minutes! * 60 : 0);
       setSimActive(true);
+      setStartedAt(Date.now());
       setPhase('taking');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al empezar');
@@ -124,7 +141,13 @@ export default function PracticaPage() {
   async function submit() {
     try {
       const r = await api<{ correct: number; total: number; feedback: Feedback[] }>('/api/practice/submit', {
-        method: 'POST', auth: true, body: JSON.stringify({ answers }),
+        method: 'POST', auth: true,
+        body: JSON.stringify({
+          answers,
+          seconds: startedAt ? Math.round((Date.now() - startedAt) / 1000) : undefined,
+          bankId: bankId || undefined,
+          isSimulacro: simActive,
+        }),
       });
       setFeedback(r.feedback);
       setScore({ correct: r.correct, total: r.total });
@@ -164,8 +187,13 @@ export default function PracticaPage() {
                     {stats.failedByCategory.map((f) => `${f.category} (${f.count})`).join(' · ')}
                   </p>
                 )}
-                <div className="info-box" style={{ fontSize: 13, marginBottom: 8 }}>
-                  Repeticiones medias por pregunta: <strong>{stats.distinctAnswered > 0 ? (stats.totalAnswered / stats.distinctAnswered).toFixed(1) : '—'}</strong>
+                <div className="grid grid-2" style={{ gap: 8, marginBottom: 8 }}>
+                  <div className="info-box" style={{ fontSize: 13 }}>
+                    Repeticiones medias por pregunta: <strong>{stats.distinctAnswered > 0 ? (stats.totalAnswered / stats.distinctAnswered).toFixed(1) : '—'}</strong>
+                  </div>
+                  <div className="info-box" style={{ fontSize: 13 }}>
+                    Horas de estudio (total): <strong>{stats.totalHours} h</strong>
+                  </div>
                 </div>
                 {stats.daily.length > 0 && (
                   <div className="grid grid-2" style={{ marginTop: 10, gap: 16 }}>
@@ -188,6 +216,39 @@ export default function PracticaPage() {
                     </div>
                   </div>
                 )}
+                {stats.hoursDaily.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Horas por día (30 días)</div>
+                    <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 60 }}>
+                      {(() => { const maxH = Math.max(0.1, ...stats.hoursDaily.map((d) => d.hours)); return stats.hoursDaily.map((d) => (
+                        <div key={d.day} title={`${d.day}: ${d.hours} h`} style={{ flex: 1, background: 'var(--primary-medium)', height: `${(d.hours / maxH) * 100}%`, minHeight: 3, borderRadius: 2 }} />
+                      )); })()}
+                    </div>
+                  </div>
+                )}
+                <div style={{ marginTop: 12 }}>
+                  <button className="btn btn-outline btn-small" onClick={loadFailedGeneral}>
+                    {showFailed ? '↻ Actualizar' : '📊'} Preguntas más falladas por todos{selectedBank ? ` (${selectedBank.name})` : ''}
+                  </button>
+                  {showFailed && (
+                    failedGeneral.length === 0
+                      ? <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>Aún no hay datos suficientes.</p>
+                      : <div className="table-responsive" style={{ marginTop: 8 }}>
+                          <table>
+                            <thead><tr><th>Tema</th><th>Pregunta</th><th>% fallo</th></tr></thead>
+                            <tbody>
+                              {failedGeneral.slice(0, 15).map((q) => (
+                                <tr key={q.id}>
+                                  <td style={{ fontSize: 12 }}>{q.tema || q.category || '—'}</td>
+                                  <td style={{ fontSize: 12 }}>{q.text}…</td>
+                                  <td><span className="badge" style={{ background: 'var(--danger)', color: '#fff' }}>{q.pct_fallo}%</span></td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                  )}
+                </div>
               </div>
             )}
 

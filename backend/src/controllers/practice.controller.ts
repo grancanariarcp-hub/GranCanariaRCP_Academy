@@ -54,10 +54,15 @@ export async function startPractice(req: Request, res: Response): Promise<void> 
   res.json({ questions: rows });
 }
 
-const submitSchema = z.object({ answers: z.record(z.union([z.number(), z.null()])) });
+const submitSchema = z.object({
+  answers: z.record(z.union([z.number(), z.null()])),
+  seconds: z.number().int().min(0).max(86400).optional(),
+  bankId: z.string().uuid().optional(),
+  isSimulacro: z.boolean().optional(),
+});
 
 export async function submitPractice(req: Request, res: Response): Promise<void> {
-  const { answers } = submitSchema.parse(req.body);
+  const { answers, seconds, bankId, isSimulacro } = submitSchema.parse(req.body);
   const uid = req.auth!.sub;
   const ids = Object.keys(answers);
   if (ids.length === 0) throw badRequest('Sin respuestas', 'EMPTY');
@@ -81,9 +86,15 @@ export async function submitPractice(req: Request, res: Response): Promise<void>
   for (const q of qs.rows) {
     await query(
       'INSERT INTO answer_log (user_id, question_id, bank_id, category, is_correct, source) VALUES ($1,$2,$3,$4,$5,$6)',
-      [uid, q.id, q.bank_id, q.category, answers[q.id] === q.correct_index, 'practica'],
+      [uid, q.id, q.bank_id, q.category, answers[q.id] === q.correct_index, isSimulacro ? 'simulacro' : 'practica'],
     );
   }
+
+  // Record the session (duration + score) for the hours graph and history.
+  await query(
+    'INSERT INTO practice_sessions (user_id, bank_id, total, correct, seconds, is_simulacro) VALUES ($1,$2,$3,$4,$5,$6)',
+    [uid, bankId ?? qs.rows.find((q) => q.bank_id)?.bank_id ?? null, qs.rows.length, correct, seconds ?? 0, isSimulacro ?? false],
+  );
 
   res.json({ correct, total: qs.rows.length, feedback });
 }
@@ -92,7 +103,7 @@ export async function submitPractice(req: Request, res: Response): Promise<void>
 export async function getPracticeStats(req: Request, res: Response): Promise<void> {
   const uid = req.auth!.sub;
 
-  const [failed, totals, daily, bankTotal] = await Promise.all([
+  const [failed, totals, daily, bankTotal, timeAgg] = await Promise.all([
     query<{ category: string; count: string }>(
       `WITH latest AS (
          SELECT DISTINCT ON (question_id) question_id, category, is_correct
@@ -114,12 +125,20 @@ export async function getPracticeStats(req: Request, res: Response): Promise<voi
       [uid],
     ),
     query<{ count: string }>('SELECT COUNT(*) FROM questions WHERE is_active = TRUE'),
+    query<{ day: string; seconds: string; total_seconds: string }>(
+      `SELECT to_char(created_at::date, 'YYYY-MM-DD') AS day, SUM(seconds) AS seconds,
+              (SELECT COALESCE(SUM(seconds),0) FROM practice_sessions WHERE user_id = $1) AS total_seconds
+       FROM practice_sessions WHERE user_id = $1 AND created_at > NOW() - INTERVAL '30 days'
+       GROUP BY created_at::date ORDER BY created_at::date`,
+      [uid],
+    ),
   ]);
 
   const total = Number(totals.rows[0].total);
   const distinctq = Number(totals.rows[0].distinctq);
   const correct = Number(totals.rows[0].correct);
   const bank = Number(bankTotal.rows[0].count);
+  const totalSeconds = timeAgg.rows.length > 0 ? Number(timeAgg.rows[0].total_seconds) : 0;
 
   res.json({
     failedByCategory: failed.rows.map((r) => ({ category: r.category, count: Number(r.count) })),
@@ -128,5 +147,7 @@ export async function getPracticeStats(req: Request, res: Response): Promise<voi
     remaining: Math.max(0, bank - distinctq),
     accuracyPct: total > 0 ? Math.round((correct / total) * 100) : null,
     daily: daily.rows.map((r) => ({ day: r.day, answered: Number(r.answered), correct: Number(r.correct) })),
+    totalHours: Math.round((totalSeconds / 3600) * 10) / 10,
+    hoursDaily: timeAgg.rows.map((r) => ({ day: r.day, hours: Math.round((Number(r.seconds) / 3600) * 100) / 100 })),
   });
 }
