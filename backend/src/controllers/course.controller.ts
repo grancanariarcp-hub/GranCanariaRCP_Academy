@@ -74,6 +74,22 @@ export async function listOpenCourses(_req: Request, res: Response): Promise<voi
   res.json({ courses: rows });
 }
 
+/** Public: full info of one published course (for its landing page). */
+export async function getPublicCourse(req: Request, res: Response): Promise<void> {
+  const { rows } = await query(
+    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents,
+            publico_objetivo, objetivo_general, objetivos_especificos, enrollment_open
+     FROM courses WHERE id = $1 AND status = 'publicado'`,
+    [req.params.id],
+  );
+  if (rows.length === 0) throw notFound('Curso no encontrado');
+  const staff = await query(
+    `SELECT u.name, u.headline, cs.role FROM course_staff cs JOIN users u ON u.id = cs.user_id WHERE cs.course_id = $1`,
+    [req.params.id],
+  );
+  res.json({ course: rows[0], staff: staff.rows });
+}
+
 export async function listCourses(req: Request, res: Response): Promise<void> {
   const isSuper = req.auth!.role === 'super_admin';
   const { rows } = isSuper

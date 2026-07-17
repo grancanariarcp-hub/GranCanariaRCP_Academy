@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import {
   adminLogin,
+  unifiedLogin,
   professorRegister,
   studentRegister,
+  studentRegisterPublic,
   studentLoginEmail,
   studentLoginCode,
   logout,
@@ -14,7 +16,13 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
-// Admin (super_admin + institution_admin + profesor)
+// Unified login (email + password) for everyone (staff + adult students)
+router.post('/login', authLimiter, asyncHandler(unifiedLogin));
+
+// Public adult student registration (no institution)
+router.post('/student/register-public', authLimiter, asyncHandler(studentRegisterPublic));
+
+// Admin (super_admin + institution_admin + profesor) — kept for compatibility
 router.post('/admin/login', authLimiter, asyncHandler(adminLogin));
 
 // Professor self-registration (creates a pending account)

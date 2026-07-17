@@ -29,6 +29,8 @@ const studentLoginEmailSchema = z.object({
 
 const studentLoginCodeSchema = z.object({
   accessCode: z.string().min(4, 'Código de acceso requerido'),
+  nickname: z.string().min(2).max(120).optional(),
+  age: z.number().int().min(3).max(17).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -254,14 +256,14 @@ export async function studentLoginEmail(req: Request, res: Response): Promise<vo
 // Student method 3: login with access code (minors / quick access)
 // ---------------------------------------------------------------------------
 export async function studentLoginCode(req: Request, res: Response): Promise<void> {
-  const { accessCode } = studentLoginCodeSchema.parse(req.body);
+  const { accessCode, nickname, age } = studentLoginCodeSchema.parse(req.body);
   const ip = clientIp(req);
   const normalized = accessCode.trim().toUpperCase();
 
   const { rows } = await query<{
     id: string;
     display_name: string;
-    institution_id: string;
+    institution_id: string | null;
     is_active: boolean;
   }>(
     `SELECT id, display_name, institution_id, is_active
@@ -275,21 +277,111 @@ export async function studentLoginCode(req: Request, res: Response): Promise<voi
     throw unauthorized('Código de acceso no válido', 'BAD_CODE');
   }
 
-  await query('UPDATE students SET last_login_at = NOW() WHERE id = $1', [student.id]);
+  // Minors identify with a pseudonym + age (RGPD: no real name / email).
+  const displayName = nickname?.trim() || student.display_name;
+  if (nickname || age !== undefined) {
+    await query('UPDATE students SET display_name = $1, age = COALESCE($2, age), last_login_at = NOW() WHERE id = $3',
+      [displayName, age ?? null, student.id]);
+  } else {
+    await query('UPDATE students SET last_login_at = NOW() WHERE id = $1', [student.id]);
+  }
 
   const token = signToken({
     sub: student.id,
     role: 'student',
     institutionId: student.institution_id,
-    name: student.display_name,
+    name: displayName,
   });
 
   await audit({ actorId: student.id, actorType: 'student', action: 'STUDENT_LOGIN_SUCCESS', entity: 'student', entityId: student.id, ip, metadata: { method: 'code' } });
 
   res.json({
     token,
-    user: { id: student.id, name: student.display_name, role: 'student', institutionId: student.institution_id },
+    user: { id: student.id, name: displayName, role: 'student', institutionId: student.institution_id },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Unified login (email + password) — works for admins, professors and students
+// ---------------------------------------------------------------------------
+const unifiedLoginSchema = z.object({
+  email: z.string().email('Email no válido'),
+  password: z.string().min(1, 'La contraseña es obligatoria'),
+});
+
+export async function unifiedLogin(req: Request, res: Response): Promise<void> {
+  const { email, password } = unifiedLoginSchema.parse(req.body);
+  const ip = clientIp(req);
+  const lower = email.toLowerCase();
+
+  // 1) Staff (super_admin / institution_admin / profesor)
+  const u = await query<{
+    id: string; password_hash: string; name: string;
+    role: 'super_admin' | 'institution_admin' | 'profesor';
+    institution_id: string | null; is_active: boolean; status: string;
+  }>('SELECT id, password_hash, name, role, institution_id, is_active, status FROM users WHERE email = $1', [lower]);
+
+  if (u.rows.length > 0) {
+    const user = u.rows[0];
+    if (user.is_active && (await verifyPassword(password, user.password_hash))) {
+      if (user.status === 'pending') throw unauthorized('Tu cuenta de profesor está pendiente de validación', 'PENDING_APPROVAL');
+      if (user.status === 'rejected') throw unauthorized('Tu solicitud no fue aprobada', 'REJECTED');
+      await query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
+      const token = signToken({ sub: user.id, role: user.role, institutionId: user.institution_id, name: user.name });
+      await audit({ actorId: user.id, actorType: user.role, action: 'AUTH_LOGIN_SUCCESS', entity: 'user', entityId: user.id, ip });
+      res.json({ token, user: { id: user.id, name: user.name, role: user.role, institutionId: user.institution_id } });
+      return;
+    }
+  }
+
+  // 2) Students (adults with email + password)
+  const s = await query<{
+    id: string; display_name: string; password_hash: string | null; institution_id: string | null; is_active: boolean;
+  }>('SELECT id, display_name, password_hash, institution_id, is_active FROM students WHERE email = $1', [lower]);
+
+  if (s.rows.length > 0 && s.rows[0].password_hash) {
+    const st = s.rows[0];
+    if (st.is_active && (await verifyPassword(password, st.password_hash!))) {
+      await query('UPDATE students SET last_login_at = NOW() WHERE id = $1', [st.id]);
+      const token = signToken({ sub: st.id, role: 'student', institutionId: st.institution_id, name: st.display_name });
+      await audit({ actorId: st.id, actorType: 'student', action: 'STUDENT_LOGIN_SUCCESS', entity: 'student', entityId: st.id, ip });
+      res.json({ token, user: { id: st.id, name: st.display_name, role: 'student', institutionId: st.institution_id } });
+      return;
+    }
+  }
+
+  await audit({ actorType: 'anonymous', action: 'AUTH_LOGIN_FAILED', ip, metadata: { email: lower } });
+  throw unauthorized('Credenciales incorrectas', 'BAD_CREDENTIALS');
+}
+
+// ---------------------------------------------------------------------------
+// Public student registration (adult) — no institution required
+// ---------------------------------------------------------------------------
+const publicRegisterSchema = z.object({
+  name: z.string().min(2, 'El nombre es obligatorio').max(120),
+  email: z.string().email('Email no válido'),
+  password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+});
+
+export async function studentRegisterPublic(req: Request, res: Response): Promise<void> {
+  const { name, email, password } = publicRegisterSchema.parse(req.body);
+  const ip = clientIp(req);
+  const lower = email.toLowerCase();
+
+  const taken = await query('SELECT 1 FROM students WHERE email = $1 UNION SELECT 1 FROM users WHERE email = $1', [lower]);
+  if (taken.rows.length > 0) throw conflict('Ya existe una cuenta con ese email', 'EMAIL_TAKEN');
+
+  const passwordHash = await hashPassword(password);
+  const accessCode = generateAccessCode();
+  const { rows } = await query<{ id: string }>(
+    `INSERT INTO students (institution_id, display_name, access_code, is_minor, email, password_hash, identity_hash)
+     VALUES (NULL, $1, $2, FALSE, $3, $4, NULL) RETURNING id`,
+    [name, accessCode, lower, passwordHash],
+  );
+  const studentId = rows[0].id;
+  const token = signToken({ sub: studentId, role: 'student', institutionId: null, name });
+  await audit({ actorId: studentId, actorType: 'student', action: 'STUDENT_REGISTER', entity: 'student', entityId: studentId, ip });
+  res.status(201).json({ token, user: { id: studentId, name, role: 'student', institutionId: null } });
 }
 
 // ---------------------------------------------------------------------------

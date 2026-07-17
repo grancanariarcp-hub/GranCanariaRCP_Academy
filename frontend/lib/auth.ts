@@ -37,3 +37,10 @@ export function clearSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
 }
+
+/** Where to send a user after logging in, based on their role. */
+export function homeForRole(role: Role): string {
+  if (role === 'super_admin' || role === 'institution_admin') return '/admin';
+  if (role === 'profesor') return '/admin/cursos';
+  return '/student';
+}
