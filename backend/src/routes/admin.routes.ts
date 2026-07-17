@@ -11,6 +11,7 @@ import {
   listAuditLogs,
 } from '../controllers/admin.controller.js';
 import { uploadDocument, listDocuments, getDocumentUrl } from '../controllers/document.controller.js';
+import { getTemplate, importQuestions } from '../controllers/questionImport.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -33,6 +34,8 @@ router.post('/admins', asyncHandler(createAdmin));
 
 router.get('/questions', asyncHandler(listQuestions));
 router.post('/questions', asyncHandler(createQuestion));
+router.get('/questions/template', getTemplate);
+router.post('/questions/import', upload.single('file'), asyncHandler(importQuestions));
 
 router.get('/documents', asyncHandler(listDocuments));
 router.post('/documents', upload.single('file'), asyncHandler(uploadDocument));

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 
 type Level = 'SVB' | 'SVI' | 'SVA';
 type Audience = 'ninos' | 'jovenes' | 'adultos';
@@ -53,6 +53,15 @@ export default function PreguntasPage() {
   const [list, setList] = useState<QuestionRow[]>([]);
   const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
 
+  // Bulk import
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{
+    created: number;
+    total: number;
+    errors: Array<{ fila: number; errores: string[] }>;
+  } | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
   async function loadList() {
     try {
       const [q, d] = await Promise.all([
@@ -99,6 +108,25 @@ export default function PreguntasPage() {
     setIsCritical(false);
     setRefDocumentId('');
     setRefPage('');
+  }
+
+  async function handleImport(file: File | undefined) {
+    if (!file) return;
+    setImportError(null);
+    setImportResult(null);
+    setImporting(true);
+    try {
+      const res = await uploadFile<{ created: number; total: number; errors: Array<{ fila: number; errores: string[] }> }>(
+        '/api/admin/questions/import',
+        file,
+      );
+      setImportResult(res);
+      loadList();
+    } catch (err) {
+      setImportError(err instanceof ApiError ? err.message : 'Error al importar');
+    } finally {
+      setImporting(false);
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -158,6 +186,79 @@ export default function PreguntasPage() {
         { label: 'Documentos', href: '/admin/documentos' },
       ]}
     >
+      {/* ---------------- Carga masiva ---------------- */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="card-header">
+          <div className="card-title">Carga masiva de preguntas</div>
+          <div className="card-subtitle">Sube muchas preguntas de golpe (Excel o JSON)</div>
+        </div>
+
+        <div className="info-box" style={{ marginBottom: 16 }}>
+          1) Descarga la plantilla · 2) rellénala (una fila/objeto por pregunta; la columna
+          <strong> documento</strong> debe coincidir con el título de un PDF ya subido en
+          «Documentos», y <strong>pagina</strong> con su página) · 3) súbela.
+          El <strong>JSON</strong> es ideal para preguntas generadas con IA.
+        </div>
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-outline btn-small"
+            onClick={() => downloadFile('/api/admin/questions/template', 'plantilla-preguntas-rcp.xlsx')}
+          >
+            ⬇ Plantilla Excel
+          </button>
+          <button
+            type="button"
+            className="btn btn-outline btn-small"
+            onClick={() => downloadFile('/api/admin/questions/template?format=json', 'ejemplo-preguntas-rcp.json')}
+          >
+            ⬇ Ejemplo JSON
+          </button>
+
+          <label className="btn btn-primary btn-small" style={{ cursor: 'pointer', marginLeft: 'auto' }}>
+            {importing ? 'Importando…' : '⬆ Subir plantilla rellenada'}
+            <input
+              type="file"
+              accept=".xlsx,.json,application/json"
+              style={{ display: 'none' }}
+              disabled={importing}
+              onChange={(e) => {
+                handleImport(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+          </label>
+        </div>
+
+        {importError && <div className="alert alert-error" style={{ marginTop: 16 }}>{importError}</div>}
+        {importResult && (
+          <div style={{ marginTop: 16 }}>
+            <div className={`alert ${importResult.errors.length === 0 ? 'alert-success' : 'alert-error'}`}>
+              Creadas <strong>{importResult.created}</strong> de {importResult.total} ·{' '}
+              {importResult.errors.length} con errores
+            </div>
+            {importResult.errors.length > 0 && (
+              <div className="table-responsive">
+                <table>
+                  <thead>
+                    <tr><th>Fila</th><th>Problema</th></tr>
+                  </thead>
+                  <tbody>
+                    {importResult.errors.map((e) => (
+                      <tr key={e.fila}>
+                        <td>{e.fila}</td>
+                        <td style={{ fontSize: 13, color: 'var(--danger)' }}>{e.errores.join('; ')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-2">
         {/* ---------------- Form ---------------- */}
         <div className="card">
