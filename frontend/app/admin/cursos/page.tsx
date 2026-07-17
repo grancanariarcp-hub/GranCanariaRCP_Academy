@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
@@ -23,6 +24,7 @@ interface Tax {
 
 export default function CursosPage() {
   const user = useSession(['super_admin', 'profesor'], '/login/admin');
+  const router = useRouter();
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [temas, setTemas] = useState<Tax[]>([]);
@@ -72,7 +74,7 @@ export default function CursosPage() {
     setMsg(null);
     setSaving(true);
     try {
-      await api('/api/courses', {
+      const created = await api<{ course: { id: string } }>('/api/courses', {
         method: 'POST',
         auth: true,
         body: JSON.stringify({
@@ -89,16 +91,9 @@ export default function CursosPage() {
           cfc: cfc || undefined,
         }),
       });
-      setMsg({ ok: true, text: 'Curso creado (en borrador). Ábrelo para subir la miniatura y añadir módulos ✅' });
-      setTitle('');
-      setDurationHours('');
-      setObjetivoGeneral('');
-      setObjetivosEspecificos('');
-      setPublicoObjetivo([]);
-      setResumen('');
-      setAcreditacion('');
-      setCfc('');
-      load();
+      // Ir directo a la edición: allí se sube la miniatura, se añaden imágenes y
+      // contenido, y se publica/abre matrícula.
+      router.push(`/admin/cursos/${created.course.id}`);
     } catch (err) {
       setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error al crear el curso' });
     } finally {
@@ -216,7 +211,7 @@ export default function CursosPage() {
             <button className="btn btn-primary btn-full" disabled={saving}>
               {saving ? 'Creando…' : 'Crear curso'}
             </button>
-            <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>La miniatura se sube al abrir el curso.</p>
+            <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>Al crearlo te llevará a la edición: allí subes la miniatura, imágenes y contenido, y lo publicas.</p>
           </form>
         </div>
 
