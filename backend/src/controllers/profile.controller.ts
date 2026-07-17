@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { z } from 'zod';
 import { query } from '../config/database.js';
-import { badRequest } from '../utils/httpError.js';
+import { badRequest, notFound } from '../utils/httpError.js';
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
@@ -113,4 +113,63 @@ export async function generateLegajo(req: Request, res: Response): Promise<void>
   doc.end();
 
   await audit({ actorId: sub, actorType: role, action: 'LEGAJO_DOWNLOAD', ip: clientIp(req) });
+}
+
+// ---------------------------------------------------------------------------
+// CV del profesor (ítems por categoría) — visible a los alumnos
+// ---------------------------------------------------------------------------
+const CV_CATEGORIES = ['formacion', 'investigacion', 'publicaciones', 'reconocimientos', 'experiencia'] as const;
+type CvCategory = (typeof CV_CATEGORIES)[number];
+
+function groupCv(rows: Array<{ id?: string; category: string; text: string }>): Record<CvCategory, Array<{ id?: string; text: string }>> {
+  const g = {} as Record<CvCategory, Array<{ id?: string; text: string }>>;
+  for (const c of CV_CATEGORIES) g[c] = [];
+  for (const r of rows) if ((CV_CATEGORIES as readonly string[]).includes(r.category)) g[r.category as CvCategory].push({ id: r.id, text: r.text });
+  return g;
+}
+
+export async function getCv(req: Request, res: Response): Promise<void> {
+  if (req.auth!.role === 'student') throw badRequest('No disponible', 'NOT_ALLOWED');
+  const { rows } = await query<{ id: string; category: string; text: string }>(
+    'SELECT id, category, text FROM cv_items WHERE user_id = $1 ORDER BY category, sort_order, created_at',
+    [req.auth!.sub],
+  );
+  res.json({ cv: groupCv(rows) });
+}
+
+const cvItemSchema = z.object({
+  category: z.enum(CV_CATEGORIES),
+  text: z.string().min(2).max(500),
+});
+
+export async function addCvItem(req: Request, res: Response): Promise<void> {
+  if (req.auth!.role === 'student') throw badRequest('No disponible', 'NOT_ALLOWED');
+  const { category, text } = cvItemSchema.parse(req.body);
+  const { rows } = await query(
+    `INSERT INTO cv_items (user_id, category, text, sort_order)
+     VALUES ($1, $2::varchar, $3, COALESCE((SELECT MAX(sort_order) + 1 FROM cv_items WHERE user_id = $1 AND category = $2::varchar), 0))
+     RETURNING id, category, text`,
+    [req.auth!.sub, category, text],
+  );
+  res.status(201).json({ item: rows[0] });
+}
+
+export async function deleteCvItem(req: Request, res: Response): Promise<void> {
+  await query('DELETE FROM cv_items WHERE id = $1 AND user_id = $2', [req.params.itemId, req.auth!.sub]);
+  res.json({ ok: true });
+}
+
+/** Public: a professor's CV (for students). */
+export async function getProfessorCv(req: Request, res: Response): Promise<void> {
+  const u = await query<{ name: string; headline: string | null; photo_key: string | null }>(
+    "SELECT name, headline, photo_key FROM users WHERE id = $1 AND role = 'profesor'",
+    [req.params.id],
+  );
+  if (u.rows.length === 0) throw notFound('Profesor no encontrado');
+  const photoUrl = u.rows[0].photo_key && r2Configured() ? await presignedGetUrl(u.rows[0].photo_key, 3600) : null;
+  const items = await query<{ category: string; text: string }>(
+    'SELECT category, text FROM cv_items WHERE user_id = $1 ORDER BY category, sort_order, created_at',
+    [req.params.id],
+  );
+  res.json({ professor: { name: u.rows[0].name, headline: u.rows[0].headline, photo_url: photoUrl }, cv: groupCv(items.rows) });
 }

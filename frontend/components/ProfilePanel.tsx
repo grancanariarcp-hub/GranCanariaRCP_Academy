@@ -34,6 +34,12 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [downloading, setDownloading] = useState(false);
 
+  // CV (staff)
+  type CvCat = 'formacion' | 'investigacion' | 'publicaciones' | 'reconocimientos' | 'experiencia';
+  const [cv, setCv] = useState<Record<CvCat, Array<{ id: string; text: string }>> | null>(null);
+  const [cvCat, setCvCat] = useState<CvCat>('formacion');
+  const [cvText, setCvText] = useState('');
+
   async function load() {
     try {
       const r = await api<{ profile: Profile; taught: Course[]; received: Course[] }>('/api/profile', { auth: true });
@@ -44,9 +50,30 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
       setError(err instanceof ApiError ? err.message : 'Error cargando el perfil');
     }
   }
+  async function loadCv() {
+    try {
+      const r = await api<{ cv: Record<CvCat, Array<{ id: string; text: string }>> }>('/api/profile/cv', { auth: true });
+      setCv(r.cv);
+    } catch {
+      /* ignore */
+    }
+  }
   useEffect(() => {
     load();
+    if (isStaff) loadCv();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function addCv() {
+    if (!cvText.trim()) return;
+    await api('/api/profile/cv', { method: 'POST', auth: true, body: JSON.stringify({ category: cvCat, text: cvText }) });
+    setCvText('');
+    loadCv();
+  }
+  async function delCv(id: string) {
+    await api(`/api/profile/cv/${id}`, { method: 'DELETE', auth: true });
+    loadCv();
+  }
 
   async function changePw(e: React.FormEvent) {
     e.preventDefault();
@@ -165,6 +192,55 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
           </table>
         </div>
       </div>
+
+      {/* CV (solo profesores) */}
+      {isStaff && cv && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-header">
+            <div className="card-title">Mi CV</div>
+            <div className="card-subtitle">Esquemático, visible para los alumnos</div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '0 0 180px' }}>
+              <label className="form-label">Categoría</label>
+              <select className="form-select" value={cvCat} onChange={(e) => setCvCat(e.target.value as CvCat)}>
+                <option value="formacion">🎓 Formación</option>
+                <option value="investigacion">🔬 Investigación</option>
+                <option value="publicaciones">📄 Publicaciones</option>
+                <option value="reconocimientos">🏅 Reconocimientos</option>
+                <option value="experiencia">💼 Experiencia laboral</option>
+              </select>
+            </div>
+            <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Añade un ítem…" value={cvText} onChange={(e) => setCvText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addCv(); }} />
+            <button className="btn btn-primary btn-small" onClick={addCv}>Añadir</button>
+          </div>
+
+          {(['formacion', 'investigacion', 'publicaciones', 'reconocimientos', 'experiencia'] as CvCat[]).map((cat) => (
+            <div key={cat} style={{ marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{CV_LABELS[cat]}</div>
+              {cv[cat].length === 0 ? (
+                <div className="muted" style={{ fontSize: 13 }}>—</div>
+              ) : (
+                cv[cat].map((it) => (
+                  <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 0', fontSize: 14 }}>
+                    <span>• {it.text}</span>
+                    <button className="btn btn-outline btn-small" onClick={() => delCv(it.id)}>✕</button>
+                  </div>
+                ))
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
+
+const CV_LABELS: Record<string, string> = {
+  formacion: '🎓 Formación',
+  investigacion: '🔬 Investigación',
+  publicaciones: '📄 Publicaciones',
+  reconocimientos: '🏅 Reconocimientos',
+  experiencia: '💼 Experiencia laboral',
+};

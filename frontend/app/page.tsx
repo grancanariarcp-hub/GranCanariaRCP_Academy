@@ -29,24 +29,41 @@ export default function Home() {
         {/* Cabecera */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <img src="/logo-horizontal.png" alt="Gran Canaria RCP" style={{ maxWidth: 320, width: '100%' }} />
-          <p className="muted" style={{ marginTop: 4 }}>Campus de formación en reanimación cardiopulmonar</p>
+          <p className="muted" style={{ marginTop: 4 }}>Campus de formación</p>
         </div>
 
         {/* Accesos */}
-        <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 12px' }}>
-          <Link href="/login/menor" className="card" style={{ textAlign: 'center', textDecoration: 'none' }}>
-            <div style={{ fontSize: 30 }}>🧒</div>
-            <div className="card-title" style={{ marginTop: 6 }}>Alumno menor de 18</div>
-            <div className="card-subtitle">Entra con el código de tu profesor</div>
+        <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 14px' }}>
+          {/* Menor: colorido / parcheado */}
+          <Link
+            href="/login/menor"
+            style={{
+              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22,
+              background: 'linear-gradient(135deg,#f59e0b 0%,#ef4444 30%,#ec4899 55%,#8b5cf6 78%,#10b981 100%)',
+              boxShadow: 'var(--shadow-md)',
+            }}
+          >
+            <div style={{ fontSize: 34 }}>🧒</div>
+            <div style={{ fontWeight: 700, fontSize: 18, marginTop: 6 }}>Alumno menor de 18</div>
+            <div style={{ fontSize: 13, opacity: 0.95 }}>Entra con el código de tu profesor</div>
           </Link>
-          <Link href="/login" className="card" style={{ textAlign: 'center', textDecoration: 'none' }}>
-            <div style={{ fontSize: 30 }}>📧</div>
-            <div className="card-title" style={{ marginTop: 6 }}>Acceso</div>
-            <div className="card-subtitle">Email y contraseña</div>
+
+          {/* Acceso: destacado para registrados (alumnos, profesores, admin) */}
+          <Link
+            href="/login"
+            style={{
+              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22,
+              background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--secondary-dark) 100%)',
+              boxShadow: 'var(--shadow-md)',
+            }}
+          >
+            <div style={{ fontSize: 34 }}>🔑</div>
+            <div style={{ fontWeight: 700, fontSize: 18, marginTop: 6 }}>Acceso</div>
+            <div style={{ fontSize: 13, opacity: 0.95 }}>Alumnos, profesores y administración ya registrados</div>
           </Link>
         </div>
         <div style={{ maxWidth: 720, margin: '0 auto 32px', textAlign: 'center' }}>
-          <Link href="/registro" className="btn btn-outline">✍️ Registrarse (nuevo alumno)</Link>
+          <Link href="/registro" className="btn btn-primary">✍️ Registrarse</Link>
         </div>
 
         {/* Cursos con matrícula abierta */}
@@ -77,8 +94,6 @@ export default function Home() {
         )}
 
         <p style={{ textAlign: 'center', marginTop: 32 }}>
-          <Link href="/login" className="muted" style={{ fontSize: 13 }}>Soy profesor o administrador</Link>
-          {' · '}
           <AppVersion />
         </p>
       </div>

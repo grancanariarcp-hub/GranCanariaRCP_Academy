@@ -25,6 +25,7 @@ interface Course {
   enrollment_open: boolean;
 }
 interface Staff {
+  id: string;
   name: string;
   headline: string | null;
   role: string;
@@ -102,7 +103,12 @@ export default function PublicCoursePage() {
             {staff.length > 0 && (
               <p style={{ marginBottom: 16 }}>
                 <strong>Docentes:</strong>{' '}
-                {staff.map((s) => `${s.name}${s.headline ? ` (${s.headline})` : ''}`).join(', ')}
+                {staff.map((s, i) => (
+                  <span key={s.id}>
+                    {i > 0 ? ', ' : ''}
+                    <Link href={`/profesor/${s.id}`}>{s.name}</Link>{s.headline ? ` (${s.headline})` : ''}
+                  </span>
+                ))}
               </p>
             )}
 

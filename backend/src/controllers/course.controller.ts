@@ -89,7 +89,7 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
   );
   if (rows.length === 0) throw notFound('Curso no encontrado');
   const staff = await query(
-    `SELECT u.name, u.headline, cs.role FROM course_staff cs JOIN users u ON u.id = cs.user_id WHERE cs.course_id = $1`,
+    `SELECT u.id, u.name, u.headline, cs.role FROM course_staff cs JOIN users u ON u.id = cs.user_id WHERE cs.course_id = $1`,
     [req.params.id],
   );
   const [course] = await presignKeys(rows, 'thumbnail_key', 'thumbnail_url');
