@@ -5,7 +5,7 @@
  * for a production app you'd likely move to httpOnly cookies, but this
  * keeps Phase 1 simple and framework-agnostic.
  */
-export type Role = 'super_admin' | 'institution_admin' | 'student';
+export type Role = 'super_admin' | 'institution_admin' | 'profesor' | 'student';
 
 export interface SessionUser {
   id: string;

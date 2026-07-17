@@ -92,6 +92,7 @@ export default function AdminDashboard() {
       title="Dashboard"
       nav={[
         { label: 'Resumen', href: '/admin', active: true },
+        { label: 'Cursos', href: '/admin/cursos' },
         { label: 'Preguntas', href: '/admin/preguntas' },
         { label: 'Documentos', href: '/admin/documentos' },
         { label: 'Instituciones', href: '/admin' },

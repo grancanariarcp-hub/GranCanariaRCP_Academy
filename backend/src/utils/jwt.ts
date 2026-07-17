@@ -1,7 +1,7 @@
 import jwt, { type SignOptions } from 'jsonwebtoken';
 import { env } from '../config/env.js';
 
-export type UserRole = 'super_admin' | 'institution_admin' | 'student';
+export type UserRole = 'super_admin' | 'institution_admin' | 'profesor' | 'student';
 
 /** The claims we embed in every access token. */
 export interface TokenPayload {

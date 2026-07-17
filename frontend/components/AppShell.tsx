@@ -77,6 +77,8 @@ function roleLabel(role: SessionUser['role']): string {
       return 'Super Admin';
     case 'institution_admin':
       return 'Admin institución';
+    case 'profesor':
+      return 'Profesor';
     default:
       return 'Alumno';
   }

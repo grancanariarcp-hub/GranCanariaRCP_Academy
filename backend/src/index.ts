@@ -8,6 +8,8 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/auth.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import studentRoutes from './routes/student.routes.js';
+import taxonomiesRoutes from './routes/taxonomies.routes.js';
+import coursesRoutes from './routes/courses.routes.js';
 
 const app = express();
 
@@ -52,6 +54,8 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/student', studentRoutes);
+app.use('/api/taxonomies', taxonomiesRoutes);
+app.use('/api/courses', coursesRoutes);
 
 // 404 + central error handler (must be last)
 app.use(notFoundHandler);

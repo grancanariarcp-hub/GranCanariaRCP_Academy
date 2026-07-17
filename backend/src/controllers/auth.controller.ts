@@ -42,11 +42,12 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
     id: string;
     password_hash: string;
     name: string;
-    role: 'super_admin' | 'institution_admin';
+    role: 'super_admin' | 'institution_admin' | 'profesor';
     institution_id: string | null;
     is_active: boolean;
+    status: string;
   }>(
-    `SELECT id, password_hash, name, role, institution_id, is_active
+    `SELECT id, password_hash, name, role, institution_id, is_active, status
      FROM users WHERE email = $1`,
     [email.toLowerCase()],
   );
@@ -67,6 +68,14 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
       metadata: { email: email.toLowerCase() },
     });
     throw unauthorized('Credenciales incorrectas', 'BAD_CREDENTIALS');
+  }
+
+  // A professor account must be approved by a super_admin before it can log in.
+  if (user.status === 'pending') {
+    throw unauthorized('Tu cuenta de profesor está pendiente de validación', 'PENDING_APPROVAL');
+  }
+  if (user.status === 'rejected') {
+    throw unauthorized('Tu solicitud de profesor no fue aprobada', 'REJECTED');
   }
 
   await query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
