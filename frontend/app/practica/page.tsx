@@ -164,11 +164,34 @@ export default function PracticaPage() {
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 820, margin: '0 auto' }}>
         <p style={{ marginBottom: 16 }}><Link href="/">← Inicio</Link></p>
-        <h1 style={{ color: 'var(--primary-dark)', marginBottom: 16 }}>📚 Práctica</h1>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <h1 style={{ color: 'var(--primary-dark)', fontSize: 30 }}>📚 Práctica libre</h1>
+          <p className="muted" style={{ maxWidth: 560, margin: '6px auto 0' }}>Entrena a tu ritmo, repasa tus fallos y prepara simulacros. Cada respuesta mejora tus estadísticas.</p>
+        </div>
         {error && <div className="alert alert-error">{error}</div>}
 
         {!user ? (
-          <div className="card"><div className="info-box">Para practicar y ver tus estadísticas, <Link href="/login">accede</Link> o <Link href="/registro">regístrate</Link>.</div></div>
+          <>
+            <div className="grid grid-3 animate-in" style={{ gap: 14, marginBottom: 20 }}>
+              {[
+                { t: 'Tests a tu medida', d: 'Aleatorio, por tema o solo tus fallos', bg: 'linear-gradient(135deg,#2c5282,#4299e1)' },
+                { t: 'Simulacros cronometrados', d: 'Con nota de corte, como el examen real', bg: 'linear-gradient(135deg,#6b46c1,#9f7aea)' },
+                { t: 'Estadísticas y progreso', d: 'Aciertos, horas y evolución', bg: 'linear-gradient(135deg,#276749,#10b981)' },
+              ].map((f) => (
+                <div key={f.t} className="press" style={{ color: '#fff', borderRadius: 14, padding: 22, background: f.bg, boxShadow: 'var(--shadow-md)', textAlign: 'center', minHeight: 120, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  <div style={{ fontWeight: 800, fontSize: 17 }}>{f.t}</div>
+                  <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>{f.d}</div>
+                </div>
+              ))}
+            </div>
+            <div className="card" style={{ textAlign: 'center' }}>
+              <p style={{ marginBottom: 12 }}>Para practicar y guardar tus estadísticas, entra o crea tu cuenta gratis:</p>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <Link href="/login" className="btn btn-primary">Acceder</Link>
+                <Link href="/registro" className="btn cta-blink" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', fontWeight: 700 }}>Regístrate gratis</Link>
+              </div>
+            </div>
+          </>
         ) : (
           <>
             {/* Estadísticas */}
