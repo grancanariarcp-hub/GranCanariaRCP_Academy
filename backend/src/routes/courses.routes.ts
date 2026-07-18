@@ -4,6 +4,7 @@ import multer from 'multer';
 import {
   updateCourse, uploadCourseThumbnail, addModule, updateModule, deleteModule,
   addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
+  addCourseImage, deleteCourseImage,
 } from '../controllers/courseContent.controller.js';
 import {
   createExam, getExam, updateExam, addExamQuestion, importExamQuestions, deleteExamQuestion, listExamAttempts,
@@ -24,6 +25,8 @@ router.post('/', asyncHandler(createCourse));
 router.get('/:id', asyncHandler(getCourse));
 router.patch('/:id', asyncHandler(updateCourse));
 router.post('/:id/thumbnail', upload.single('file'), asyncHandler(uploadCourseThumbnail));
+router.post('/:id/gallery', upload.single('file'), asyncHandler(addCourseImage));
+router.delete('/:id/gallery/:imageId', asyncHandler(deleteCourseImage));
 
 // Modules
 router.post('/:id/modules', asyncHandler(addModule));

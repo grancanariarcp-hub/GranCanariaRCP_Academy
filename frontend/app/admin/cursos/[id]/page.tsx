@@ -62,6 +62,7 @@ export default function CourseDetailPage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
   const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,10 +98,11 @@ export default function CourseDetailPage() {
   async function load() {
     try {
       const [c, d] = await Promise.all([
-        api<{ course: Course; modules: Module[]; staff: Staff[] }>(`/api/courses/${courseId}`, { auth: true }),
+        api<{ course: Course; modules: Module[]; staff: Staff[]; gallery: Array<{ id: string; url: string }> }>(`/api/courses/${courseId}`, { auth: true }),
         api<{ documents: Array<{ id: string; title: string }> }>('/api/admin/documents', { auth: true }).catch(() => ({ documents: [] })),
       ]);
       setCourse(c.course);
+      setGallery(c.gallery ?? []);
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
@@ -147,6 +149,23 @@ export default function CourseDetailPage() {
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al subir la miniatura');
+    }
+  }
+  async function uploadGallery(file: File | undefined) {
+    if (!file) return;
+    try {
+      await uploadFile(`/api/courses/${courseId}/gallery`, file);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al subir la imagen');
+    }
+  }
+  async function deleteGalleryImage(imageId: string) {
+    try {
+      await api(`/api/courses/${courseId}/gallery/${imageId}`, { method: 'DELETE', auth: true });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al borrar');
     }
   }
 
@@ -341,6 +360,32 @@ export default function CourseDetailPage() {
                 <button className="btn btn-primary btn-small" onClick={saveFicha}>Guardar ficha</button>
               </div>
             </div>
+          </div>
+
+          {/* Galería / carrusel */}
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <div className="card-title">Galería (carrusel de la ficha)</div>
+              <div className="card-subtitle">Varias imágenes que rotan en la página pública del curso</div>
+            </div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              {gallery.map((g) => (
+                <div key={g.id} style={{ position: 'relative', width: 120, height: 80 }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={g.url} alt="" style={{ width: 120, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--gray-200)' }} />
+                  <button
+                    onClick={() => deleteGalleryImage(g.id)}
+                    title="Borrar"
+                    style={{ position: 'absolute', top: -8, right: -8, background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 999, width: 22, height: 22, cursor: 'pointer', lineHeight: 1 }}
+                  >×</button>
+                </div>
+              ))}
+              <label className="btn btn-outline btn-small" style={{ cursor: 'pointer', height: 80, width: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                + Añadir imagen
+                <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadGallery(e.target.files?.[0]); e.target.value = ''; }} />
+              </label>
+            </div>
+            {gallery.length === 0 && <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>Sin imágenes. Si no añades ninguna, la ficha usa la miniatura.</p>}
           </div>
 
           {/* Certificado */}

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
+import { Carousel } from '@/components/Carousel';
 import { temaPalette } from '@/lib/temaColors';
 
 interface Course {
@@ -40,12 +41,13 @@ export default function PublicCoursePage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [program, setProgram] = useState<Mod[]>([]);
+  const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   useEffect(() => {
-    api<{ course: Course; staff: Staff[]; program: Mod[] }>(`/api/public/courses/${courseId}`)
-      .then((r) => { setCourse(r.course); setStaff(r.staff); setProgram(r.program ?? []); })
+    api<{ course: Course; staff: Staff[]; program: Mod[]; gallery: Array<{ id: string; url: string }> }>(`/api/public/courses/${courseId}`)
+      .then((r) => { setCourse(r.course); setStaff(r.staff); setProgram(r.program ?? []); setGallery(r.gallery ?? []); })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Curso no disponible'));
   }, [courseId]);
 
@@ -71,7 +73,9 @@ export default function PublicCoursePage() {
           !error && <div className="muted">Cargando…</div>
         ) : (
           <div className="card animate-pop" style={{ padding: 0, overflow: 'hidden', borderTop: `6px solid ${temaPalette(course.tema).main}` }}>
-            {course.thumbnail_url ? (
+            {gallery.length > 0 ? (
+              <Carousel images={gallery.map((g) => g.url)} height={260} />
+            ) : course.thumbnail_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={course.thumbnail_url} alt="" style={{ width: '100%', maxHeight: 240, objectFit: 'cover' }} />
             ) : (

@@ -109,8 +109,12 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
      ORDER BY m.sort_order`,
     [req.params.id],
   );
+  const gallery = await presignKeys(
+    (await query<{ id: string; image_key: string; url?: string }>('SELECT id, image_key FROM course_images WHERE course_id = $1 ORDER BY sort_order', [req.params.id])).rows,
+    'image_key', 'url',
+  );
   const [course] = await presignKeys(rows, 'thumbnail_key', 'thumbnail_url');
-  res.json({ course, staff: staff.rows, program: program.rows });
+  res.json({ course, staff: staff.rows, program: program.rows, gallery: gallery.map((g) => ({ id: g.id, url: g.url })) });
 }
 
 export async function listCourses(req: Request, res: Response): Promise<void> {
@@ -176,5 +180,9 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
   let [courseFull] = await presignKeys(course.rows, 'thumbnail_key', 'thumbnail_url');
   [courseFull] = await presignKeys([courseFull], 'cert_bg_key', 'cert_bg_url');
   [courseFull] = await presignKeys([courseFull], 'cfc_image_key', 'cfc_image_url');
-  res.json({ course: courseFull, modules: modulesWithActivities, staff: staff.rows });
+  const gallery = await presignKeys(
+    (await query<{ id: string; image_key: string; url?: string }>('SELECT id, image_key FROM course_images WHERE course_id = $1 ORDER BY sort_order', [id])).rows,
+    'image_key', 'url',
+  );
+  res.json({ course: courseFull, modules: modulesWithActivities, staff: staff.rows, gallery: gallery.map((g) => ({ id: g.id, url: g.url })) });
 }

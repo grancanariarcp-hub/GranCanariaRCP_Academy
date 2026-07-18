@@ -5,7 +5,7 @@ import { badRequest, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { assertEditor, assertDirector } from '../services/courseAuth.js';
-import { r2Configured, buildKey, uploadObject, presignedGetUrl } from '../services/r2.js';
+import { r2Configured, buildKey, uploadObject, presignedGetUrl, deleteObject } from '../services/r2.js';
 
 /** Editing the inside of a course: modules, activities and staff. */
 
@@ -138,6 +138,37 @@ export async function uploadCourseThumbnail(req: Request, res: Response): Promis
   await uploadObject(key, file.buffer, file.mimetype);
   await query('UPDATE courses SET thumbnail_key = $1, updated_at = NOW() WHERE id = $2', [key, req.params.id]);
   res.json({ thumbnail_url: await presignedGetUrl(key, 3600) });
+}
+
+// ---------------------------------------------------------------------------
+// Galería del curso (carrusel de la ficha) — imágenes en R2
+// ---------------------------------------------------------------------------
+export async function addCourseImage(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  if (!r2Configured()) throw badRequest('El almacén de imágenes no está configurado', 'R2_NOT_CONFIGURED');
+  const file = req.file;
+  if (!file || !file.mimetype.startsWith('image/')) throw badRequest('Sube una imagen', 'NOT_IMAGE');
+
+  const key = buildKey(file.originalname, 'gallery');
+  await uploadObject(key, file.buffer, file.mimetype);
+  const { rows } = await query(
+    `INSERT INTO course_images (course_id, image_key, sort_order)
+     VALUES ($1, $2, COALESCE((SELECT MAX(sort_order) + 1 FROM course_images WHERE course_id = $1), 0))
+     RETURNING id, image_key`,
+    [req.params.id, key],
+  );
+  res.status(201).json({ image: { id: rows[0].id, url: await presignedGetUrl(key, 3600) } });
+}
+
+export async function deleteCourseImage(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const { rows } = await query<{ image_key: string }>(
+    'DELETE FROM course_images WHERE id = $1 AND course_id = $2 RETURNING image_key',
+    [req.params.imageId, req.params.id],
+  );
+  if (rows.length === 0) throw notFound('Imagen no encontrada');
+  await deleteObject(rows[0].image_key).catch(() => { /* si R2 falla, la fila ya se borró */ });
+  res.json({ ok: true });
 }
 
 /** Add an image activity (multipart: file + title). Stores the image in R2. */
