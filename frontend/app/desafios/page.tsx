@@ -46,8 +46,8 @@ export default function DesafiosPage() {
           <p className="muted" style={{ textAlign: 'center' }}>Pronto habrá desafíos disponibles.</p>
         ) : (
           <div className="grid grid-2">
-            {challenges.map((c) => (
-              <Link key={c.id} href={`/desafios/${c.id}`} className="card" style={{ textDecoration: 'none' }}>
+            {challenges.map((c, i) => (
+              <Link key={c.id} href={`/desafios/${c.id}`} className="card press animate-in" style={{ textDecoration: 'none', borderTop: `4px solid ${c.kind === 'permanente' ? '#c41e3a' : '#f59e0b'}`, animationDelay: `${Math.min(i, 8) * 60}ms` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div className="card-title">{c.title}</div>
                   {c.kind === 'permanente'

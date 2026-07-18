@@ -54,50 +54,65 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Accesos */}
+        {/* Bloque destacado y destellante: desafíos + menores */}
         <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 14px' }}>
+          <Link
+            href="/desafios"
+            className="press cta-blink animate-in"
+            style={{
+              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 14, padding: 28,
+              background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)',
+            }}
+          >
+            <div style={{ fontWeight: 800, fontSize: 21 }}>¿Qué tanto sabes de RCP?</div>
+            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Desafíos, reto permanente y ranking</div>
+          </Link>
+
           {/* Menor: colorido / parcheado */}
           <Link
             href="/login/menor"
-            className="press animate-in"
+            className="press cta-blink animate-in"
             style={{
-              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 26,
+              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 14, padding: 28,
               background: 'linear-gradient(135deg,#f59e0b 0%,#ef4444 30%,#ec4899 55%,#8b5cf6 78%,#10b981 100%)',
               boxShadow: 'var(--shadow-md)',
             }}
           >
-            <div style={{ fontWeight: 700, fontSize: 19 }}>Alumno menor de 18</div>
+            <div style={{ fontWeight: 800, fontSize: 21 }}>Alumno menor de 18</div>
             <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Entra con el código de tu profesor</div>
           </Link>
+        </div>
 
-          {/* Acceso: destacado para registrados (alumnos, profesores, admin) */}
+        {/* Acceso + Práctica en la misma línea */}
+        <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 14px' }}>
           <Link
             href="/login"
             className="press animate-in"
             style={{
-              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 26,
+              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22,
               background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--secondary-dark) 100%)',
               boxShadow: 'var(--shadow-md)',
             }}
           >
-            <div style={{ fontWeight: 700, fontSize: 19 }}>Acceso</div>
-            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Alumnos, profesores y administración ya registrados</div>
+            <div style={{ fontWeight: 700, fontSize: 18 }}>Acceso</div>
+            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Alumnos, profesores y administración</div>
           </Link>
-        </div>
-        <div style={{ maxWidth: 720, margin: '0 auto 32px', textAlign: 'center' }}>
-          <Link href="/registro" className="btn" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', boxShadow: 'var(--shadow-sm)' }}>Registrarse</Link>
-        </div>
-
-        {/* Desafíos + Práctica */}
-        <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 32px' }}>
-          <Link href="/desafios" className="press animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22, textAlign: 'center', background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)' }}>
-            <div style={{ fontWeight: 700, fontSize: 18 }}>¿Qué tanto sabes de RCP?</div>
-            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Desafíos activos, reto permanente y ranking</div>
-          </Link>
-          <Link href="/practica" className="press animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22, textAlign: 'center', background: 'linear-gradient(135deg,#2c5282,#276749)', boxShadow: 'var(--shadow-md)' }}>
+          <Link
+            href="/practica"
+            className="press animate-in"
+            style={{
+              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22,
+              background: 'linear-gradient(135deg,#2c5282,#276749)', boxShadow: 'var(--shadow-md)',
+            }}
+          >
             <div style={{ fontWeight: 700, fontSize: 18 }}>Práctica libre</div>
             <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Entrena y repasa tus fallos</div>
           </Link>
+        </div>
+
+        {/* Registrarse centrado */}
+        <div style={{ maxWidth: 720, margin: '0 auto 32px', textAlign: 'center' }}>
+          <Link href="/registro" className="btn" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', boxShadow: 'var(--shadow-sm)', fontWeight: 700, padding: '12px 26px' }}>Regístrate</Link>
         </div>
 
         {/* Cursos */}

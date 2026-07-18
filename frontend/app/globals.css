@@ -340,6 +340,9 @@ tbody td {
   padding: 12px;
   border-bottom: 1px solid var(--gray-200);
 }
+tbody tr {
+  transition: background 0.15s ease;
+}
 tbody tr:hover {
   background: var(--gray-100);
 }
