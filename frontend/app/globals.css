@@ -115,7 +115,9 @@ body {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', sans-serif;
-  background: var(--bg-primary);
+  /* Degradado sutil (evita el fondo plano/blanco) fijo al hacer scroll. */
+  background: linear-gradient(170deg, #eef2f7 0%, #dbe2ec 45%, #cdd8e6 100%);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.6;
@@ -388,7 +390,9 @@ tbody tr:hover {
   border-radius: 14px;
   box-shadow: var(--shadow-xl);
   padding: 32px;
+  animation: popIn 0.4s ease both;
 }
+@media (prefers-reduced-motion: reduce) { .auth-card { animation: none; } }
 .auth-logo {
   text-align: center;
   margin-bottom: 24px;

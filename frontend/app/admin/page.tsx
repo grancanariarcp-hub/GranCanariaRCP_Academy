@@ -129,7 +129,7 @@ export default function AdminDashboard() {
 
       <div className="grid grid-2">
         {/* Institutions table */}
-        <div className="card">
+        <div className="card animate-in">
           <div className="card-header">
             <div className="card-title">Instituciones</div>
             <div className="card-subtitle">{institutions.length} registradas</div>
@@ -178,7 +178,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Create institution (super_admin only) */}
-        <div className="card">
+        <div className="card animate-in">
           <div className="card-header">
             <div className="card-title">Nueva institución</div>
             <div className="card-subtitle">Solo Super Admin</div>

@@ -45,7 +45,7 @@ export default function RankingsPage() {
           <button className={`tab ${tab === 'instituciones' ? 'active' : ''}`} onClick={() => setTab('instituciones')}>🏫 Instituciones</button>
         </div>
 
-        <div className="card">
+        <div className="card animate-in">
           {!loaded ? (
             <div className="muted">Cargando…</div>
           ) : tab === 'personas' ? (

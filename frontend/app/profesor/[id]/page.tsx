@@ -32,22 +32,23 @@ export default function PublicProfessorPage() {
         <p style={{ marginBottom: 16 }}><Link href="/">← Volver</Link></p>
         {error && <div className="alert alert-error">{error}</div>}
         {data && (
-          <div className="card">
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 20 }}>
-              <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--gray-200)', overflow: 'hidden', flexShrink: 0 }}>
+          <div className="card animate-pop" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ background: 'linear-gradient(135deg,var(--primary-dark),var(--secondary-dark))', padding: '26px 24px', display: 'flex', gap: 18, alignItems: 'center' }}>
+              <div style={{ width: 84, height: 84, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', overflow: 'hidden', flexShrink: 0, border: '3px solid rgba(255,255,255,0.7)' }}>
                 {data.professor.photo_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={data.professor.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 28 }}>👤</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 34 }}>👤</div>
                 )}
               </div>
-              <div>
-                <h1 style={{ fontSize: 22 }}>{data.professor.name}</h1>
-                {data.professor.headline && <div className="muted">{data.professor.headline}</div>}
+              <div style={{ color: '#fff' }}>
+                <h1 style={{ fontSize: 24 }}>{data.professor.name}</h1>
+                {data.professor.headline && <div style={{ opacity: 0.9 }}>{data.professor.headline}</div>}
               </div>
             </div>
 
+            <div style={{ padding: 24 }}>
             {(Object.keys(LABELS) as CvCat[]).map((cat) =>
               data.cv[cat].length > 0 ? (
                 <div key={cat} style={{ marginBottom: 14 }}>
@@ -58,6 +59,7 @@ export default function PublicProfessorPage() {
                 </div>
               ) : null,
             )}
+            </div>
           </div>
         )}
         <p style={{ textAlign: 'center', marginTop: 24 }}><AppVersion /></p>

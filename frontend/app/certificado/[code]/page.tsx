@@ -55,7 +55,7 @@ export default function CertificadoPage() {
             </div>
 
             {/* Versión digital del certificado */}
-            <div className="card" style={{ border: '2px solid var(--primary-dark)', textAlign: 'center', padding: 28 }}>
+            <div className="card animate-pop" style={{ border: '2px solid var(--primary-dark)', textAlign: 'center', padding: 28 }}>
               <div style={{ color: 'var(--primary-dark)', fontWeight: 700, letterSpacing: 1, fontSize: 14 }}>GRAN CANARIA RCP · CAMPUS</div>
               <h1 style={{ letterSpacing: 3, margin: '14px 0 6px', color: 'var(--primary-dark)' }}>CERTIFICADO</h1>
               <p style={{ margin: '10px 0 2px' }}>{cert.certifica} certifica que:</p>
