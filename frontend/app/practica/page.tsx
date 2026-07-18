@@ -173,7 +173,7 @@ export default function PracticaPage() {
           <>
             {/* Estadísticas */}
             {stats && phase === 'config' && (
-              <div className="card" style={{ marginBottom: 20 }}>
+              <div className="card animate-in" style={{ marginBottom: 20 }}>
                 <div className="card-header"><div className="card-title">Tu progreso</div></div>
                 <div className="grid grid-4" style={{ marginBottom: 12 }}>
                   <div className="info-box">Respondidas: <strong>{stats.totalAnswered}</strong></div>
@@ -254,7 +254,7 @@ export default function PracticaPage() {
 
             {/* Config */}
             {phase === 'config' && (
-              <div className="card">
+              <div className="card animate-in">
                 <div className="card-header"><div className="card-title">Generar test</div></div>
                 <div className="tabs">
                   <button className={`tab ${mode === 'aleatorio' ? 'active' : ''}`} onClick={() => setMode('aleatorio')}>🎲 Aleatorio</button>

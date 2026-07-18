@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
+import { temaPalette } from '@/lib/temaColors';
 
 interface MyCourse {
   id: string;
@@ -67,7 +68,7 @@ export default function StudentDashboard() {
       {msg && <div className="alert alert-success">{msg}</div>}
 
       {/* Mis cursos */}
-      <div className="card" style={{ marginBottom: 24 }}>
+      <div className="card animate-in" style={{ marginBottom: 24 }}>
         <div className="card-header">
           <div className="card-title">Mis cursos</div>
           <div className="card-subtitle">Cursos en los que estás matriculado</div>
@@ -76,8 +77,8 @@ export default function StudentDashboard() {
           <div className="muted">Aún no estás matriculado en ningún curso. ¡Explora los disponibles abajo!</div>
         ) : (
           <div className="grid grid-2">
-            {mine.map((c) => (
-              <div key={c.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: 16 }}>
+            {mine.map((c, i) => (
+              <div key={c.id} className="press animate-in" style={{ border: '1px solid var(--gray-200)', borderLeft: `4px solid ${temaPalette(c.tema).main}`, borderRadius: 8, padding: 16, animationDelay: `${Math.min(i, 8) * 50}ms` }}>
                 <div style={{ fontWeight: 600 }}>{c.title}</div>
                 <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>
                   {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')} ·{' '}
@@ -91,7 +92,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* Cursos disponibles */}
-      <div className="card">
+      <div className="card animate-in">
         <div className="card-header">
           <div className="card-title">Cursos disponibles</div>
           <div className="card-subtitle">Con matrícula abierta</div>
@@ -100,8 +101,8 @@ export default function StudentDashboard() {
           <div className="muted">No hay cursos con matrícula abierta ahora mismo.</div>
         ) : (
           <div className="grid grid-2">
-            {available.map((c) => (
-              <div key={c.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: 16 }}>
+            {available.map((c, i) => (
+              <div key={c.id} className="press animate-in" style={{ border: '1px solid var(--gray-200)', borderLeft: `4px solid ${temaPalette(c.tema).main}`, borderRadius: 8, padding: 16, animationDelay: `${Math.min(i, 8) * 50}ms` }}>
                 <div style={{ fontWeight: 600 }}>{c.title}</div>
                 <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>
                   {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')}
