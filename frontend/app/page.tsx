@@ -59,53 +59,51 @@ export default function Home() {
           {/* Menor: colorido / parcheado */}
           <Link
             href="/login/menor"
-            className="hover-lift animate-in"
+            className="press animate-in"
             style={{
-              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22,
+              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 26,
               background: 'linear-gradient(135deg,#f59e0b 0%,#ef4444 30%,#ec4899 55%,#8b5cf6 78%,#10b981 100%)',
               boxShadow: 'var(--shadow-md)',
             }}
           >
-            <div style={{ fontSize: 34 }}>🧒</div>
-            <div style={{ fontWeight: 700, fontSize: 18, marginTop: 6 }}>Alumno menor de 18</div>
-            <div style={{ fontSize: 13, opacity: 0.95 }}>Entra con el código de tu profesor</div>
+            <div style={{ fontWeight: 700, fontSize: 19 }}>Alumno menor de 18</div>
+            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Entra con el código de tu profesor</div>
           </Link>
 
           {/* Acceso: destacado para registrados (alumnos, profesores, admin) */}
           <Link
             href="/login"
-            className="hover-lift animate-in"
+            className="press animate-in"
             style={{
-              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22,
+              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 26,
               background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--secondary-dark) 100%)',
               boxShadow: 'var(--shadow-md)',
             }}
           >
-            <div style={{ fontSize: 34 }}>🔑</div>
-            <div style={{ fontWeight: 700, fontSize: 18, marginTop: 6 }}>Acceso</div>
-            <div style={{ fontSize: 13, opacity: 0.95 }}>Alumnos, profesores y administración ya registrados</div>
+            <div style={{ fontWeight: 700, fontSize: 19 }}>Acceso</div>
+            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Alumnos, profesores y administración ya registrados</div>
           </Link>
         </div>
         <div style={{ maxWidth: 720, margin: '0 auto 32px', textAlign: 'center' }}>
-          <Link href="/registro" className="btn" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', boxShadow: 'var(--shadow-sm)' }}>✍️ Registrarse</Link>
+          <Link href="/registro" className="btn" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', boxShadow: 'var(--shadow-sm)' }}>Registrarse</Link>
         </div>
 
         {/* Desafíos + Práctica */}
         <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 32px' }}>
-          <Link href="/desafios" className="hover-lift animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 18, textAlign: 'center', background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)' }}>
-            <div style={{ fontSize: 26 }}>🏆</div>
+          <Link href="/desafios" className="press animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22, textAlign: 'center', background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)' }}>
             <div style={{ fontWeight: 700, fontSize: 18 }}>Desafíos y ranking</div>
-            <div style={{ fontSize: 13, opacity: 0.95 }}>Compite y sube en el ranking</div>
+            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Compite y sube en el ranking</div>
           </Link>
-          <Link href="/practica" className="hover-lift animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 18, textAlign: 'center', background: 'linear-gradient(135deg,#2c5282,#276749)', boxShadow: 'var(--shadow-md)' }}>
-            <div style={{ fontSize: 26 }}>📚</div>
+          <Link href="/practica" className="press animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22, textAlign: 'center', background: 'linear-gradient(135deg,#2c5282,#276749)', boxShadow: 'var(--shadow-md)' }}>
             <div style={{ fontWeight: 700, fontSize: 18 }}>Práctica libre</div>
-            <div style={{ fontSize: 13, opacity: 0.95 }}>Entrena y repasa tus fallos</div>
+            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Entrena y repasa tus fallos</div>
           </Link>
         </div>
 
         {/* Cursos */}
-        <h2 style={{ textAlign: 'center', marginBottom: 12 }}>Cursos disponibles</h2>
+        <h2 style={{ textAlign: 'center', marginBottom: 20 }}>
+          <span className="heading-underline animate-in">Cursos disponibles</span>
+        </h2>
 
         {courses.length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 18 }}>

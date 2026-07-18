@@ -16,11 +16,31 @@
 .hover-lift { transition: transform 0.18s ease, box-shadow 0.18s ease; }
 .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 12px 26px rgba(26, 54, 93, 0.18); }
 
+/* Sensación "comprimido/pulsado" al pasar el cursor (botones y accesos). */
+.press { transition: transform 0.13s ease, box-shadow 0.13s ease, filter 0.13s ease; }
+.press:hover { transform: scale(0.965); box-shadow: 0 3px 8px rgba(26, 54, 93, 0.16); filter: brightness(1.04); }
+.press:active { transform: scale(0.93); }
+
+/* Todos los botones se comprimen al interactuar. */
+.btn { transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.2s ease, color 0.2s ease; }
+.btn:hover { transform: scale(0.965); }
+.btn:active { transform: scale(0.92); }
+
+/* Subrayado animado para títulos de sección. */
+.heading-underline { position: relative; display: inline-block; }
+.heading-underline::after {
+  content: ''; position: absolute; left: 50%; bottom: -8px; height: 3px; width: 0;
+  background: var(--accent, #c41e3a); border-radius: 2px; transform: translateX(-50%);
+  animation: underlineGrow 0.6s 0.25s ease forwards;
+}
+@keyframes underlineGrow { to { width: 64px; } }
+
 /* Respeta a quien prefiere menos movimiento. */
 @media (prefers-reduced-motion: reduce) {
   .animate-in, .animate-fade, .animate-pop { animation: none; }
-  .hover-lift { transition: none; }
-  .hover-lift:hover { transform: none; }
+  .hover-lift, .press, .btn { transition: none; }
+  .hover-lift:hover, .press:hover, .press:active, .btn:hover, .btn:active { transform: none; }
+  .heading-underline::after { animation: none; width: 64px; }
 }
 
 :root {
