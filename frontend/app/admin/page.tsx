@@ -18,6 +18,10 @@ interface Institution {
   name: string;
   code: string;
   contact_email: string | null;
+  contact_name: string | null;
+  contact_phone: string | null;
+  address: string | null;
+  status: string;
   is_active: boolean;
   student_count: string;
 }
@@ -62,6 +66,15 @@ export default function AdminDashboard() {
     if (user) loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function setInstitutionStatus(id: string, action: 'approve' | 'reject') {
+    try {
+      await api(`/api/admin/institutions/${id}/${action}`, { method: 'POST', auth: true });
+      loadAll();
+    } catch (err) {
+      setFormMsg(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
 
   async function createInstitution(e: React.FormEvent) {
     e.preventDefault();
@@ -126,20 +139,38 @@ export default function AdminDashboard() {
               <thead>
                 <tr>
                   <th>Nombre</th>
-                  <th>Código</th>
+                  <th>Estado</th>
                   <th>Alumnos</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {institutions.map((i) => (
                   <tr key={i.id}>
-                    <td>{i.name}</td>
-                    <td><span className="badge badge-primary">{i.code}</span></td>
+                    <td>
+                      {i.name}
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {i.code}{i.contact_name ? ` · ${i.contact_name}` : ''}{i.contact_phone ? ` · ${i.contact_phone}` : ''}{i.contact_email ? ` · ${i.contact_email}` : ''}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`badge ${i.status === 'active' ? 'badge-success' : i.status === 'pending' ? 'badge-warning' : 'badge-danger'}`}>
+                        {i.status === 'active' ? 'activa' : i.status === 'pending' ? 'pendiente' : 'rechazada'}
+                      </span>
+                    </td>
                     <td>{i.student_count}</td>
+                    <td>
+                      {i.status === 'pending' && (
+                        <span style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-primary btn-small" onClick={() => setInstitutionStatus(i.id, 'approve')}>Aprobar</button>
+                          <button className="btn btn-outline btn-small" onClick={() => setInstitutionStatus(i.id, 'reject')}>Rechazar</button>
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
                 {institutions.length === 0 && (
-                  <tr><td colSpan={3} className="muted">Sin instituciones</td></tr>
+                  <tr><td colSpan={4} className="muted">Sin instituciones</td></tr>
                 )}
               </tbody>
             </table>
