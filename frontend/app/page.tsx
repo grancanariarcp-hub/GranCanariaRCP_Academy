@@ -47,7 +47,7 @@ export default function Home() {
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         {/* Cabecera */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
+        <div className="animate-fade" style={{ textAlign: 'center', marginBottom: 28 }}>
           <img src="/logo-horizontal.png" alt="Gran Canaria RCP" style={{ maxWidth: 320, width: '100%' }} />
           <p style={{ marginTop: 10, fontSize: 22, fontWeight: 700, color: 'var(--primary-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
             Campus de formación
@@ -59,6 +59,7 @@ export default function Home() {
           {/* Menor: colorido / parcheado */}
           <Link
             href="/login/menor"
+            className="hover-lift animate-in"
             style={{
               textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22,
               background: 'linear-gradient(135deg,#f59e0b 0%,#ef4444 30%,#ec4899 55%,#8b5cf6 78%,#10b981 100%)',
@@ -73,6 +74,7 @@ export default function Home() {
           {/* Acceso: destacado para registrados (alumnos, profesores, admin) */}
           <Link
             href="/login"
+            className="hover-lift animate-in"
             style={{
               textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22,
               background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--secondary-dark) 100%)',
@@ -90,12 +92,12 @@ export default function Home() {
 
         {/* Desafíos + Práctica */}
         <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 32px' }}>
-          <Link href="/desafios" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 18, textAlign: 'center', background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)' }}>
+          <Link href="/desafios" className="hover-lift animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 18, textAlign: 'center', background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)' }}>
             <div style={{ fontSize: 26 }}>🏆</div>
             <div style={{ fontWeight: 700, fontSize: 18 }}>Desafíos y ranking</div>
             <div style={{ fontSize: 13, opacity: 0.95 }}>Compite y sube en el ranking</div>
           </Link>
-          <Link href="/practica" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 18, textAlign: 'center', background: 'linear-gradient(135deg,#2c5282,#276749)', boxShadow: 'var(--shadow-md)' }}>
+          <Link href="/practica" className="hover-lift animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 18, textAlign: 'center', background: 'linear-gradient(135deg,#2c5282,#276749)', boxShadow: 'var(--shadow-md)' }}>
             <div style={{ fontSize: 26 }}>📚</div>
             <div style={{ fontWeight: 700, fontSize: 18 }}>Práctica libre</div>
             <div style={{ fontSize: 13, opacity: 0.95 }}>Entrena y repasa tus fallos</div>
@@ -136,10 +138,10 @@ export default function Home() {
           <p className="muted" style={{ textAlign: 'center' }}>Ningún curso coincide con los filtros.</p>
         ) : (
           <div className="grid grid-4">
-            {filtered.map((c) => {
+            {filtered.map((c, i) => {
               const pal = temaPalette(c.tema);
               return (
-                <Link key={c.id} href={`/curso/${c.id}`} className="card" style={{ textDecoration: 'none', position: 'relative', padding: 0, overflow: 'hidden', borderTop: `4px solid ${pal.main}` }}>
+                <Link key={c.id} href={`/curso/${c.id}`} className="card hover-lift animate-in" style={{ textDecoration: 'none', position: 'relative', padding: 0, overflow: 'hidden', borderTop: `4px solid ${pal.main}`, animationDelay: `${Math.min(i, 8) * 60}ms` }}>
                   {/* Cabecera de color por tema (o miniatura si la hay) */}
                   {c.thumbnail_url ? (
                     // eslint-disable-next-line @next/next/no-img-element

@@ -70,7 +70,7 @@ export default function PublicCoursePage() {
         {!course ? (
           !error && <div className="muted">Cargando…</div>
         ) : (
-          <div className="card" style={{ padding: 0, overflow: 'hidden', borderTop: `6px solid ${temaPalette(course.tema).main}` }}>
+          <div className="card animate-pop" style={{ padding: 0, overflow: 'hidden', borderTop: `6px solid ${temaPalette(course.tema).main}` }}>
             {course.thumbnail_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={course.thumbnail_url} alt="" style={{ width: '100%', maxHeight: 240, objectFit: 'cover' }} />
