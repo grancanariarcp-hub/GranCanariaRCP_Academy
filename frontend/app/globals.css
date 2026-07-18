@@ -507,6 +507,14 @@ tbody tr:hover {
   display: none;
 }
 
+/* ---------- Impresión (hoja de códigos) ---------- */
+@media print {
+  .no-print, .sidebar, .topbar, .sidebar-backdrop { display: none !important; }
+  .main, .container, .shell { display: block !important; }
+  .print-card { break-inside: avoid; page-break-inside: avoid; border: 1px solid #999 !important; }
+  body { background: #fff !important; }
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 1023px) {
   .menu-toggle {

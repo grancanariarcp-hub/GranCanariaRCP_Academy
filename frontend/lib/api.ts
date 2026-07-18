@@ -4,6 +4,9 @@ import { getToken } from './auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 
+/** Base pública de la API (para construir URLs de imágenes como el QR). */
+export const apiBase = API_URL;
+
 export class ApiError extends Error {
   constructor(
     public status: number,

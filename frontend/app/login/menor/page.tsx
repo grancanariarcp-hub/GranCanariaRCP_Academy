@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -14,6 +14,12 @@ export default function MinorLoginPage() {
   const [age, setAge] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Prefill del código si se llega desde el QR (…/login/menor?code=RCP-XXXX-XXXX)
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get('code');
+    if (code) setAccessCode(code.toUpperCase());
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();

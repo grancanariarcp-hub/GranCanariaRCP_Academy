@@ -5,6 +5,7 @@ import { listChallenges, getChallengeRanking, getInstitutionRanking, getIndividu
 import { listBanks, getBankTemas } from '../controllers/bank.controller.js';
 import { getPublicCertificate, publicCertificatePdf } from '../controllers/certificate.controller.js';
 import { listPublicInstitutions } from '../controllers/institution.controller.js';
+import { qrImage } from '../controllers/qr.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /** Public endpoints (no auth) — course discovery + challenges/rankings. */
@@ -19,6 +20,7 @@ router.get('/challenges/:id/ranking', asyncHandler(getChallengeRanking));
 router.get('/banks', asyncHandler(listBanks));
 router.get('/banks/:id/temas', asyncHandler(getBankTemas));
 router.get('/institutions', asyncHandler(listPublicInstitutions));
+router.get('/qr', asyncHandler(qrImage));
 router.get('/certificates/:code', asyncHandler(getPublicCertificate));
 router.get('/certificates/:code/pdf', asyncHandler(publicCertificatePdf));
 
