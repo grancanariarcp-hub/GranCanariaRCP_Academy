@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
+import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 
 interface Challenge {
@@ -18,6 +19,7 @@ interface Challenge {
 
 export default function DesafiosPage() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const user = typeof window !== 'undefined' ? getUser() : null;
 
   useEffect(() => {
     api<{ challenges: Challenge[] }>('/api/public/challenges').then((r) => setChallenges(r.challenges)).catch(() => {});
@@ -28,9 +30,16 @@ export default function DesafiosPage() {
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <p style={{ marginBottom: 16 }}><Link href="/">← Inicio</Link></p>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <h1 style={{ color: 'var(--primary-dark)' }}>🏆 Desafíos y rankings</h1>
-          <p className="muted">Demuestra cuánto sabes de RCP y primeros auxilios. ¡Sube en el ranking!</p>
-          <p style={{ marginTop: 10 }}><Link href="/rankings" className="btn btn-outline btn-small">🏫 Ranking de instituciones</Link></p>
+          <h1 style={{ color: 'var(--primary-dark)' }}>🏆 ¿Qué tanto sabes de RCP?</h1>
+          <p className="muted">Desafíos activos y reto permanente. Demuestra cuánto sabes y sube en el ranking.</p>
+          <p style={{ marginTop: 10 }}><Link href="/rankings" className="btn btn-outline btn-small">Ver rankings (personas e instituciones)</Link></p>
+          {!user && (
+            <p style={{ marginTop: 10 }}>
+              <Link href="/registro" className="btn cta-blink" style={{ background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', color: '#fff', fontWeight: 700, padding: '12px 22px' }}>
+                Regístrate, participa y representa a tu institución
+              </Link>
+            </p>
+          )}
         </div>
 
         {challenges.length === 0 ? (

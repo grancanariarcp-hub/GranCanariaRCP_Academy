@@ -91,8 +91,8 @@ export default function Home() {
         {/* Desafíos + Práctica */}
         <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 32px' }}>
           <Link href="/desafios" className="press animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22, textAlign: 'center', background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)' }}>
-            <div style={{ fontWeight: 700, fontSize: 18 }}>Desafíos y ranking</div>
-            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Compite y sube en el ranking</div>
+            <div style={{ fontWeight: 700, fontSize: 18 }}>¿Qué tanto sabes de RCP?</div>
+            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Desafíos activos, reto permanente y ranking</div>
           </Link>
           <Link href="/practica" className="press animate-in" style={{ textDecoration: 'none', color: '#fff', borderRadius: 12, padding: 22, textAlign: 'center', background: 'linear-gradient(135deg,#2c5282,#276749)', boxShadow: 'var(--shadow-md)' }}>
             <div style={{ fontWeight: 700, fontSize: 18 }}>Práctica libre</div>

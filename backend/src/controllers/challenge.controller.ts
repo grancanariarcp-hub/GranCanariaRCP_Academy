@@ -78,6 +78,30 @@ export async function getInstitutionRanking(_req: Request, res: Response): Promi
 }
 
 // ---------------------------------------------------------------------------
+// Public: ranking individual global (mejores personas en todos los desafíos)
+// ---------------------------------------------------------------------------
+export async function getIndividualRanking(_req: Request, res: Response): Promise<void> {
+  const { rows } = await query(
+    `WITH best AS (
+       SELECT DISTINCT ON (a.challenge_id, a.participant_id)
+              a.participant_id, a.participant_name, a.institution_id, a.correct, a.total, a.time_seconds
+       FROM challenge_attempts a
+       WHERE a.submitted_at IS NOT NULL
+       ORDER BY a.challenge_id, a.participant_id, a.correct DESC, a.time_seconds ASC
+     )
+     SELECT MAX(b.participant_name) AS name, i.name AS institution,
+            COUNT(*) AS challenges, SUM(b.correct) AS points,
+            ROUND(100.0 * SUM(b.correct) / NULLIF(SUM(b.total), 0)) AS accuracy_pct,
+            ROW_NUMBER() OVER (ORDER BY SUM(b.correct) DESC, SUM(b.time_seconds) ASC) AS position
+     FROM best b LEFT JOIN institutions i ON i.id = b.institution_id
+     GROUP BY b.participant_id, i.name
+     ORDER BY position
+     LIMIT 100`,
+  );
+  res.json({ ranking: rows });
+}
+
+// ---------------------------------------------------------------------------
 // Participate: start (auth, any role)
 // ---------------------------------------------------------------------------
 export async function startChallenge(req: Request, res: Response): Promise<void> {
