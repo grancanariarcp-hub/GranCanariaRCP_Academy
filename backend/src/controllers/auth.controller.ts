@@ -264,9 +264,10 @@ export async function studentLoginCode(req: Request, res: Response): Promise<voi
     id: string;
     display_name: string;
     institution_id: string | null;
+    class_id: string | null;
     is_active: boolean;
   }>(
-    `SELECT id, display_name, institution_id, is_active
+    `SELECT id, display_name, institution_id, class_id, is_active
      FROM students WHERE access_code = $1`,
     [normalized],
   );
@@ -279,6 +280,12 @@ export async function studentLoginCode(req: Request, res: Response): Promise<voi
 
   // Minors identify with a pseudonym + age (RGPD: no real name / email).
   const displayName = nickname?.trim() || student.display_name;
+  // El seudónimo debe ser único dentro de la clase.
+  if (nickname && student.class_id) {
+    const dup = await query('SELECT 1 FROM students WHERE class_id = $1 AND LOWER(display_name) = LOWER($2) AND id <> $3',
+      [student.class_id, displayName, student.id]);
+    if (dup.rows.length > 0) throw conflict('Ese apodo ya está en uso en tu clase, elige otro', 'NICKNAME_TAKEN');
+  }
   if (nickname || age !== undefined) {
     await query('UPDATE students SET display_name = $1, age = COALESCE($2, age), last_login_at = NOW() WHERE id = $3',
       [displayName, age ?? null, student.id]);
@@ -299,6 +306,41 @@ export async function studentLoginCode(req: Request, res: Response): Promise<voi
     token,
     user: { id: student.id, name: displayName, role: 'student', institutionId: student.institution_id },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Minor login (method 4): institución + seudónimo + edad (sin el código en mano)
+// ---------------------------------------------------------------------------
+const studentLoginInstitutionSchema = z.object({
+  institutionId: z.string().uuid(),
+  nickname: z.string().min(2).max(120),
+  age: z.number().int().min(3).max(17),
+});
+
+export async function studentLoginInstitution(req: Request, res: Response): Promise<void> {
+  const { institutionId, nickname, age } = studentLoginInstitutionSchema.parse(req.body);
+  const ip = clientIp(req);
+
+  const { rows } = await query<{ id: string; display_name: string; institution_id: string | null }>(
+    `SELECT id, display_name, institution_id FROM students
+     WHERE institution_id = $1 AND is_minor = TRUE AND is_active = TRUE
+       AND LOWER(display_name) = LOWER($2) AND age = $3`,
+    [institutionId, nickname.trim(), age],
+  );
+
+  if (rows.length === 0) {
+    await audit({ actorType: 'anonymous', action: 'STUDENT_LOGIN_FAILED', ip, metadata: { method: 'institution' } });
+    throw unauthorized('No encontramos ese apodo y edad en esa institución. Usa tu código.', 'NOT_FOUND');
+  }
+  if (rows.length > 1) {
+    throw conflict('Hay varios alumnos con ese apodo y edad. Entra con tu código.', 'AMBIGUOUS');
+  }
+
+  const student = rows[0];
+  await query('UPDATE students SET last_login_at = NOW() WHERE id = $1', [student.id]);
+  const token = signToken({ sub: student.id, role: 'student', institutionId: student.institution_id, name: student.display_name });
+  await audit({ actorId: student.id, actorType: 'student', action: 'STUDENT_LOGIN_SUCCESS', entity: 'student', entityId: student.id, ip, metadata: { method: 'institution' } });
+  res.json({ token, user: { id: student.id, name: student.display_name, role: 'student', institutionId: student.institution_id } });
 }
 
 // ---------------------------------------------------------------------------
