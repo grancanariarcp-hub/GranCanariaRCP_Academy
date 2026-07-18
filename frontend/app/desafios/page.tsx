@@ -30,6 +30,7 @@ export default function DesafiosPage() {
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <h1 style={{ color: 'var(--primary-dark)' }}>🏆 Desafíos y rankings</h1>
           <p className="muted">Demuestra cuánto sabes de RCP y primeros auxilios. ¡Sube en el ranking!</p>
+          <p style={{ marginTop: 10 }}><Link href="/rankings" className="btn btn-outline btn-small">🏫 Ranking de instituciones</Link></p>
         </div>
 
         {challenges.length === 0 ? (

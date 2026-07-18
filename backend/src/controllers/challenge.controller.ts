@@ -49,6 +49,35 @@ export async function getChallengeRanking(req: Request, res: Response): Promise<
 }
 
 // ---------------------------------------------------------------------------
+// Public: ranking de instituciones (global, sobre todos los desafíos)
+// ---------------------------------------------------------------------------
+export async function getInstitutionRanking(_req: Request, res: Response): Promise<void> {
+  // Mejor intento por participante y desafío, agregado por institución.
+  const { rows } = await query(
+    `WITH best AS (
+       SELECT DISTINCT ON (a.challenge_id, a.participant_id)
+              a.institution_id, a.participant_id, a.correct, a.total
+       FROM challenge_attempts a
+       WHERE a.submitted_at IS NOT NULL AND a.institution_id IS NOT NULL
+       ORDER BY a.challenge_id, a.participant_id, a.correct DESC, a.time_seconds ASC
+     )
+     SELECT i.id, i.name,
+            COUNT(DISTINCT b.participant_id) AS participants,
+            COUNT(*) AS attempts,
+            SUM(b.correct) AS total_correct,
+            ROUND(100.0 * SUM(b.correct) / NULLIF(SUM(b.total), 0)) AS accuracy_pct,
+            ROW_NUMBER() OVER (ORDER BY ROUND(100.0 * SUM(b.correct) / NULLIF(SUM(b.total), 0)) DESC NULLS LAST,
+                                        COUNT(DISTINCT b.participant_id) DESC) AS position
+     FROM best b JOIN institutions i ON i.id = b.institution_id
+     GROUP BY i.id, i.name
+     HAVING COUNT(*) > 0
+     ORDER BY position
+     LIMIT 100`,
+  );
+  res.json({ ranking: rows });
+}
+
+// ---------------------------------------------------------------------------
 // Participate: start (auth, any role)
 // ---------------------------------------------------------------------------
 export async function startChallenge(req: Request, res: Response): Promise<void> {
