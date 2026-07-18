@@ -102,7 +102,7 @@ export default function Home() {
 
         {/* Cursos */}
         <h2 style={{ textAlign: 'center', marginBottom: 20 }}>
-          <span className="heading-underline animate-in">Cursos disponibles</span>
+          <span className="heading-underline animate-in"><span className="shine-text">Cursos disponibles</span></span>
         </h2>
 
         {courses.length > 0 && (
@@ -139,7 +139,7 @@ export default function Home() {
             {filtered.map((c, i) => {
               const pal = temaPalette(c.tema);
               return (
-                <Link key={c.id} href={`/curso/${c.id}`} className="card hover-lift animate-in" style={{ textDecoration: 'none', position: 'relative', padding: 0, overflow: 'hidden', borderTop: `4px solid ${pal.main}`, animationDelay: `${Math.min(i, 8) * 60}ms` }}>
+                <Link key={c.id} href={`/curso/${c.id}`} className="card press animate-in" style={{ textDecoration: 'none', position: 'relative', padding: 0, overflow: 'hidden', borderTop: `4px solid ${pal.main}`, animationDelay: `${Math.min(i, 8) * 60}ms` }}>
                   {/* Cabecera de color por tema (o miniatura si la hay) */}
                   {c.thumbnail_url ? (
                     // eslint-disable-next-line @next/next/no-img-element

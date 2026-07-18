@@ -26,6 +26,16 @@
 .btn:hover { transform: scale(0.965); }
 .btn:active { transform: scale(0.92); }
 
+/* Texto con brillo que recorre (para títulos de sección). */
+.shine-text {
+  background: linear-gradient(90deg, var(--primary-dark) 0%, #4299e1 50%, var(--primary-dark) 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+  animation: shine 3.5s linear infinite;
+}
+@keyframes shine { to { background-position: 200% center; } }
+
 /* Subrayado animado para títulos de sección. */
 .heading-underline { position: relative; display: inline-block; }
 .heading-underline::after {
@@ -37,7 +47,8 @@
 
 /* Respeta a quien prefiere menos movimiento. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-in, .animate-fade, .animate-pop { animation: none; }
+  .animate-in, .animate-fade, .animate-pop, .shine-text { animation: none; }
+  .shine-text { color: var(--primary-dark); -webkit-text-fill-color: var(--primary-dark); }
   .hover-lift, .press, .btn { transition: none; }
   .hover-lift:hover, .press:hover, .press:active, .btn:hover, .btn:active { transform: none; }
   .heading-underline::after { animation: none; width: 64px; }
