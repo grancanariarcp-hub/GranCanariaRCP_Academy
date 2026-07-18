@@ -54,32 +54,18 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Bloque destacado y destellante: desafíos + menores */}
-        <div className="grid grid-2" style={{ maxWidth: 720, margin: '0 auto 14px' }}>
+        {/* Botón destacado y destellante, centrado */}
+        <div style={{ maxWidth: 520, margin: '0 auto 14px' }}>
           <Link
             href="/desafios"
             className="press cta-blink animate-in"
             style={{
-              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 14, padding: 28,
+              display: 'block', textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 14, padding: 30,
               background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)',
             }}
           >
-            <div style={{ fontWeight: 800, fontSize: 21 }}>¿Qué tanto sabes de RCP?</div>
-            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Desafíos, reto permanente y ranking</div>
-          </Link>
-
-          {/* Menor: colorido / parcheado */}
-          <Link
-            href="/login/menor"
-            className="press cta-blink animate-in"
-            style={{
-              textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 14, padding: 28,
-              background: 'linear-gradient(135deg,#f59e0b 0%,#ef4444 30%,#ec4899 55%,#8b5cf6 78%,#10b981 100%)',
-              boxShadow: 'var(--shadow-md)',
-            }}
-          >
-            <div style={{ fontWeight: 800, fontSize: 21 }}>Alumno menor de 18</div>
-            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Entra con el código de tu profesor</div>
+            <div style={{ fontWeight: 800, fontSize: 23 }}>¿Qué tanto sabes de RCP?</div>
+            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 4 }}>Desafíos, reto permanente, ranking y acceso para menores</div>
           </Link>
         </div>
 
