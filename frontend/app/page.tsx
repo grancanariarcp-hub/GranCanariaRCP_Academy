@@ -145,13 +145,13 @@ export default function Home() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: 90, objectFit: 'cover' }} />
                   ) : (
-                    <div style={{ height: 72, background: pal.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30 }}>{pal.icon}</div>
+                    <div style={{ height: 72, background: pal.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: pal.text, fontWeight: 700, letterSpacing: 1, padding: '0 10px', textAlign: 'center', fontSize: 14 }}>{c.tema || 'Curso'}</div>
                   )}
                   {!c.enrollment_open && (
                     <span className="badge" style={{ position: 'absolute', top: 8, right: 8, background: 'var(--secondary-dark)', color: '#fff' }}>Próximamente</span>
                   )}
                   <div style={{ padding: 12 }}>
-                    {c.tema && <span className="badge" style={{ background: pal.main, color: '#fff', fontSize: 11 }}>{pal.icon} {c.tema}</span>}
+                    {c.tema && <span className="badge" style={{ background: pal.main, color: pal.text, fontSize: 11 }}>{c.tema}</span>}
                     <div style={{ fontWeight: 600, marginTop: 6 }}>{c.title}</div>
                     <div className="muted" style={{ fontSize: 12, margin: '4px 0 8px' }}>
                       {[c.subtema, c.modality].filter(Boolean).join(' · ')}

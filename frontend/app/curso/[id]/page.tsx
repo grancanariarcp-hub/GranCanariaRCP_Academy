@@ -75,10 +75,10 @@ export default function PublicCoursePage() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={course.thumbnail_url} alt="" style={{ width: '100%', maxHeight: 240, objectFit: 'cover' }} />
             ) : (
-              <div style={{ height: 120, background: temaPalette(course.tema).grad, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 54 }}>{temaPalette(course.tema).icon}</div>
+              <div style={{ height: 120, background: temaPalette(course.tema).grad }} />
             )}
             <div style={{ padding: 24 }}>
-            {course.tema && <span className="badge" style={{ background: temaPalette(course.tema).main, color: '#fff', marginBottom: 8 }}>{temaPalette(course.tema).icon} {course.tema}</span>}
+            {course.tema && <span className="badge" style={{ background: temaPalette(course.tema).main, color: temaPalette(course.tema).text, marginBottom: 8 }}>{course.tema}</span>}
             <h1 style={{ marginBottom: 6 }}>{course.title}</h1>
             <div className="muted" style={{ marginBottom: 16 }}>
               {[course.subtema, course.modality].filter(Boolean).join(' · ')}
