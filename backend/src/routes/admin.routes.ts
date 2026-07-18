@@ -17,6 +17,7 @@ import { uploadDocument, listDocuments, getDocumentUrl } from '../controllers/do
 import { getTemplate, importQuestions } from '../controllers/questionImport.controller.js';
 import { createChallenge, listAllChallenges } from '../controllers/challenge.controller.js';
 import { createBank, updateBank, listBanks, getBankTemas, importBankQuestions, globalFailedStats } from '../controllers/bank.controller.js';
+import { setInstitutionStatus } from '../controllers/institution.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -33,6 +34,7 @@ router.get('/stats', asyncHandler(getStats));
 
 router.get('/institutions', asyncHandler(listInstitutions));
 router.post('/institutions', asyncHandler(createInstitution));
+router.post('/institutions/:id/:action', asyncHandler(setInstitutionStatus));
 
 router.get('/admins', asyncHandler(listAdmins));
 router.post('/admins', asyncHandler(createAdmin));

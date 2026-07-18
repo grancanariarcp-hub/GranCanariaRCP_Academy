@@ -7,6 +7,7 @@ import {
   studentRegisterPublic,
   studentLoginEmail,
   studentLoginCode,
+  institutionRegister,
   logout,
   me,
 } from '../controllers/auth.controller.js';
@@ -27,6 +28,9 @@ router.post('/admin/login', authLimiter, asyncHandler(adminLogin));
 
 // Professor self-registration (creates a pending account)
 router.post('/professor/register', authLimiter, asyncHandler(professorRegister));
+
+// Institution self-registration (pending super_admin validation)
+router.post('/institution/register', authLimiter, asyncHandler(institutionRegister));
 
 // Student - 3 methods
 router.post('/student/register', authLimiter, asyncHandler(studentRegister)); // 1

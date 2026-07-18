@@ -4,6 +4,7 @@ import { getProfessorCv } from '../controllers/profile.controller.js';
 import { listChallenges, getChallengeRanking, getInstitutionRanking, getIndividualRanking } from '../controllers/challenge.controller.js';
 import { listBanks, getBankTemas } from '../controllers/bank.controller.js';
 import { getPublicCertificate, publicCertificatePdf } from '../controllers/certificate.controller.js';
+import { listPublicInstitutions } from '../controllers/institution.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /** Public endpoints (no auth) — course discovery + challenges/rankings. */
@@ -17,6 +18,7 @@ router.get('/rankings/individuals', asyncHandler(getIndividualRanking));
 router.get('/challenges/:id/ranking', asyncHandler(getChallengeRanking));
 router.get('/banks', asyncHandler(listBanks));
 router.get('/banks/:id/temas', asyncHandler(getBankTemas));
+router.get('/institutions', asyncHandler(listPublicInstitutions));
 router.get('/certificates/:code', asyncHandler(getPublicCertificate));
 router.get('/certificates/:code/pdf', asyncHandler(publicCertificatePdf));
 

@@ -40,10 +40,10 @@ export async function getStats(_req: Request, res: Response): Promise<void> {
 // ---------------------------------------------------------------------------
 export async function listInstitutions(_req: Request, res: Response): Promise<void> {
   const { rows } = await query(
-    `SELECT i.id, i.name, i.code, i.contact_email, i.is_active, i.created_at,
+    `SELECT i.id, i.name, i.code, i.contact_email, i.contact_name, i.contact_phone, i.address, i.status, i.is_active, i.created_at,
             (SELECT COUNT(*) FROM students s WHERE s.institution_id = i.id) AS student_count
      FROM institutions i
-     ORDER BY i.created_at DESC`,
+     ORDER BY (i.status = 'pending') DESC, i.created_at DESC`,
   );
   res.json({ institutions: rows });
 }

@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { query } from '../config/database.js';
+import { query, withTransaction } from '../config/database.js';
 import { hashPassword, verifyPassword, generateAccessCode, identityHash } from '../utils/crypto.js';
 import { signToken } from '../utils/jwt.js';
 import { badRequest, conflict, unauthorized } from '../utils/httpError.js';
@@ -361,27 +361,91 @@ const publicRegisterSchema = z.object({
   name: z.string().min(2, 'El nombre es obligatorio').max(120),
   email: z.string().email('Email no válido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+  institutionId: z.string().uuid().optional(), // institución a la que representa (opcional)
 });
 
 export async function studentRegisterPublic(req: Request, res: Response): Promise<void> {
-  const { name, email, password } = publicRegisterSchema.parse(req.body);
+  const { name, email, password, institutionId } = publicRegisterSchema.parse(req.body);
   const ip = clientIp(req);
   const lower = email.toLowerCase();
 
   const taken = await query('SELECT 1 FROM students WHERE email = $1 UNION SELECT 1 FROM users WHERE email = $1', [lower]);
   if (taken.rows.length > 0) throw conflict('Ya existe una cuenta con ese email', 'EMAIL_TAKEN');
 
+  // Si elige representar a una institución, debe existir y estar activa.
+  let instId: string | null = null;
+  if (institutionId) {
+    const inst = await query('SELECT 1 FROM institutions WHERE id = $1 AND status = $2', [institutionId, 'active']);
+    if (inst.rows.length === 0) throw badRequest('Institución no válida', 'BAD_INSTITUTION');
+    instId = institutionId;
+  }
+
   const passwordHash = await hashPassword(password);
   const accessCode = generateAccessCode();
   const { rows } = await query<{ id: string }>(
     `INSERT INTO students (institution_id, display_name, access_code, is_minor, email, password_hash, identity_hash)
-     VALUES (NULL, $1, $2, FALSE, $3, $4, NULL) RETURNING id`,
-    [name, accessCode, lower, passwordHash],
+     VALUES ($1, $2, $3, FALSE, $4, $5, NULL) RETURNING id`,
+    [instId, name, accessCode, lower, passwordHash],
   );
   const studentId = rows[0].id;
-  const token = signToken({ sub: studentId, role: 'student', institutionId: null, name });
+  const token = signToken({ sub: studentId, role: 'student', institutionId: instId, name });
   await audit({ actorId: studentId, actorType: 'student', action: 'STUDENT_REGISTER', entity: 'student', entityId: studentId, ip });
-  res.status(201).json({ token, user: { id: studentId, name, role: 'student', institutionId: null } });
+  res.status(201).json({ token, user: { id: studentId, name, role: 'student', institutionId: instId } });
+}
+
+// ---------------------------------------------------------------------------
+// Institution self-registration (queda pendiente de validación del super_admin)
+// ---------------------------------------------------------------------------
+const institutionRegisterSchema = z.object({
+  name: z.string().min(2).max(160),
+  address: z.string().max(500).optional(),
+  contactName: z.string().max(160).optional(),
+  contactEmail: z.string().email(),
+  contactPhone: z.string().max(40).optional(),
+  adminName: z.string().min(2).max(160),
+  adminEmail: z.string().email(),
+  adminPassword: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
+});
+
+/** Genera un código único de institución a partir del nombre. */
+async function uniqueInstitutionCode(name: string): Promise<string> {
+  const base = name.toUpperCase().normalize('NFD').replace(/[^A-Z0-9]/g, '').slice(0, 8) || 'INST';
+  for (let i = 0; i < 20; i++) {
+    const suffix = Math.floor(1000 + Math.random() * 9000); // 4 dígitos
+    const code = `${base}-${suffix}`.slice(0, 32);
+    const exists = await query('SELECT 1 FROM institutions WHERE code = $1', [code]);
+    if (exists.rows.length === 0) return code;
+  }
+  return `INST-${Date.now().toString().slice(-8)}`;
+}
+
+export async function institutionRegister(req: Request, res: Response): Promise<void> {
+  const d = institutionRegisterSchema.parse(req.body);
+  const adminEmail = d.adminEmail.toLowerCase();
+
+  const taken = await query('SELECT 1 FROM users WHERE email = $1 UNION SELECT 1 FROM students WHERE email = $1', [adminEmail]);
+  if (taken.rows.length > 0) throw conflict('Ya existe una cuenta con ese email', 'EMAIL_TAKEN');
+
+  const code = await uniqueInstitutionCode(d.name);
+  const passwordHash = await hashPassword(d.adminPassword);
+
+  const institutionId = await withTransaction(async (client) => {
+    const inst = await client.query<{ id: string }>(
+      `INSERT INTO institutions (name, code, contact_email, contact_name, contact_phone, address, status, is_active)
+       VALUES ($1,$2,$3,$4,$5,$6,'pending',FALSE) RETURNING id`,
+      [d.name, code, d.contactEmail.toLowerCase(), d.contactName ?? null, d.contactPhone ?? null, d.address ?? null],
+    );
+    const id = inst.rows[0].id;
+    await client.query(
+      `INSERT INTO users (email, password_hash, name, role, institution_id, status)
+       VALUES ($1,$2,$3,'institution_admin',$4,'active')`,
+      [adminEmail, passwordHash, d.adminName, id],
+    );
+    return id;
+  });
+
+  await audit({ actorId: institutionId, actorType: 'institution_admin', action: 'INSTITUTION_REGISTER', entity: 'institution', entityId: institutionId, ip: clientIp(req) });
+  res.status(201).json({ ok: true, message: 'Institución registrada. La validaremos y podrás empezar a crear clases.' });
 }
 
 // ---------------------------------------------------------------------------
