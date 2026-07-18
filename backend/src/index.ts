@@ -16,6 +16,7 @@ import challengesRoutes from './routes/challenges.routes.js';
 import practiceRoutes from './routes/practice.routes.js';
 import forumRoutes from './routes/forum.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
+import institutionRoutes from './routes/institution.routes.js';
 
 const app = express();
 
@@ -68,6 +69,7 @@ app.use('/api/challenges', challengesRoutes);
 app.use('/api/practice', practiceRoutes);
 app.use('/api/forum', forumRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/institution', institutionRoutes);
 
 // 404 + central error handler (must be last)
 app.use(notFoundHandler);

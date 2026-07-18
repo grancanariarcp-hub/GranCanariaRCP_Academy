@@ -35,7 +35,7 @@ interface AuditLog {
 }
 
 export default function AdminDashboard() {
-  const user = useSession(['super_admin', 'institution_admin'], '/login/admin');
+  const user = useSession(['super_admin'], '/login/admin');
   const [stats, setStats] = useState<Stats | null>(null);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);

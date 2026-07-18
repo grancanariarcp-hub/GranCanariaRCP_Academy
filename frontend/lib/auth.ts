@@ -5,7 +5,7 @@
  * for a production app you'd likely move to httpOnly cookies, but this
  * keeps Phase 1 simple and framework-agnostic.
  */
-export type Role = 'super_admin' | 'institution_admin' | 'profesor' | 'student';
+export type Role = 'super_admin' | 'institution_admin' | 'profesor' | 'institution_teacher' | 'student';
 
 export interface SessionUser {
   id: string;
@@ -40,7 +40,9 @@ export function clearSession(): void {
 
 /** Where to send a user after logging in, based on their role. */
 export function homeForRole(role: Role): string {
-  if (role === 'super_admin' || role === 'institution_admin') return '/admin';
+  if (role === 'super_admin') return '/admin';
+  if (role === 'institution_admin') return '/institucion';
+  if (role === 'institution_teacher') return '/maestro';
   if (role === 'profesor') return '/admin/cursos';
   return '/student';
 }
