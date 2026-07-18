@@ -4,6 +4,7 @@ import { query } from '../config/database.js';
 import { hashPassword } from '../utils/crypto.js';
 import { badRequest, conflict, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
+import { notify } from '../services/notify.js';
 import { clientIp } from '../utils/asyncHandler.js';
 
 /**
@@ -154,6 +155,13 @@ export async function setProfessorStatus(req: Request, res: Response): Promise<v
     [status, req.params.id],
   );
   if (rows.length === 0) throw notFound('Profesor no encontrado');
+
+  await notify(
+    { id: rows[0].id, type: 'user' },
+    status === 'active' ? 'Perfil de profesor validado' : 'Solicitud de profesor rechazada',
+    status === 'active' ? 'Tu perfil ha sido aprobado. Ya puedes acceder y gestionar cursos.' : 'Tu solicitud de profesor no ha sido aprobada.',
+    '/admin',
+  ).catch(() => { /* no bloquear */ });
 
   await audit({
     actorId: req.auth!.sub, actorType: req.auth!.role,

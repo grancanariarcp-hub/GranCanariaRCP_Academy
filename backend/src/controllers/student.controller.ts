@@ -4,6 +4,7 @@ import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { withImageUrls } from '../services/r2.js';
+import { notify } from '../services/notify.js';
 
 /**
  * Basic student dashboard payload: their profile summary + progress.
@@ -70,8 +71,8 @@ export async function listAvailableCourses(req: Request, res: Response): Promise
 /** Matricular al alumno actual. Curso gratis -> activo; de pago -> pendiente_pago. */
 export async function enrollCourse(req: Request, res: Response): Promise<void> {
   const courseId = req.params.courseId;
-  const course = await query<{ status: string; enrollment_open: boolean; price_cents: number }>(
-    'SELECT status, enrollment_open, price_cents FROM courses WHERE id = $1',
+  const course = await query<{ status: string; enrollment_open: boolean; price_cents: number; title: string }>(
+    'SELECT status, enrollment_open, price_cents, title FROM courses WHERE id = $1',
     [courseId],
   );
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
@@ -86,6 +87,17 @@ export async function enrollCourse(req: Request, res: Response): Promise<void> {
      RETURNING id, status`,
     [req.auth!.sub, courseId, status],
   );
+
+  // Avisar al profesorado del curso del nuevo alumno.
+  const [staff, st] = await Promise.all([
+    query<{ user_id: string }>('SELECT user_id FROM course_staff WHERE course_id = $1', [courseId]),
+    query<{ display_name: string }>('SELECT display_name FROM students WHERE id = $1', [req.auth!.sub]),
+  ]);
+  const alumno = st.rows[0]?.display_name ?? 'Un alumno';
+  for (const s of staff.rows) {
+    await notify({ id: s.user_id, type: 'user' }, 'Nueva matrícula',
+      `${alumno} se matriculó en «${c.title}»`, `/admin/cursos/${courseId}`).catch(() => { /* no bloquear */ });
+  }
 
   await audit({ actorId: req.auth!.sub, actorType: 'student', action: 'ENROLL', entity: 'course', entityId: courseId, ip: clientIp(req) });
   res.status(201).json({ enrollment: rows[0], paymentRequired: c.price_cents > 0 });

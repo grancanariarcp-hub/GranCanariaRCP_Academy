@@ -5,6 +5,7 @@ import { badRequest, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { assertEditor, assertDirector } from '../services/courseAuth.js';
+import { notify } from '../services/notify.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl, deleteObject } from '../services/r2.js';
 
 /** Editing the inside of a course: modules, activities and staff. */
@@ -228,6 +229,9 @@ export async function inviteStaff(req: Request, res: Response): Promise<void> {
      ON CONFLICT (course_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
     [req.params.id, u.rows[0].id, role],
   );
+  const ct = await query<{ title: string }>('SELECT title FROM courses WHERE id = $1', [req.params.id]);
+  await notify({ id: u.rows[0].id, type: 'user' }, 'Te han añadido a un curso',
+    `Ahora eres ${role} de «${ct.rows[0]?.title ?? 'un curso'}»`, `/admin/cursos/${req.params.id}`).catch(() => { /* no bloquear */ });
   await audit({ actorId: req.auth!.sub, actorType: req.auth!.role, action: 'COURSE_STAFF_ADD', entity: 'course', entityId: req.params.id, ip: clientIp(req), metadata: { email: email.toLowerCase(), role } });
   res.status(201).json({ staff: { id: u.rows[0].id, name: u.rows[0].name, email: email.toLowerCase(), role } });
 }
