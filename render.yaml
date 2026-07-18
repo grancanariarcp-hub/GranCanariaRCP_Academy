@@ -39,6 +39,16 @@ services:
       - key: DATABASE_URL
         sync: false
 
+      # Email (Resend). La API key se pone a mano en el dashboard (secreto).
+      # RESEND_FROM: remitente verificado, p.ej. "GranCanaria RCP <campus@grancanariarcp.es>".
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      # Base pública del campus para los enlaces de los correos.
+      - key: FRONTEND_URL
+        value: https://campus.grancanariarcp.es
+
       # Super admin (Federico). Set the password manually as a secret.
       - key: SUPERADMIN_EMAIL
         value: grancanariarcp@gmail.com

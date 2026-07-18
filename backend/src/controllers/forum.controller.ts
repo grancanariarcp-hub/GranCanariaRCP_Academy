@@ -132,7 +132,7 @@ export async function createPost(req: Request, res: Response): Promise<void> {
   const b = `${req.auth!.name} respondió en «${t.rows[0].title}»`;
   for (const p of parts.rows) {
     const link = p.author_type === 'student' ? `/student/curso/${courseId}` : `/admin/cursos/${courseId}`;
-    await notify({ id: p.author_id, type: p.author_type }, title, b, link).catch(() => { /* no bloquear la respuesta */ });
+    await notify({ id: p.author_id, type: p.author_type }, title, b, link, { email: true }).catch(() => { /* no bloquear la respuesta */ });
   }
 
   res.status(201).json({ ok: true });
