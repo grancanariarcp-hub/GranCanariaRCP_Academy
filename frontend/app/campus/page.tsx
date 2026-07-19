@@ -19,9 +19,17 @@ interface OpenCourse {
   enrollment_open: boolean;
   publico_objetivo: string[];
   cfc: string | null;
+  resumen?: string | null;
 }
 
-/** Campus: la oferta formativa completa, con certificado. */
+const VENTAJAS = [
+  { titulo: 'Certificado verificable', texto: 'Con código y QR: cualquiera puede comprobar su autenticidad al instante.', color: '#c41e3a' },
+  { titulo: 'Formación acreditada', texto: 'Cursos con horas lectivas justificadas y créditos CFC cuando procede.', color: '#0d9488' },
+  { titulo: 'Profesorado sanitario', texto: 'Docentes en activo, con su currículum publicado y verificable.', color: '#2563eb' },
+  { titulo: 'A tu ritmo', texto: 'Estudias cuando puedes; la plataforma registra tu avance y tu dedicación.', color: '#7c3aed' },
+];
+
+/** Campus de formación: página de captación de la oferta acreditada. */
 export default function CampusPage() {
   const [courses, setCourses] = useState<OpenCourse[]>([]);
   const [fMatricula, setFMatricula] = useState<'todas' | 'abierta' | 'proximamente'>('todas');
@@ -35,6 +43,8 @@ export default function CampusPage() {
 
   const temas = useMemo(() => [...new Set(courses.map((c) => c.tema).filter(Boolean) as string[])].sort(), [courses]);
   const publicos = useMemo(() => [...new Set(courses.flatMap((c) => c.publico_objetivo || []))].sort(), [courses]);
+  const abiertos = courses.filter((c) => c.enrollment_open).length;
+  const conCfc = courses.filter((c) => c.cfc).length;
 
   const filtered = courses.filter((c) => {
     if (fMatricula === 'abierta' && !c.enrollment_open) return false;
@@ -46,29 +56,74 @@ export default function CampusPage() {
   });
 
   return (
-    <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/">← Inicio</Link></p>
-
-        <div className="animate-fade" style={{ textAlign: 'center', marginBottom: 26 }}>
-          <img src="/logo-horizontal.png" alt="Gran Canaria RCP" style={{ maxWidth: 260, width: '100%' }} />
-          <h1 style={{ marginTop: 10, fontSize: 30 }}>
-            <span className="heading-underline"><span className="shine-text">Campus de formación</span></span>
-          </h1>
-          <p className="muted" style={{ maxWidth: 640, margin: '14px auto 0' }}>
-            Formación acreditada en reanimación y emergencias, con evaluación y <strong>certificado verificable</strong>.
+    <div style={{ minHeight: '100vh' }}>
+      {/* ---------- Portada ---------- */}
+      <div style={{
+        background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--secondary-dark) 55%,#0d9488 100%)',
+        color: '#fff', padding: '38px 16px 46px',
+      }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
+          <p style={{ textAlign: 'left', marginBottom: 18 }}>
+            <Link href="/" style={{ color: 'rgba(255,255,255,0.85)' }}>← Zona gratuita</Link>
           </p>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-            <Link href="/login" className="btn press" style={{ background: 'linear-gradient(135deg,var(--primary-dark),var(--secondary-dark))', color: '#fff', fontWeight: 700, padding: '12px 22px' }}>Acceder</Link>
-            <Link href="/registro" className="btn press" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', fontWeight: 700, padding: '12px 22px' }}>Registrarse</Link>
+          <div className="animate-fade">
+            <img src="/logo-horizontal.png" alt="Gran Canaria RCP" style={{ maxWidth: 280, width: '100%', filter: 'brightness(0) invert(1)' }} />
+            <h1 style={{ fontSize: 34, marginTop: 14, lineHeight: 1.15 }}>Campus de formación</h1>
+            <p style={{ fontSize: 17, opacity: 0.95, maxWidth: 640, margin: '12px auto 0' }}>
+              Fórmate en <strong>reanimación y emergencias</strong> con cursos acreditados, evaluación real y
+              <strong> certificado verificable</strong>.
+            </p>
           </div>
-        </div>
 
-        <Reveal>
-          <h2 style={{ textAlign: 'center', marginBottom: 18 }}>Oferta formativa</h2>
+          {/* Acceso y registro: lo primero y destacado */}
+          <div className="animate-in" style={{ display: 'flex', gap: 12, justifyContent: 'center', marginTop: 26, flexWrap: 'wrap' }}>
+            <Link href="/registro" className="press cta-blink"
+              style={{ textDecoration: 'none', background: '#fff', color: 'var(--primary-dark)', borderRadius: 12,
+                padding: '16px 30px', fontWeight: 800, fontSize: 17, boxShadow: '0 6px 20px rgba(0,0,0,.25)' }}>
+              Crear mi cuenta y matricularme
+            </Link>
+            <Link href="/login" className="press"
+              style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.14)', color: '#fff',
+                border: '1px solid rgba(255,255,255,0.5)', borderRadius: 12, padding: '16px 30px', fontWeight: 700, fontSize: 17 }}>
+              Ya tengo cuenta
+            </Link>
+          </div>
 
           {courses.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 18 }}>
+            <div style={{ display: 'flex', gap: 26, justifyContent: 'center', marginTop: 26, flexWrap: 'wrap', fontSize: 14 }}>
+              <span><strong style={{ fontSize: 22 }}>{courses.length}</strong> cursos</span>
+              <span><strong style={{ fontSize: 22 }}>{abiertos}</strong> con matrícula abierta</span>
+              {conCfc > 0 && <span><strong style={{ fontSize: 22 }}>{conCfc}</strong> con créditos CFC</span>}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1100, margin: '0 auto', padding: '34px 16px' }}>
+
+        {/* ---------- Por qué formarte aquí ---------- */}
+        <div className="grid grid-4" style={{ marginBottom: 44 }}>
+          {VENTAJAS.map((v, i) => (
+            <Reveal key={v.titulo} delay={i * 80}>
+              <div className="card" style={{ height: '100%', borderTop: `4px solid ${v.color}` }}>
+                <div style={{ fontWeight: 700, marginBottom: 6, color: v.color }}>{v.titulo}</div>
+                <div className="muted" style={{ fontSize: 13.5 }}>{v.texto}</div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+
+        {/* ---------- Oferta ---------- */}
+        <Reveal>
+          <h2 style={{ textAlign: 'center', marginBottom: 8 }}>
+            <span className="heading-underline"><span className="shine-text">Oferta formativa</span></span>
+          </h2>
+          <p className="muted" style={{ textAlign: 'center', marginBottom: 20, fontSize: 14 }}>
+            Filtra por tema, público o acreditación para encontrar tu curso.
+          </p>
+
+          {courses.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 22 }}>
               <select className="form-select" style={{ width: 'auto' }} value={fMatricula} onChange={(e) => setFMatricula(e.target.value as typeof fMatricula)}>
                 <option value="todas">Todas las matrículas</option>
                 <option value="abierta">Matrícula abierta</option>
@@ -94,32 +149,32 @@ export default function CampusPage() {
         </Reveal>
 
         {courses.length === 0 ? (
-          <p className="muted" style={{ textAlign: 'center' }}>Pronto habrá cursos disponibles.</p>
+          <p className="muted" style={{ textAlign: 'center', marginBottom: 44 }}>Pronto habrá cursos disponibles.</p>
         ) : filtered.length === 0 ? (
-          <p className="muted" style={{ textAlign: 'center' }}>Ningún curso coincide con los filtros.</p>
+          <p className="muted" style={{ textAlign: 'center', marginBottom: 44 }}>Ningún curso coincide con los filtros.</p>
         ) : (
-          <div className="grid grid-4">
+          <div className="grid grid-4" style={{ marginBottom: 44 }}>
             {filtered.map((c, i) => {
               const pal = temaPalette(c.tema);
               return (
                 <Reveal key={c.id} delay={Math.min(i, 8) * 60}>
-                  <Link href={`/curso/${c.id}`} className="card press" style={{ display: 'block', textDecoration: 'none', position: 'relative', padding: 0, overflow: 'hidden', borderTop: `4px solid ${pal.main}` }}>
+                  <Link href={`/curso/${c.id}`} className="card press" style={{ display: 'block', height: '100%', textDecoration: 'none', position: 'relative', padding: 0, overflow: 'hidden', borderTop: `4px solid ${pal.main}` }}>
                     {c.thumbnail_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: 90, objectFit: 'cover' }} />
+                      <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: 96, objectFit: 'cover' }} />
                     ) : (
-                      <div style={{ height: 72, background: pal.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: pal.text, fontWeight: 700, letterSpacing: 1, padding: '0 10px', textAlign: 'center', fontSize: 14 }}>{c.tema || 'Curso'}</div>
+                      <div style={{ height: 80, background: pal.grad, display: 'flex', alignItems: 'center', justifyContent: 'center', color: pal.text, fontWeight: 700, letterSpacing: 1, padding: '0 10px', textAlign: 'center', fontSize: 14 }}>{c.tema || 'Curso'}</div>
                     )}
                     {!c.enrollment_open && (
                       <span className="badge" style={{ position: 'absolute', top: 8, right: 8, background: 'var(--secondary-dark)', color: '#fff' }}>Próximamente</span>
                     )}
-                    <div style={{ padding: 12 }}>
+                    <div style={{ padding: 14 }}>
                       {c.tema && <span className="badge" style={{ background: pal.main, color: pal.text, fontSize: 11 }}>{c.tema}</span>}
                       <div style={{ fontWeight: 600, marginTop: 6 }}>{c.title}</div>
                       <div className="muted" style={{ fontSize: 12, margin: '4px 0 8px' }}>
                         {[c.subtema, c.modality].filter(Boolean).join(' · ')}
                         {c.duration_hours ? ` · ${c.duration_hours} h` : ''}
-                        {c.cfc ? ' · CFC' : ''}
+                        {c.cfc ? ` · CFC ${c.cfc}` : ''}
                       </div>
                       {!c.enrollment_open ? (
                         <span className="badge badge-warning">Matrícula cerrada</span>
@@ -136,7 +191,33 @@ export default function CampusPage() {
           </div>
         )}
 
-        <p style={{ textAlign: 'center', marginTop: 32, fontSize: 13 }}>
+        {/* ---------- Desafío ---------- */}
+        <Reveal>
+          <Link href="/desafios" className="press cta-blink"
+            style={{ display: 'block', textDecoration: 'none', color: '#fff', borderRadius: 16, padding: 34, textAlign: 'center',
+              background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)', marginBottom: 34 }}>
+            <div style={{ fontWeight: 800, fontSize: 26 }}>¿Qué tanto sabes de RCP?</div>
+            <div style={{ fontSize: 15, opacity: 0.96, marginTop: 8, maxWidth: 560, marginInline: 'auto' }}>
+              Ponte a prueba con un desafío y <strong>representa a tu institución</strong> en el ranking. Es gratis.
+            </div>
+            <div className="btn" style={{ background: '#fff', color: '#c41e3a', fontWeight: 700, marginTop: 16, padding: '10px 22px' }}>
+              Aceptar el desafío
+            </div>
+          </Link>
+        </Reveal>
+
+        {/* ---------- Cierre ---------- */}
+        <Reveal>
+          <div className="card" style={{ textAlign: 'center', marginBottom: 24 }}>
+            <h3 style={{ marginBottom: 8 }}>¿Formas parte de un centro o institución?</h3>
+            <p className="muted" style={{ maxWidth: 620, margin: '0 auto 14px', fontSize: 14 }}>
+              Registra tu institución para formar a tu equipo y que tu alumnado compita en los rankings.
+            </p>
+            <Link href="/registro" className="btn btn-primary">Registrar mi institución</Link>
+          </div>
+        </Reveal>
+
+        <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13 }}>
           <Link href="/privacidad">Política de privacidad</Link> · <Link href="/terminos">Condiciones de uso</Link>
         </p>
         <p style={{ textAlign: 'center', marginTop: 8 }}><AppVersion /></p>
