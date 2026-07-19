@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
-import { hashPassword, verifyPassword, generateAccessCode, identityHash } from '../utils/crypto.js';
+import { hashPassword, verifyPassword, needsRehash, generateAccessCode, identityHash } from '../utils/crypto.js';
 import { signToken } from '../utils/jwt.js';
 import { badRequest, conflict, unauthorized } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
@@ -59,7 +59,7 @@ export async function adminLogin(req: Request, res: Response): Promise<void> {
   // account enumeration, then fail with the same generic message.
   const ok = user
     ? user.is_active && (await verifyPassword(password, user.password_hash))
-    : await verifyPassword(password, '$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinva');
+    : await verifyPassword(password, '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinva');
 
   if (!user || !ok) {
     await audit({
@@ -228,7 +228,7 @@ export async function studentLoginEmail(req: Request, res: Response): Promise<vo
   const ok =
     student && student.password_hash
       ? student.is_active && (await verifyPassword(password, student.password_hash))
-      : await verifyPassword(password, '$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinva');
+      : await verifyPassword(password, '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinva');
 
   if (!student || !student.password_hash || !ok) {
     await audit({ actorType: 'anonymous', action: 'STUDENT_LOGIN_FAILED', ip, metadata: { email: email.toLowerCase() } });
@@ -368,6 +368,12 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
     if (user.is_active && (await verifyPassword(password, user.password_hash))) {
       if (user.status === 'pending') throw unauthorized('Tu cuenta de profesor está pendiente de validación', 'PENDING_APPROVAL');
       if (user.status === 'rejected') throw unauthorized('Tu solicitud no fue aprobada', 'REJECTED');
+      // Re-hasheo transparente: acelera los siguientes accesos de cuentas antiguas.
+      if (needsRehash(user.password_hash)) {
+        hashPassword(password)
+          .then((h) => query('UPDATE users SET password_hash = $1 WHERE id = $2', [h, user.id]))
+          .catch(() => { /* no bloquear el login */ });
+      }
       await query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
       const token = signToken({ sub: user.id, role: user.role, institutionId: user.institution_id, name: user.name });
       await audit({ actorId: user.id, actorType: user.role, action: 'AUTH_LOGIN_SUCCESS', entity: 'user', entityId: user.id, ip });
@@ -384,6 +390,11 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
   if (s.rows.length > 0 && s.rows[0].password_hash) {
     const st = s.rows[0];
     if (st.is_active && (await verifyPassword(password, st.password_hash!))) {
+      if (needsRehash(st.password_hash!)) {
+        hashPassword(password)
+          .then((h) => query('UPDATE students SET password_hash = $1 WHERE id = $2', [h, st.id]))
+          .catch(() => { /* no bloquear el login */ });
+      }
       await query('UPDATE students SET last_login_at = NOW() WHERE id = $1', [st.id]);
       const token = signToken({ sub: st.id, role: 'student', institutionId: st.institution_id, name: st.display_name });
       await audit({ actorId: st.id, actorType: 'student', action: 'STUDENT_LOGIN_SUCCESS', entity: 'student', entityId: st.id, ip });

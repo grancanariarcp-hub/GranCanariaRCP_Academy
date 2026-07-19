@@ -20,7 +20,7 @@ interface Bank {
 }
 
 const INSTITUCIONES = ['ERC', 'AHA', 'PNRCP', 'ILCOR', 'Cruz Roja', 'Otra'];
-const POBLACIONES = ['Niños de 6 a 12 años', 'Jóvenes de 13 a 17 años', 'Adultos +18 años'];
+const POBLACIONES = ['Niños de 6 a 12 años', 'Jóvenes de 13 a 17 años', 'Adultos +18 años', 'Sanitarios'];
 
 /**
  * Las dos dimensiones del banco se etiquetan según el tipo:
@@ -250,23 +250,25 @@ export default function BancosPage() {
                 {banks.map((b) => (
                   <tr key={b.id}>
                     <td>
-                      {b.name}
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {b.kind.toUpperCase()}
-                        {b.anio ? ` · ${b.anio}` : ''}
-                        {b.comunidad_autonoma ? ` · ${b.comunidad_autonoma}` : ''}
-                        {b.categoria_profesional ? ` · ${b.categoria_profesional}` : ''}
-                        {b.official ? ' · oficial' : ''}
-                        {b.sim_questions ? ` · sim ${b.sim_questions}p/${b.sim_minutes ?? '∞'}min` : ''}
-                      </div>
+                      <strong>{b.name}</strong>
+                      <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
+                        {[
+                          b.kind.toUpperCase(),
+                          b.anio || null,
+                          b.comunidad_autonoma,
+                          b.categoria_profesional,
+                          b.official ? 'oficial' : null,
+                          b.sim_questions ? `sim ${b.sim_questions}p/${b.sim_minutes ?? '∞'}min` : null,
+                        ].filter(Boolean).join(' · ')}
+                      </span>
                     </td>
                     <td>{b.questions}</td>
                     <td>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        <button className="btn btn-outline btn-small" onClick={() => loadTemas(b.id)}>Importar/ver</button>
-                        <button className="btn btn-outline btn-small" onClick={() => startEdit(b)}>Editar</button>
-                        <button className="btn btn-outline btn-small" onClick={() => download(b)} title="Descargar preguntas en JSON">Descargar</button>
-                        <button className="btn btn-outline btn-small" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => removeBank(b)}>Borrar</button>
+                      <div className="row-actions">
+                        <button className="link-action" onClick={() => loadTemas(b.id)} title="Importar preguntas y ver temas">Importar</button>
+                        <button className="link-action" onClick={() => startEdit(b)} title="Editar la ficha del banco">Editar</button>
+                        <button className="link-action" onClick={() => download(b)} title="Descargar las preguntas en JSON">Descargar</button>
+                        <button className="link-action danger" onClick={() => removeBank(b)} title="Borrar el banco y sus preguntas">Borrar</button>
                       </div>
                     </td>
                   </tr>

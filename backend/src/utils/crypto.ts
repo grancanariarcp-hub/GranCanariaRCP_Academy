@@ -3,10 +3,11 @@ import crypto from 'node:crypto';
 import { env } from '../config/env.js';
 
 /**
- * Password hashing (bcrypt). Cost 12 is a sensible 2026 default:
- * strong enough to slow brute force, fast enough for interactive login.
+ * Password hashing (bcrypt). Coste 10: recomendación mínima de OWASP y buen
+ * equilibrio en la CPU compartida del plan gratuito. Con bcryptjs (JS puro) el
+ * coste 12 tardaba ~2,5 s por login; con 10 baja a ~0,6 s.
  */
-const BCRYPT_ROUNDS = 12;
+const BCRYPT_ROUNDS = 10;
 
 export async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, BCRYPT_ROUNDS);
@@ -14,6 +15,12 @@ export async function hashPassword(plain: string): Promise<string> {
 
 export async function verifyPassword(plain: string, hash: string): Promise<boolean> {
   return bcrypt.compare(plain, hash);
+}
+
+/** ¿El hash guardado usa un coste mayor del actual? (para re-hashear al entrar) */
+export function needsRehash(hash: string): boolean {
+  const cost = Number(hash.split('$')[2]);
+  return Number.isFinite(cost) && cost > BCRYPT_ROUNDS;
 }
 
 /**

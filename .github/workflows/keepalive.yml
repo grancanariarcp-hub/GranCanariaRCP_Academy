@@ -1,0 +1,22 @@
+name: Keep API warm
+
+# El plan gratuito de Render duerme el servicio tras ~15 min sin tráfico y el
+# siguiente clic tarda ~50 s en despertarlo. Este ping cada 10 minutos lo
+# mantiene despierto (y de paso mantiene caliente la base de datos de Neon).
+#
+# Solo en horario activo (06:00-22:00 UTC ≈ 07:00-23:00 en Canarias) para no
+# agotar las 750 horas/mes de instancia del plan gratuito.
+on:
+  schedule:
+    - cron: '*/10 6-22 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping API (health + una consulta a BD)
+        run: |
+          curl -fsS -m 60 https://grancanaria-rcp-api.onrender.com/api/health > /dev/null
+          curl -fsS -m 60 https://grancanaria-rcp-api.onrender.com/api/public/courses > /dev/null
+          echo "API despierta"
