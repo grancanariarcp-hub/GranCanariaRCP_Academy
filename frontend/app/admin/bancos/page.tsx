@@ -63,6 +63,8 @@ export default function BancosPage() {
   // Importar preguntas
   const [selBank, setSelBank] = useState('');
   const [json, setJson] = useState('');
+  const [archivo, setArchivo] = useState('');
+  const [importando, setImportando] = useState(false);
   const [temas, setTemas] = useState<Array<{ tema: string; questions: string }>>([]);
   const [impMsg, setImpMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -96,7 +98,10 @@ export default function BancosPage() {
     const s = shapeFor(kind);
     // Los campos que no aplican a este tipo se envían en null para limpiarlos.
     const body = {
-      name, kind,
+      // El servidor exige un nombre; si se deja vacío se marca como pendiente y
+      // se sustituye por el del archivo en cuanto se importe.
+      name: name.trim() || 'Sin nombre',
+      kind,
       anio: anio ? Number(anio) : null,
       comunidadAutonoma: dim1 || null,
       categoriaProfesional: dim2 || null,
@@ -143,11 +148,40 @@ export default function BancosPage() {
     } catch { setTemas([]); }
   }
 
+  /**
+   * Lee el archivo elegido y, si el banco quedó sin nombre, le pone el del
+   * archivo: es lo que el usuario espera y ahorra un paso en cada importación.
+   */
+  async function cargarArchivo(file: File | undefined) {
+    if (!file) return;
+    setImpMsg(null);
+    try {
+      const texto = await file.text();
+      JSON.parse(texto); // se valida aquí para avisar antes de enviar nada
+      setJson(texto);
+      setArchivo(file.name);
+
+      const banco = banks.find((b) => b.id === selBank);
+      const sinNombre = !banco?.name || /^sin nombre$/i.test(banco.name);
+      if (banco && sinNombre) {
+        const limpio = file.name.replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim();
+        await api(`/api/banks/${banco.id}`, { method: 'PATCH', auth: true, body: JSON.stringify({ name: limpio }) });
+        load();
+        setImpMsg({ ok: true, text: `Archivo cargado. El banco pasa a llamarse «${limpio}».` });
+        return;
+      }
+      setImpMsg({ ok: true, text: 'Archivo cargado. Pulsa «Importar preguntas» para añadirlas.' });
+    } catch {
+      setImpMsg({ ok: false, text: 'El archivo no contiene un JSON válido' });
+    }
+  }
+
   async function importJson() {
+    setImportando(true);
     setImpMsg(null);
     let parsed: unknown;
-    try { parsed = JSON.parse(json); } catch { setImpMsg({ ok: false, text: 'JSON no válido' }); return; }
-    if (!Array.isArray(parsed)) { setImpMsg({ ok: false, text: 'Debe ser una lista [ ... ]' }); return; }
+    try { parsed = JSON.parse(json); } catch { setImpMsg({ ok: false, text: 'JSON no válido' }); setImportando(false); return; }
+    if (!Array.isArray(parsed)) { setImpMsg({ ok: false, text: 'Debe ser una lista [ ... ]' }); setImportando(false); return; }
     try {
       const r = await api<{ created: number; duplicadas: number; total: number; errors: Array<{ fila: number }>; posibleReimport: boolean }>(`/api/banks/${selBank}/import`, { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) });
       const partes = [`Creadas ${r.created}/${r.total}`];
@@ -155,9 +189,11 @@ export default function BancosPage() {
       if (r.errors.length) partes.push(`errores en filas: ${r.errors.map((e) => e.fila).join(', ')}`);
       if (r.posibleReimport) partes.push('⚠️ Ninguna pregunta nueva: parece que este banco ya estaba importado');
       setImpMsg({ ok: r.errors.length === 0 && !r.posibleReimport, text: partes.join(' · ') });
-      setJson(''); loadTemas(selBank); load();
+      setJson(''); setArchivo(''); loadTemas(selBank); load();
     } catch (err) {
       setImpMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
+    } finally {
+      setImportando(false);
     }
   }
 
@@ -178,7 +214,14 @@ export default function BancosPage() {
           </div>
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
           <form onSubmit={submitForm}>
-            <div className="form-group"><label className="form-label">Nombre</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} required /></div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="b-nombre">Nombre</label>
+              <input id="b-nombre" className="form-input" value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="Si lo dejas vacío, se usará el nombre del archivo" />
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Opcional: al importar un archivo sin nombre puesto, el banco tomará el del archivo.
+              </p>
+            </div>
 
             <div className="grid grid-2" style={{ gap: 12 }}>
               <div className="form-group">
@@ -310,8 +353,30 @@ export default function BancosPage() {
           </div>
           {temas.length > 0 && <p style={{ fontSize: 13, marginBottom: 8 }}><strong>Temas actuales:</strong> {temas.map((t) => `${t.tema} (${t.questions})`).join(' · ')}</p>}
           {impMsg && <div className={`alert ${impMsg.ok ? 'alert-success' : 'alert-error'}`}>{impMsg.text}</div>}
-          <textarea className="form-input" style={{ height: 140, padding: 10, fontFamily: 'monospace', fontSize: 12 }} placeholder='[{"tema":"ICC","text":"...","options":["a","b","c"],"correcta":"B","explicacion":"..."}]' value={json} onChange={(e) => setJson(e.target.value)} />
-          <button className="btn btn-primary btn-small" style={{ marginTop: 8 }} onClick={importJson} disabled={!json.trim()}>Importar</button>
+          {/* Elegir archivo es lo normal; pegar el texto queda como alternativa
+              para lotes pequeños. Un banco entero pegado a mano es inviable. */}
+          <label className="btn btn-primary btn-full press" style={{ cursor: 'pointer', marginBottom: 10 }}>
+            📂 Elegir archivo (.json)
+            <input type="file" accept=".json,application/json" style={{ display: 'none' }}
+              onChange={(e) => { cargarArchivo(e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+
+          {archivo && (
+            <p className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
+              Archivo: <strong>{archivo}</strong>
+            </p>
+          )}
+
+          <details style={{ marginBottom: 8 }}>
+            <summary className="link-action" style={{ fontSize: 13 }}>o pegar el contenido a mano</summary>
+            <textarea className="form-input" style={{ height: 140, padding: 10, fontFamily: 'monospace', fontSize: 12, marginTop: 8 }}
+              placeholder='[{"tema":"ICC","text":"...","options":["a","b","c"],"correcta":"B","explicacion":"..."}]'
+              value={json} onChange={(e) => setJson(e.target.value)} />
+          </details>
+
+          <button className="btn btn-primary btn-small" onClick={importJson} disabled={!json.trim() || importando}>
+            {importando ? 'Importando…' : 'Importar preguntas'}
+          </button>
         </div>
       )}
     </AppShell>
