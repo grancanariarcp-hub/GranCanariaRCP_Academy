@@ -1,12 +1,15 @@
 /**
- * Certificado de reconocimiento en A4 apaisado.
+ * Diploma de participación en A4 apaisado.
  *
- * Comparte lenguaje visual con el certificado de aprobación, pero el literal
- * dice "RECONOCIMIENTO" y no menciona créditos ni acreditación: no debe poder
- * confundirse con la formación oficial. Esa distinción es deliberada.
+ * Comparte lenguaje visual con el certificado de aprobación, pero NUNCA usa la
+ * palabra "certificado" ni menciona créditos: es un diploma de agradecimiento y
+ * no debe poder confundirse con la formación oficial. La distinción es
+ * deliberada y aparece también al pie.
  */
 
 export interface ReconocimientoData {
+  /** Encabezado del documento, según el motivo. */
+  encabezado?: string;
   certifica: string;
   titulo: string;
   nombre: string;
@@ -45,11 +48,14 @@ export function renderReconocimiento(doc: PDFKit.PDFDocument, d: ReconocimientoD
   }
 
   // Título
-  doc.font('Helvetica-Bold').fontSize(30).fillColor(NAVY)
-    .text('CERTIFICADO DE RECONOCIMIENTO', cx, hayFondo ? 62 : 96, { width: cw, align: 'center', characterSpacing: 2 });
+  doc.font('Helvetica-Bold').fontSize(29).fillColor(NAVY)
+    .text(d.encabezado || 'DIPLOMA DE PARTICIPACIÓN', cx, hayFondo ? 62 : 96,
+      { width: cw, align: 'center', characterSpacing: 2 });
 
-  doc.font('Helvetica').fontSize(11.5).fillColor('#444')
-    .text(`${d.certifica} reconoce a:`, cx, hayFondo ? 112 : 142, { width: cw, align: 'center' });
+  // "Gran Canaria RCP AGRADECE a" — el agradecimiento es el tono del documento.
+  doc.font('Helvetica-Bold').fontSize(12.5).fillColor('#444')
+    .text(`${d.certifica} AGRADECE a`, cx, hayFondo ? 112 : 142,
+      { width: cw, align: 'center', characterSpacing: 0.8 });
 
   // Nombre
   const yNombre = hayFondo ? 138 : 170;
@@ -96,7 +102,7 @@ export function renderReconocimiento(doc: PDFKit.PDFDocument, d: ReconocimientoD
     .text(`Emitido: ${d.emitido} · Código ${d.codigo}`, 40, H - 46, { width: 260 });
   doc.font('Helvetica-Oblique').fontSize(7.5).fillColor('#888')
     .text(
-      'Reconocimiento a la participación. No constituye formación acreditada ni otorga créditos de formación continuada.',
+      'Diploma de participación. No constituye formación acreditada ni otorga créditos de formación continuada.',
       40, H - 34, { width: W - 200 },
     );
 }

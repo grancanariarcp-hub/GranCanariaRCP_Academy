@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 
 /**
- * Reconocimientos del participante.
+ * Diplomas del participante.
  *
  * Al montarse se comprueba si le corresponde algún hito por horas: así el
  * reconocimiento llega solo, sin depender de un proceso programado.
@@ -45,8 +45,8 @@ export function MyRecognitions() {
   return (
     <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid #c41e3a' }}>
       <div className="card-header">
-        <div className="card-title">Mis reconocimientos</div>
-        <div className="card-subtitle">Por participar en desafíos y por tus horas de práctica</div>
+        <div className="card-title">Mis diplomas</div>
+        <div className="card-subtitle">Por participar en los desafíos y por tus horas de práctica</div>
       </div>
 
       {/* Avance hacia el siguiente hito: da sentido a seguir practicando. */}
@@ -64,14 +64,15 @@ export function MyRecognitions() {
 
       {recognitions.length === 0 ? (
         <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-          Aún no tienes reconocimientos. Participa en un desafío o sigue practicando: al alcanzar
+          Aún no tienes diplomas. Participa en un desafío —lo recibe todo el que lo completa— o sigue
+          practicando: al alcanzar
           {proximoHito ? ` las ${proximoHito.horas} horas` : ' los hitos de práctica'} recibirás el primero.
         </p>
       ) : (
         <div className="table-responsive">
           <table className="table-plain">
             <thead>
-              <tr><th>Reconocimiento</th><th>Fecha</th><th></th></tr>
+              <tr><th>Diploma</th><th>Fecha</th><th></th></tr>
             </thead>
             <tbody>
               {recognitions.map((r) => (

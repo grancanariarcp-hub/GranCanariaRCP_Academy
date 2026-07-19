@@ -190,6 +190,7 @@ export async function verifyRecognition(req: Request, res: Response): Promise<vo
     valido: true,
     reconocimiento: {
       titular: r.subject_name,
+      tipo: r.kind === 'desafio' ? 'Diploma de participación' : 'Diploma de reconocimiento',
       motivo: r.kind === 'desafio'
         ? `Participación en «${r.challenge_title}»${r.position ? `, ${r.position}.º puesto` : ''}`
         : `${Number(r.hours)} horas de práctica`,
@@ -236,6 +237,7 @@ async function enviarPdf(
   res.setHeader('Content-Disposition', `attachment; filename="reconocimiento-${datos.codigo}.pdf"`);
   doc.pipe(res);
   renderReconocimiento(doc, {
+    encabezado: p.kind === 'desafio' ? 'DIPLOMA DE PARTICIPACIÓN' : 'DIPLOMA DE RECONOCIMIENTO',
     certifica: p.certifica || 'Gran Canaria RCP',
     titulo: p.title,
     nombre: datos.nombre,

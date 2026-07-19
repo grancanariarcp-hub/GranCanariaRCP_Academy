@@ -8,11 +8,12 @@ import { adminNav } from '@/lib/nav';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 
 /**
- * Certificados de reconocimiento: plantillas.
+ * Diplomas de participación y reconocimiento: plantillas.
  *
- * Misma lógica que los certificados de aprobación (quién certifica, firmantes e
- * imagen de fondo), pero con dos motivos: ganar un desafío o acumular horas de
- * práctica. El cuerpo admite marcadores que se sustituyen al emitirlo.
+ * Misma lógica que los certificados de aprobación (quién firma e imagen de
+ * fondo), pero con dos motivos: participar en un desafío o acumular horas de
+ * práctica. Se evita la palabra "certificado", reservada a la formación
+ * acreditada. El cuerpo admite marcadores que se sustituyen al emitirlo.
  */
 
 interface Plantilla {
@@ -37,8 +38,8 @@ interface Plantilla {
 const VACIA = {
   kind: 'horas' as 'desafio' | 'horas',
   title: '',
-  bodyTemplate: 'Ha dedicado {horas} horas a entrenar sus conocimientos en reanimación cardiopulmonar y primeros auxilios.',
-  frase: 'Gracias por contribuir a que nuestra sociedad cada día esté más cardioprotegida.',
+  bodyTemplate: 'por DEDICAR {horas} horas a formarse en reanimación y primeros auxilios, y contribuir a que nuestra sociedad esté realmente cardioprotegida.',
+  frase: '',
   certifica: 'Gran Canaria RCP',
   firmante1Nombre: '',
   firmante1Cargo: '',
@@ -114,7 +115,7 @@ export default function ReconocimientosPage() {
   }
 
   async function borrar(p: Plantilla) {
-    if (!confirm(`¿Eliminar «${p.title}»? Los reconocimientos ya emitidos se conservan.`)) return;
+    if (!confirm(`¿Eliminar «${p.title}»? Los diplomas ya emitidos se conservan.`)) return;
     await api(`/api/admin/recognition-templates/${p.id}`, { method: 'DELETE', auth: true });
     cargar();
   }
@@ -133,7 +134,7 @@ export default function ReconocimientosPage() {
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
   return (
-    <AppShell user={user} title="Reconocimientos" nav={adminNav(user.role, '/admin/reconocimientos')}>
+    <AppShell user={user} title="Diplomas" nav={adminNav(user.role, '/admin/reconocimientos')}>
       <PageNav backHref="/admin" backLabel="Volver al panel" />
 
       <div className="grid grid-2">
@@ -163,7 +164,7 @@ export default function ReconocimientosPage() {
               <label className="form-label" htmlFor="r-title">Título interno</label>
               <input id="r-title" className="form-input" required value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder={form.kind === 'horas' ? 'Reconocimiento por 25 horas' : 'Reconocimiento por desafío'} />
+                placeholder={form.kind === 'horas' ? 'Diploma por 25 horas' : 'Diploma de participación'} />
             </div>
 
             {form.kind === 'horas' ? (
@@ -178,23 +179,24 @@ export default function ReconocimientosPage() {
                 <input id="r-puesto" className="form-input" inputMode="numeric" value={form.maxPosition}
                   onChange={(e) => setForm({ ...form, maxPosition: e.target.value })} placeholder="3" />
                 <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  Déjalo vacío para que lo reciba todo el que complete el desafío: es lo que más se comparte en redes.
+                  Recomendado: déjalo vacío para que lo reciba <strong>todo el que complete el desafío</strong>.
+                  El ganador ya tiene la gloria del ranking; el diploma compartible es lo que atrae usuarios nuevos.
                 </p>
               </div>
             )}
 
             <div className="form-group">
-              <label className="form-label" htmlFor="r-cuerpo">Texto del certificado</label>
+              <label className="form-label" htmlFor="r-cuerpo">Texto del diploma</label>
               <textarea id="r-cuerpo" className="form-input" style={{ height: 80, padding: 10 }} required
                 value={form.bodyTemplate} onChange={(e) => setForm({ ...form, bodyTemplate: e.target.value })} />
               <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                Marcadores disponibles: <code>{'{nombre}'}</code> <code>{'{desafio}'}</code> <code>{'{puesto}'}</code>{' '}
+                Continúa la frase «Gran Canaria RCP AGRADECE a [nombre]…». Marcadores disponibles: <code>{'{nombre}'}</code> <code>{'{desafio}'}</code> <code>{'{puesto}'}</code>{' '}
                 <code>{'{horas}'}</code> <code>{'{fecha}'}</code>
               </p>
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="r-frase">Frase de cierre</label>
+              <label className="form-label" htmlFor="r-frase">Frase de cierre (opcional)</label>
               <textarea id="r-frase" className="form-input" style={{ height: 60, padding: 10 }}
                 value={form.frase} onChange={(e) => setForm({ ...form, frase: e.target.value })} />
             </div>
@@ -265,7 +267,7 @@ export default function ReconocimientosPage() {
                       <td>{p.emitidos}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button className="link-action"
-                          onClick={() => downloadFile(`/api/admin/recognition-templates/${p.id}/preview.pdf`, 'reconocimiento-ejemplo.pdf')}>
+                          onClick={() => downloadFile(`/api/admin/recognition-templates/${p.id}/preview.pdf`, 'diploma-ejemplo.pdf')}>
                           Ver
                         </button>{' · '}
                         <button className="link-action" onClick={() => editar(p)}>Editar</button>{' · '}
