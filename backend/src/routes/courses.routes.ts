@@ -20,6 +20,7 @@ import {
   attendanceQrToken, listAttendanceRecords, markAttendanceManually, attendanceListPdf,
 } from '../controllers/attendance.controller.js';
 import { coursePayments } from '../controllers/payment.controller.js';
+import { previewActa, cerrarActa, listActas, actaPdf } from '../controllers/acta.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -77,6 +78,12 @@ router.post('/:id/students/:studentId/reset-password', asyncHandler(directorRese
 
 // Asistencia presencial
 router.get('/:id/payments', asyncHandler(coursePayments));
+
+// Acta del curso
+router.get('/:id/acta/preview.pdf', asyncHandler(previewActa));
+router.post('/:id/acta', asyncHandler(cerrarActa));
+router.get('/:id/actas', asyncHandler(listActas));
+router.get('/:id/actas/:code.pdf', asyncHandler(actaPdf));
 router.get('/:id/attendance/list.pdf', asyncHandler(attendanceListPdf));
 router.get('/:id/attendance/sessions', asyncHandler(listAttendanceSessions));
 router.post('/:id/attendance/sessions', asyncHandler(createAttendanceSession));

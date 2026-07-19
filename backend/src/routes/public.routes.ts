@@ -8,6 +8,7 @@ import { listPublicInstitutions } from '../controllers/institution.controller.js
 import { qrImage } from '../controllers/qr.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { subscribeLead, unsubscribeLead } from '../controllers/lead.controller.js';
+import { verificarActa } from '../controllers/acta.controller.js';
 
 /** Public endpoints (no auth) — course discovery + challenges/rankings. */
 const router = Router();
@@ -27,6 +28,7 @@ router.get('/qr', asyncHandler(qrImage));
 // Aviso de apertura de matrícula
 router.post('/leads', asyncHandler(subscribeLead));
 router.delete('/leads/:email', asyncHandler(unsubscribeLead));
+router.get('/actas/:code', asyncHandler(verificarActa));
 router.get('/certificates/:code', asyncHandler(getPublicCertificate));
 router.get('/certificates/:code/pdf', asyncHandler(publicCertificatePdf));
 

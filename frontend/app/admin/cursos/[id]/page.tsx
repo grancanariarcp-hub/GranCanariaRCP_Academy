@@ -12,6 +12,7 @@ import { PageNav } from '@/components/PageNav';
 import { AttendancePanel } from '@/components/AttendancePanel';
 import { adminNav } from '@/lib/nav';
 import { CoursePricing } from '@/components/CoursePricing';
+import { ActaPanel } from '@/components/ActaPanel';
 
 interface Activity {
   id: string;
@@ -458,7 +459,10 @@ export default function CourseDetailPage() {
             </div>
           )}
 
-          {/* Precio de matrícula, con matrícula anticipada */}
+          {/* Acta: cierra la actividad formativa y congela sus datos */}
+        <ActaPanel courseId={courseId} />
+
+        {/* Precio de matrícula, con matrícula anticipada */}
         <CoursePricing courseId={courseId} course={course} onSaved={load} />
 
         {/* Asistencia presencial: jornadas, QR y lista de clase */}
