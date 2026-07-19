@@ -5,6 +5,7 @@ import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { withImageUrls } from '../services/r2.js';
 import { notify } from '../services/notify.js';
+import { precioDe } from '../services/pricing.js';
 
 /**
  * Basic student dashboard payload: their profile summary + progress.
@@ -71,21 +72,32 @@ export async function listAvailableCourses(req: Request, res: Response): Promise
 /** Matricular al alumno actual. Curso gratis -> activo; de pago -> pendiente_pago. */
 export async function enrollCourse(req: Request, res: Response): Promise<void> {
   const courseId = req.params.courseId;
-  const course = await query<{ status: string; enrollment_open: boolean; price_cents: number; title: string }>(
-    'SELECT status, enrollment_open, price_cents, title FROM courses WHERE id = $1',
+  const course = await query<{
+    status: string; enrollment_open: boolean; price_cents: number; title: string;
+    early_bird_until: string | null; late_surcharge_pct: number | null;
+  }>(
+    `SELECT status, enrollment_open, price_cents, title, early_bird_until, late_surcharge_pct
+       FROM courses WHERE id = $1`,
     [courseId],
   );
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
   const c = course.rows[0];
   if (c.status !== 'publicado' || !c.enrollment_open) throw badRequest('La matrícula de este curso no está abierta', 'ENROLL_CLOSED');
 
-  const status = c.price_cents > 0 ? 'pendiente_pago' : 'activo';
+  // El importe se congela aquí: si luego cambia el precio o vence el plazo de
+  // matrícula anticipada, esta matrícula conserva lo que le correspondía.
+  const precio = precioDe({
+    priceCents: c.price_cents,
+    earlyBirdUntil: c.early_bird_until,
+    lateSurchargePct: c.late_surcharge_pct,
+  });
+  const status = precio.cents > 0 ? 'pendiente_pago' : 'activo';
   const { rows } = await query(
-    `INSERT INTO enrollments (student_id, course_id, status)
-     VALUES ($1, $2, $3)
+    `INSERT INTO enrollments (student_id, course_id, status, price_paid_cents)
+     VALUES ($1, $2, $3, $4)
      ON CONFLICT (student_id, course_id) DO UPDATE SET status = enrollments.status
-     RETURNING id, status`,
-    [req.auth!.sub, courseId, status],
+     RETURNING id, status, price_paid_cents`,
+    [req.auth!.sub, courseId, status, precio.cents],
   );
 
   // Avisar al profesorado del curso del nuevo alumno.

@@ -5,6 +5,7 @@ import { forbidden, notFound } from '../utils/httpError.js';
 import { withImageUrls, presignKeys } from '../services/r2.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { precioDe } from '../services/pricing.js';
 
 /**
  * Courses. super_admin sees/manages all; a profesor sees/manages the courses
@@ -77,13 +78,27 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
  * (genera interés); la tarjeta indica el estado con enrollment_open.
  * Los de matrícula abierta salen primero.
  */
+/** Añade el precio vigente calculado, para que la ficha y el cobro coincidan. */
+function conPrecio<T extends Record<string, unknown>>(c: T): T & { precio: ReturnType<typeof precioDe> } {
+  return {
+    ...c,
+    precio: precioDe({
+      priceCents: Number(c.price_cents),
+      earlyBirdUntil: (c.early_bird_until as string | null) ?? null,
+      lateSurchargePct: (c.late_surcharge_pct as number | null) ?? 0,
+    }),
+  };
+}
+
 export async function listOpenCourses(_req: Request, res: Response): Promise<void> {
   const { rows } = await query(
-    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, resumen, thumbnail_key, enrollment_open, cfc
+    `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, resumen, thumbnail_key, enrollment_open, cfc,
+            early_bird_until, late_surcharge_pct
      FROM courses WHERE status = 'publicado'
      ORDER BY enrollment_open DESC, created_at DESC`,
   );
-  res.json({ courses: await presignKeys(rows, 'thumbnail_key', 'thumbnail_url') });
+  const conUrl = await presignKeys(rows, 'thumbnail_key', 'thumbnail_url');
+  res.json({ courses: conUrl.map(conPrecio) });
 }
 
 /** Public: full info of one published course (for its landing page). */
@@ -91,7 +106,7 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
   const { rows } = await query(
     `SELECT id, title, tema, subtema, modality, duration_hours, price_cents,
             publico_objetivo, objetivo_general, objetivos_especificos, resumen, acreditacion, cfc,
-            thumbnail_key, enrollment_open
+            thumbnail_key, enrollment_open, early_bird_until, late_surcharge_pct
      FROM courses WHERE id = $1 AND status = 'publicado'`,
     [req.params.id],
   );
@@ -116,7 +131,8 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
     (await query<{ id: string; image_key: string; url?: string }>('SELECT id, image_key FROM course_images WHERE course_id = $1 ORDER BY sort_order', [req.params.id])).rows,
     'image_key', 'url',
   );
-  const [course] = await presignKeys(rows, 'thumbnail_key', 'thumbnail_url');
+  const [conUrl] = await presignKeys(rows, 'thumbnail_key', 'thumbnail_url');
+  const course = conPrecio(conUrl);
   res.json({ course, staff: staff.rows, program: program.rows, gallery: gallery.map((g) => ({ id: g.id, url: g.url })) });
 }
 

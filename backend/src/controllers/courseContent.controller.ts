@@ -34,6 +34,10 @@ const updateCourseSchema = z.object({
   minPerPage: z.number().min(0.5).max(30).optional(),
   wordsPerMin: z.number().int().min(50).max(600).optional(),
   minPerQuestion: z.number().min(0.1).max(30).optional(),
+  // Precio de matrícula: base (anticipado), plazo y recargo posterior.
+  priceCents: z.number().int().min(0).max(10_000_00).optional(),
+  earlyBirdUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).nullish(),
+  lateSurchargePct: z.number().min(0).max(500).optional(),
 });
 
 export async function updateCourse(req: Request, res: Response): Promise<void> {
@@ -47,6 +51,7 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     firmante2_nombre: d.firmante2Nombre, firmante2_cargo: d.firmante2Cargo,
     whatsapp_url: d.whatsappUrl,
     min_per_page: d.minPerPage, words_per_min: d.wordsPerMin, min_per_question: d.minPerQuestion,
+    price_cents: d.priceCents, early_bird_until: d.earlyBirdUntil, late_surcharge_pct: d.lateSurchargePct,
   };
   const fields: string[] = [];
   const params: unknown[] = [];

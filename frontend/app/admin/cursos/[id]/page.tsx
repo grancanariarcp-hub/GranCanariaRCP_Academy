@@ -11,6 +11,7 @@ import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
 import { AttendancePanel } from '@/components/AttendancePanel';
 import { adminNav } from '@/lib/nav';
+import { CoursePricing } from '@/components/CoursePricing';
 
 interface Activity {
   id: string;
@@ -55,6 +56,9 @@ interface Course {
   firmante2_cargo: string | null;
   cert_bg_url?: string;
   cfc_image_url?: string;
+  price_cents: number;
+  early_bird_until: string | null;
+  late_surcharge_pct: number | string | null;
 }
 
 const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
@@ -454,7 +458,10 @@ export default function CourseDetailPage() {
             </div>
           )}
 
-          {/* Asistencia presencial: jornadas, QR y lista de clase */}
+          {/* Precio de matrícula, con matrícula anticipada */}
+        <CoursePricing courseId={courseId} course={course} onSaved={load} />
+
+        {/* Asistencia presencial: jornadas, QR y lista de clase */}
         <AttendancePanel courseId={courseId} />
 
         {/* Ficha del curso */}
