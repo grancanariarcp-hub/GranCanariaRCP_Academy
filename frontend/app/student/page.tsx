@@ -6,6 +6,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
 import { temaPalette } from '@/lib/temaColors';
+import { WhatsAppPrompt } from '@/components/WhatsAppPrompt';
 
 interface MyCourse {
   id: string;
@@ -64,6 +65,7 @@ export default function StudentDashboard() {
 
   return (
     <AppShell user={user} title="Campus" nav={[{ label: 'Inicio', href: '/student', active: true }, { label: 'Práctica', href: '/practica' }, { label: 'Desafíos', href: '/desafios' }, { label: 'Perfil', href: '/student/perfil' }]}>
+      <WhatsAppPrompt />
       {error && <div className="alert alert-error">{error}</div>}
       {msg && <div className="alert alert-success">{msg}</div>}
 

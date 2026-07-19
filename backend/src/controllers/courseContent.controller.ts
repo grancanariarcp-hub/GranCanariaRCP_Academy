@@ -30,6 +30,7 @@ const updateCourseSchema = z.object({
   firmante1Cargo: z.string().max(160).optional(),
   firmante2Nombre: z.string().max(160).optional(),
   firmante2Cargo: z.string().max(160).optional(),
+  whatsappUrl: z.string().url('Enlace no válido').or(z.literal('')).optional(),
 });
 
 export async function updateCourse(req: Request, res: Response): Promise<void> {
@@ -41,6 +42,7 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     resumen: d.resumen, acreditacion: d.acreditacion, cfc: d.cfc, duration_hours: d.durationHours,
     certifica: d.certifica, firmante1_nombre: d.firmante1Nombre, firmante1_cargo: d.firmante1Cargo,
     firmante2_nombre: d.firmante2Nombre, firmante2_cargo: d.firmante2Cargo,
+    whatsapp_url: d.whatsappUrl,
   };
   const fields: string[] = [];
   const params: unknown[] = [];

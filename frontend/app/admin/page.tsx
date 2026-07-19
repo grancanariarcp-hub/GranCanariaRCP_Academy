@@ -47,6 +47,10 @@ export default function AdminDashboard() {
   const [creating, setCreating] = useState(false);
   const [formMsg, setFormMsg] = useState<string | null>(null);
 
+  // Grupo de WhatsApp general de la plataforma
+  const [waUrl, setWaUrl] = useState('');
+  const [waMsg, setWaMsg] = useState<string | null>(null);
+
   async function loadAll() {
     try {
       const [s, inst, audit] = await Promise.all([
@@ -57,6 +61,8 @@ export default function AdminDashboard() {
       setStats(s);
       setInstitutions(inst.institutions);
       setLogs(audit.logs);
+      api<{ url: string | null }>('/api/admin/whatsapp', { auth: true })
+        .then((r) => setWaUrl(r.url ?? '')).catch(() => {});
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error cargando datos');
     }
@@ -73,6 +79,17 @@ export default function AdminDashboard() {
       loadAll();
     } catch (err) {
       setFormMsg(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
+
+  async function saveWhatsapp(e: React.FormEvent) {
+    e.preventDefault();
+    setWaMsg(null);
+    try {
+      await api('/api/admin/whatsapp', { method: 'POST', auth: true, body: JSON.stringify({ url: waUrl }) });
+      setWaMsg('Enlace guardado ✅');
+    } catch (err) {
+      setWaMsg(err instanceof ApiError ? err.message : 'Error');
     }
   }
 
@@ -207,6 +224,18 @@ export default function AdminDashboard() {
       </div>
 
       {/* Audit logs */}
+      <div className="card animate-in" style={{ marginTop: 24 }}>
+        <div className="card-header">
+          <div className="card-title">Grupo de WhatsApp de la comunidad</div>
+          <div className="card-subtitle">Se ofrece a los alumnos al entrar; unirse es voluntario</div>
+        </div>
+        {waMsg && <div className={`alert ${waMsg.includes('✅') ? 'alert-success' : 'alert-error'}`}>{waMsg}</div>}
+        <form onSubmit={saveWhatsapp} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input className="form-input" style={{ flex: 1, minWidth: 260 }} placeholder="https://chat.whatsapp.com/..." value={waUrl} onChange={(e) => setWaUrl(e.target.value)} />
+          <button className="btn btn-primary">Guardar</button>
+        </form>
+      </div>
+
       <div className="card" style={{ marginTop: 24 }}>
         <div className="card-header">
           <div className="card-title">Actividad reciente (auditoría)</div>

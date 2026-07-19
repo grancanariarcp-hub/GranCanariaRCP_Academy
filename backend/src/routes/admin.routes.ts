@@ -19,6 +19,7 @@ import { createChallenge, listAllChallenges } from '../controllers/challenge.con
 import { createBank, updateBank, deleteBank, exportBank, listBanks, getBankTemas, importBankQuestions, globalFailedStats } from '../controllers/bank.controller.js';
 import { setInstitutionStatus } from '../controllers/institution.controller.js';
 import { adminResetPassword } from '../controllers/credentials.controller.js';
+import { getGlobalWhatsapp, setGlobalWhatsapp } from '../controllers/whatsapp.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -66,6 +67,8 @@ router.post('/banks/:id/import', asyncHandler(importBankQuestions));
 router.get('/failed-general', asyncHandler(globalFailedStats));
 
 router.post('/reset-password/:type/:id', asyncHandler(adminResetPassword));
+router.get('/whatsapp', asyncHandler(getGlobalWhatsapp));
+router.post('/whatsapp', asyncHandler(setGlobalWhatsapp));
 
 router.get('/audit-logs', asyncHandler(listAuditLogs));
 

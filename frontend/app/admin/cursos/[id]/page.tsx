@@ -42,6 +42,7 @@ interface Course {
   resumen: string | null;
   acreditacion: string | null;
   cfc: string | null;
+  whatsapp_url: string | null;
   thumbnail_url?: string;
   certifica: string | null;
   firmante1_nombre: string | null;
@@ -74,6 +75,7 @@ export default function CourseDetailPage() {
   const [fResumen, setFResumen] = useState('');
   const [fAcred, setFAcred] = useState('');
   const [fCfc, setFCfc] = useState('');
+  const [fWhats, setFWhats] = useState('');
   const [fichaMsg, setFichaMsg] = useState<string | null>(null);
 
   // Certificado
@@ -110,6 +112,7 @@ export default function CourseDetailPage() {
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
+      setFWhats(c.course.whatsapp_url ?? '');
       setCertifica(c.course.certifica ?? '');
       setF1n(c.course.firmante1_nombre ?? '');
       setF1c(c.course.firmante1_cargo ?? '');
@@ -139,7 +142,7 @@ export default function CourseDetailPage() {
   async function saveFicha() {
     setFichaMsg(null);
     try {
-      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc }) });
+      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats }) });
       setFichaMsg('Ficha guardada ✅');
       load();
     } catch (err) {
@@ -370,6 +373,11 @@ export default function CourseDetailPage() {
                     <label className="form-label">CFC</label>
                     <input className="form-input" value={fCfc} onChange={(e) => setFCfc(e.target.value)} />
                   </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Grupo de WhatsApp del curso (enlace de invitación)</label>
+                  <input className="form-input" placeholder="https://chat.whatsapp.com/..." value={fWhats} onChange={(e) => setFWhats(e.target.value)} />
+                  <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>Se ofrecerá a los alumnos al entrar. Unirse es voluntario.</p>
                 </div>
                 <button className="btn btn-primary btn-small" onClick={saveFicha}>Guardar ficha</button>
               </div>
