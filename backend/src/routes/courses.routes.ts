@@ -7,7 +7,7 @@ import {
   addCourseImage, deleteCourseImage, setActivityDuration,
 } from '../controllers/courseContent.controller.js';
 import {
-  createExam, getExam, updateExam, addExamQuestion, importExamQuestions, addExamQuestionsFromBank, deleteExamQuestion, listExamAttempts,
+  createExam, getExam, updateExam, addExamQuestion, importExamQuestions, addExamQuestionsFromBank, createExamWizard, deleteExamQuestion, listExamAttempts,
 } from '../controllers/exam.controller.js';
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
@@ -49,6 +49,7 @@ router.delete('/:id/staff/:userId', asyncHandler(removeStaff));
 
 // Exámenes
 router.post('/:id/modules/:moduleId/exams', asyncHandler(createExam));
+router.post('/:id/modules/:moduleId/exams/wizard', asyncHandler(createExamWizard));
 router.get('/:id/exams/:examId', asyncHandler(getExam));
 router.patch('/:id/exams/:examId', asyncHandler(updateExam));
 router.post('/:id/exams/:examId/questions', asyncHandler(addExamQuestion));

@@ -276,3 +276,135 @@ export async function addExamQuestionsFromBank(req: Request, res: Response): Pro
   }
   res.status(201).json({ added });
 }
+
+// ---------------------------------------------------------------------------
+// Asistente de creación de exámenes
+// ---------------------------------------------------------------------------
+
+/** Minutos sugeridos para responder N preguntas (1,5 min por pregunta). */
+export function suggestedMinutes(nQuestions: number): number {
+  return Math.max(5, Math.ceil((nQuestions * 1.5) / 5) * 5); // redondeado a múltiplos de 5
+}
+
+/**
+ * POST /api/banks/availability — cuántas preguntas hay disponibles en los
+ * bancos elegidos, en total y por tema. Evita configurar un examen de 50
+ * preguntas cuando solo hay 30.
+ */
+export async function bankAvailability(req: Request, res: Response): Promise<void> {
+  const { bankIds } = z.object({ bankIds: z.array(z.string().uuid()).min(1) }).parse(req.body);
+
+  // Solo bancos propios o públicos (el super_admin ve todos).
+  const allowed = await query<{ id: string }>(
+    `SELECT id FROM question_banks
+      WHERE id = ANY($1) AND ($2::boolean OR visibility = 'publico' OR created_by = $3)`,
+    [bankIds, req.auth!.role === 'super_admin', req.auth!.sub],
+  );
+  const ids = allowed.rows.map((r) => r.id);
+  if (ids.length === 0) { res.json({ total: 0, porTema: [] }); return; }
+
+  const [tot, temas] = await Promise.all([
+    query<{ n: string }>('SELECT COUNT(*) AS n FROM questions WHERE bank_id = ANY($1) AND is_active = TRUE', [ids]),
+    query<{ tema: string; n: string }>(
+      `SELECT COALESCE(tema, '(sin tema)') AS tema, COUNT(*) AS n
+         FROM questions WHERE bank_id = ANY($1) AND is_active = TRUE
+        GROUP BY tema ORDER BY tema`,
+      [ids],
+    ),
+  ]);
+  const total = Number(tot.rows[0].n);
+  res.json({
+    total,
+    porTema: temas.rows.map((t) => ({ tema: t.tema, disponibles: Number(t.n) })),
+    sugerencia: { minutosPara: (n: number) => n }, // el cálculo real lo hace el asistente
+  });
+}
+
+const wizardSchema = z.object({
+  title: z.string().min(2).max(200),
+  kind: z.enum(['test', 'examen']).default('test'),
+  bankIds: z.array(z.string().uuid()).min(1, 'Elige al menos un banco'),
+  mode: z.enum(['aleatorio', 'temas']).default('aleatorio'),
+  count: z.number().int().min(1).max(200).optional(),
+  porTema: z.array(z.object({ tema: z.string().min(1), count: z.number().int().min(1).max(200) })).optional(),
+  timeLimitMin: z.number().int().min(1).max(600).nullable().optional(),
+  passPct: z.number().int().min(0).max(100).default(60),
+  attemptsAllowed: z.number().int().min(1).max(10).default(1),
+  shuffle: z.boolean().optional().default(true),
+});
+
+/** Crea el examen y lo llena de preguntas en un solo paso. */
+export async function createExamWizard(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const d = wizardSchema.parse(req.body);
+
+  const mod = await query('SELECT 1 FROM modules WHERE id = $1 AND course_id = $2', [req.params.moduleId, req.params.id]);
+  if (mod.rows.length === 0) throw notFound('Módulo no encontrado');
+
+  // Bancos permitidos (propios o públicos).
+  const allowed = await query<{ id: string }>(
+    `SELECT id FROM question_banks
+      WHERE id = ANY($1) AND ($2::boolean OR visibility = 'publico' OR created_by = $3)`,
+    [d.bankIds, req.auth!.role === 'super_admin', req.auth!.sub],
+  );
+  const ids = allowed.rows.map((r) => r.id);
+  if (ids.length === 0) throw badRequest('No puedes usar esos bancos', 'BAD_BANKS');
+
+  // Selección de preguntas: aleatoria del conjunto, o por temas con su cupo.
+  type Q = { text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null };
+  let picked: Q[] = [];
+  if (d.mode === 'temas') {
+    if (!d.porTema?.length) throw badRequest('Indica cuántas preguntas quieres de cada tema', 'NO_TEMAS');
+    for (const t of d.porTema) {
+      const r = await query<Q>(
+        `SELECT text, options, correct_index, video_url, image_key FROM questions
+          WHERE bank_id = ANY($1) AND is_active = TRUE AND COALESCE(tema,'(sin tema)') = $2
+          ORDER BY RANDOM() LIMIT $3`,
+        [ids, t.tema, t.count],
+      );
+      if (r.rows.length < t.count) {
+        throw badRequest(`El tema «${t.tema}» solo tiene ${r.rows.length} pregunta(s) disponibles y pediste ${t.count}`, 'NOT_ENOUGH');
+      }
+      picked = picked.concat(r.rows);
+    }
+  } else {
+    const count = d.count ?? 10;
+    const r = await query<Q>(
+      `SELECT text, options, correct_index, video_url, image_key FROM questions
+        WHERE bank_id = ANY($1) AND is_active = TRUE ORDER BY RANDOM() LIMIT $2`,
+      [ids, count],
+    );
+    if (r.rows.length < count) {
+      throw badRequest(`Los bancos elegidos solo tienen ${r.rows.length} pregunta(s) y pediste ${count}`, 'NOT_ENOUGH');
+    }
+    picked = r.rows;
+  }
+
+  const minutos = d.timeLimitMin === undefined ? suggestedMinutes(picked.length) : d.timeLimitMin;
+
+  const exam = await withTransaction(async (client) => {
+    const { rows } = await client.query(
+      `INSERT INTO exams (module_id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle`,
+      [req.params.moduleId, d.title, d.kind, d.attemptsAllowed, d.passPct, minutos, d.shuffle],
+    );
+    const created = rows[0];
+    await client.query(
+      `INSERT INTO activities (module_id, type, title, exam_id, sort_order)
+       VALUES ($1, $2, $3, $4, COALESCE((SELECT MAX(sort_order)+1 FROM activities WHERE module_id=$1),0))`,
+      [req.params.moduleId, d.kind, d.title, created.id],
+    );
+    let i = 0;
+    for (const q of picked) {
+      await client.query(
+        `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, sort_order)
+         VALUES ($1,'test',$2,$3::jsonb,$4,$5,$6,$7)`,
+        [created.id, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key, i++],
+      );
+    }
+    return created;
+  });
+
+  await audit({ actorId: req.auth!.sub, actorType: req.auth!.role, action: 'EXAM_WIZARD', entity: 'exam', entityId: exam.id, ip: clientIp(req), metadata: { preguntas: picked.length } });
+  res.status(201).json({ exam, preguntas: picked.length, minutosSugeridos: suggestedMinutes(picked.length) });
+}

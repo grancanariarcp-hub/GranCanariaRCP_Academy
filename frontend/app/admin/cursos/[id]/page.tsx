@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { CourseForum } from '@/components/CourseForum';
+import { ExamWizard } from '@/components/ExamWizard';
 import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
 
 interface Activity {
@@ -717,7 +718,9 @@ export default function CourseDetailPage() {
                           </button>
                         ))}
                       </div>
-                      <input className="form-input" placeholder={actType === 'test' || actType === 'examen' ? 'Título del examen' : 'Título de la actividad'} value={actTitle} onChange={(e) => setActTitle(e.target.value)} style={{ marginBottom: 8 }} />
+                      {actType !== 'test' && actType !== 'examen' && (
+                        <input className="form-input" placeholder="Título de la actividad" value={actTitle} onChange={(e) => setActTitle(e.target.value)} style={{ marginBottom: 8 }} />
+                      )}
                       {actType === 'documento' && (
                         <select className="form-select" value={actDoc} onChange={(e) => setActDoc(e.target.value)} style={{ marginBottom: 8 }}>
                           <option value="">Elige un documento…</option>
@@ -737,24 +740,11 @@ export default function CourseDetailPage() {
                         </label>
                       )}
                       {(actType === 'test' || actType === 'examen') && (
-                        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                          <div style={{ flex: 1 }}>
-                            <label className="form-label">Intentos</label>
-                            <input className="form-input" type="number" min="1" value={examAttempts} onChange={(e) => setExamAttempts(e.target.value)} />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <label className="form-label">% aprobado</label>
-                            <input className="form-input" type="number" min="0" max="100" value={examPass} onChange={(e) => setExamPass(e.target.value)} />
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <label className="form-label">Minutos</label>
-                            <input className="form-input" type="number" min="1" placeholder="libre" value={examTime} onChange={(e) => setExamTime(e.target.value)} title="Vacío = tiempo libre" />
-                          </div>
-                        </div>
+                        <ExamWizard courseId={courseId} moduleId={m.id} onCreated={() => { setAddingTo(null); load(); }} />
                       )}
-                      {actType !== 'imagen' && (
+                      {actType !== 'imagen' && actType !== 'test' && actType !== 'examen' && (
                         <button className="btn btn-primary btn-small btn-full" onClick={() => addActivity(m.id)} disabled={!actTitle.trim()}>
-                          {actType === 'test' || actType === 'examen' ? 'Crear examen' : 'Añadir'}
+                          Añadir
                         </button>
                       )}
                     </div>

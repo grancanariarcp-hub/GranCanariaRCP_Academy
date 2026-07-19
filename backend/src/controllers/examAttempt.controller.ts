@@ -5,6 +5,7 @@ import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { hasAnsweredSurvey } from '../services/surveyGate.js';
+import { withImageUrls } from '../services/r2.js';
 
 /** Student side: taking exams. All routes assume role 'student'. */
 
@@ -19,7 +20,7 @@ interface ExamRow {
 
 async function examForStudent(examId: string, studentId: string): Promise<ExamRow> {
   const { rows } = await query<ExamRow>(
-    `SELECT e.id, e.title, e.kind, e.attempts_allowed, e.pass_pct, e.time_limit_min, m.course_id
+    `SELECT e.id, e.title, e.kind, e.attempts_allowed, e.pass_pct, e.time_limit_min, e.shuffle, m.course_id
      FROM exams e JOIN modules m ON m.id = e.module_id
      WHERE e.id = $1`,
     [examId],
@@ -52,13 +53,19 @@ export async function startExam(req: Request, res: Response): Promise<void> {
     'INSERT INTO exam_attempts (exam_id, student_id) VALUES ($1, $2) RETURNING id, started_at',
     [exam.id, req.auth!.sub],
   );
-  // Questions WITHOUT the correct answer.
-  const q = await query('SELECT id, format, text, options FROM exam_questions WHERE exam_id = $1 ORDER BY sort_order', [exam.id]);
+  // Preguntas SIN la respuesta correcta. Si el examen baraja, cada alumno las
+  // recibe en un orden distinto (misma dificultad, más difícil de copiar).
+  const shuffle = (exam as { shuffle?: boolean }).shuffle !== false;
+  const q = await query<{ id: string; image_key: string | null }>(
+    `SELECT id, format, text, options, video_url, image_key FROM exam_questions
+      WHERE exam_id = $1 ORDER BY ${shuffle ? 'RANDOM()' : 'sort_order'}`,
+    [exam.id],
+  );
   res.status(201).json({
     attemptId: att.rows[0].id,
     startedAt: att.rows[0].started_at,
     exam: { title: exam.title, timeLimitMin: exam.time_limit_min, passPct: exam.pass_pct },
-    questions: q.rows,
+    questions: await withImageUrls(q.rows),
   });
 }
 

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createBank, updateBank, deleteBank, exportBank, listBanks, getBankTemas, importBankQuestions,
 } from '../controllers/bank.controller.js';
+import { bankAvailability } from '../controllers/exam.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -15,6 +16,7 @@ const router = Router();
 router.use(requireAuth, requireRole('super_admin', 'profesor'));
 
 router.get('/', asyncHandler(listBanks));
+router.post('/availability', asyncHandler(bankAvailability));
 router.post('/', asyncHandler(createBank));
 router.patch('/:id', asyncHandler(updateBank));
 router.delete('/:id', asyncHandler(deleteBank));
