@@ -85,8 +85,8 @@ const FAQ_DOCENTES: ItemFaq[] = [
     pregunta: '¿Cuánto cuesta empezar?',
     respuesta: (
       <p>
-        No hay cuota fija obligatoria. Compartes comisión solo cuando tienes matrículas, y los detalles se
-        acuerdan contigo según tu volumen.
+        Las condiciones se acuerdan contigo en función de tu volumen de cursos y de matrículas. Escríbenos y te
+        preparamos una propuesta concreta, sin compromiso.
       </p>
     ),
   },
@@ -181,7 +181,7 @@ export default function DocentesPage() {
           <div className="animate-in" style={{ marginTop: 26 }}>
             <BotonesContacto variante="oscuro" />
             <p style={{ fontSize: 13.5, opacity: 0.9, marginTop: 12 }}>
-              Sin cuotas fijas obligatorias: solo compartes comisión cuando tienes matrículas.
+              Cuéntanos cómo impartes y te preparamos una propuesta a tu medida.
             </p>
           </div>
 
@@ -236,8 +236,8 @@ export default function DocentesPage() {
             <h2 style={{ fontSize: 22, marginBottom: 10 }}>Cuantos más cursos impartes, menos comisión pagas.</h2>
             <p style={{ fontSize: 15, marginBottom: 20, maxWidth: 720 }}>
               La comisión baja a medida que aumentan tus cursos y tus matriculaciones. Sabemos que la mayoría de
-              docentes imparten de forma esporádica, por eso no aplicamos cuotas mensuales fijas por defecto:
-              cada acuerdo se adapta a tu ritmo.
+              docentes imparten de forma esporádica, por eso cada acuerdo se adapta a tu ritmo y a tu volumen
+              real de actividad.
             </p>
 
             <div className="grid grid-3" style={{ gap: 12, marginBottom: 20 }}>
@@ -254,7 +254,7 @@ export default function DocentesPage() {
             </div>
 
             <p className="muted" style={{ fontSize: 12.5, marginBottom: 18 }}>
-              Escala orientativa. El tramo y las condiciones concretas se acuerdan contigo.
+              Escala orientativa y no vinculante. El tramo y las condiciones concretas se acuerdan contigo.
             </p>
 
             <BotonesContacto />

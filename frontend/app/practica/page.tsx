@@ -7,6 +7,7 @@ import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 import { PageNav } from '@/components/PageNav';
 import { StickyCampusBar } from '@/components/StickyCampusBar';
+import { FreeTrial } from '@/components/FreeTrial';
 
 interface Q { id: string; category: string | null; text: string; options: string[] }
 interface Feedback { id: string; correct_index: number; your: number | null; is_correct: boolean; explanation: string | null; document_title: string | null; ref_page: number | null }
@@ -189,13 +190,9 @@ export default function PracticaPage() {
                 </div>
               ))}
             </div>
-            <div className="card" style={{ textAlign: 'center' }}>
-              <p style={{ marginBottom: 12 }}>Para practicar y guardar tus estadísticas, entra o crea tu cuenta gratis:</p>
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <Link href="/login" className="btn btn-primary">Acceder</Link>
-                <Link href="/registro" className="btn cta-blink" style={{ background: 'linear-gradient(135deg,#276749,#10b981)', color: '#fff', fontWeight: 700 }}>Regístrate gratis</Link>
-              </div>
-            </div>
+            {/* Se deja probar antes de pedir nada: el muro llega después, con
+                la nota delante, que es lo que de verdad convierte. */}
+            <FreeTrial />
           </>
         ) : (
           <>

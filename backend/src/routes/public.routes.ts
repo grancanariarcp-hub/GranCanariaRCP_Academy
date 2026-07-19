@@ -10,6 +10,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { subscribeLead, unsubscribeLead } from '../controllers/lead.controller.js';
 import { verificarActa } from '../controllers/acta.controller.js';
 import { verifyRecognition, recognitionPdf } from '../controllers/recognition.controller.js';
+import { anonStatus, anonStart, anonSubmit, anonConverted } from '../controllers/anonPractice.controller.js';
 
 /** Public endpoints (no auth) — course discovery + challenges/rankings. */
 const router = Router();
@@ -25,6 +26,12 @@ router.get('/banks', asyncHandler(listBanks));
 router.get('/banks/:id/temas', asyncHandler(getBankTemas));
 router.get('/institutions', asyncHandler(listPublicInstitutions));
 router.get('/qr', asyncHandler(qrImage));
+
+// Práctica libre sin registro: una ronda gratuita y después muro
+router.get('/practice/status', asyncHandler(anonStatus));
+router.post('/practice/start', asyncHandler(anonStart));
+router.post('/practice/submit', asyncHandler(anonSubmit));
+router.post('/practice/converted', asyncHandler(anonConverted));
 
 // Aviso de apertura de matrícula
 router.post('/leads', asyncHandler(subscribeLead));

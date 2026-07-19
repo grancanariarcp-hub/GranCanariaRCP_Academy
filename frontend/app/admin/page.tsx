@@ -5,6 +5,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
+import { AnonPracticeStats } from '@/components/AnonPracticeStats';
 
 interface Stats {
   students: number;
@@ -135,6 +136,9 @@ export default function AdminDashboard() {
       nav={adminNav(user.role, '/admin')}
     >
       {error && <div className="alert alert-error">{error}</div>}
+
+      {/* Captación por la zona gratuita: cuánta gente prueba y cuánta se queda */}
+      <AnonPracticeStats />
 
       {/* KPIs */}
       <div className="grid grid-4" style={{ marginBottom: 16 }}>

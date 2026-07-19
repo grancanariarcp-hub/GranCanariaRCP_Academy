@@ -69,6 +69,13 @@ export default function RegistroPage() {
           body: JSON.stringify({ name, email, password, institutionId: institutionId || undefined, acceptTerms, rankingConsent, marketingConsent }),
         });
         saveSession(res.token, res.user);
+      // Cierra el círculo de la práctica libre: permite medir cuántos de los
+      // que probaron el test gratuito acaban registrándose.
+      const visitante = typeof window !== 'undefined' ? localStorage.getItem('rcp_visitor') : null;
+      if (visitante) {
+        api('/api/public/practice/converted', { method: 'POST', body: JSON.stringify({ visitor: visitante }) })
+          .catch(() => { /* la métrica nunca puede romper un registro */ });
+      }
         router.push('/student');
       }
     } catch (err) {
