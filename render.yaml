@@ -46,6 +46,10 @@ services:
       - key: RESEND_FROM
         sync: false
       # Base pública del campus para los enlaces de los correos.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
       - key: FRONTEND_URL
         value: https://campus.grancanariarcp.es
 

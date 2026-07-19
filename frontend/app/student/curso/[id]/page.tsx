@@ -11,6 +11,7 @@ import { CourseSurvey } from '@/components/CourseSurvey';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
 import { MyAttendance } from '@/components/MyAttendance';
+import { PayEnrollment } from '@/components/PayEnrollment';
 
 interface Activity {
   id: string;
@@ -45,14 +46,15 @@ export default function StudentCoursePage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [certAvailable, setCertAvailable] = useState(false);
+  const [matricula, setMatricula] = useState<{ estado: string; importeCents: number } | null>(null);
   const [progress, setProgress] = useState<{ total: number; completed: number; pct: number } | null>(null);
   const [time, setTime] = useState<{ activeHours: number; sessionHours: number; focusPct: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    api<{ course: Course; modules: Module[]; certificateAvailable: boolean; progress: { total: number; completed: number; pct: number } }>(`/api/student/courses/${courseId}`, { auth: true })
-      .then((r) => { setCourse(r.course); setModules(r.modules); setCertAvailable(r.certificateAvailable); setProgress(r.progress); })
+    api<{ course: Course; modules: Module[]; certificateAvailable: boolean; progress: { total: number; completed: number; pct: number }; matricula: { estado: string; importeCents: number } }>(`/api/student/courses/${courseId}`, { auth: true })
+      .then((r) => { setCourse(r.course); setModules(r.modules); setCertAvailable(r.certificateAvailable); setProgress(r.progress); setMatricula(r.matricula); })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Error cargando el curso'));
     api<{ activeHours: number; sessionHours: number; focusPct: number | null }>(`/api/profile/time?courseId=${courseId}`, { auth: true })
       .then(setTime).catch(() => {});
@@ -60,8 +62,8 @@ export default function StudentCoursePage() {
   }, [user]);
 
   async function reload() {
-    const r = await api<{ course: Course; modules: Module[]; certificateAvailable: boolean; progress: { total: number; completed: number; pct: number } }>(`/api/student/courses/${courseId}`, { auth: true });
-    setModules(r.modules); setCertAvailable(r.certificateAvailable); setProgress(r.progress);
+    const r = await api<{ course: Course; modules: Module[]; certificateAvailable: boolean; progress: { total: number; completed: number; pct: number }; matricula: { estado: string; importeCents: number } }>(`/api/student/courses/${courseId}`, { auth: true });
+    setModules(r.modules); setCertAvailable(r.certificateAvailable); setProgress(r.progress); setMatricula(r.matricula);
   }
 
   async function toggleDone(a: Activity) {
@@ -89,6 +91,7 @@ export default function StudentCoursePage() {
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={[{ label: 'Inicio', href: '/student', active: true }]}>
       <TimeTracker courseId={courseId} />
       <MyAttendance courseId={courseId} />
+      {matricula && <PayEnrollment courseId={courseId} estado={matricula.estado} importeCents={matricula.importeCents} />}
       <PageNav backHref="/student" backLabel="Volver a mis cursos" />
       {error && <div className="alert alert-error">{error}</div>}
 

@@ -130,8 +130,12 @@ export async function listMyCourses(req: Request, res: Response): Promise<void> 
 /** Contenido del curso para estudiar (solo si está matriculado). */
 export async function getMyCourseContent(req: Request, res: Response): Promise<void> {
   const courseId = req.params.courseId;
-  const enr = await query('SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2', [req.auth!.sub, courseId]);
+  const enr = await query<{ status: string; price_paid_cents: number | null }>(
+    'SELECT status, price_paid_cents FROM enrollments WHERE student_id = $1 AND course_id = $2',
+    [req.auth!.sub, courseId],
+  );
   if (enr.rows.length === 0) throw forbidden('No estás matriculado en este curso');
+  const matricula = enr.rows[0];
 
   const course = await query('SELECT id, title, tema, subtema, modality, objetivo_general FROM courses WHERE id = $1', [courseId]);
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
@@ -170,6 +174,7 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
     modules: mods,
     certificateAvailable: passed.rows.length > 0,
     progress: { total, completed, pct: total > 0 ? Math.round((completed / total) * 100) : 0 },
+    matricula: { estado: matricula.status, importeCents: matricula.price_paid_cents ?? 0 },
   });
 }
 

@@ -16,6 +16,7 @@ import { requireRole } from '../middleware/role.js';
 import { getSurveyForStudent, submitSurvey } from '../controllers/survey.controller.js';
 import { reportQuestion } from '../controllers/questionQuality.controller.js';
 import { myAttendance, previewScan, scanAttendance } from '../controllers/attendance.controller.js';
+import { createCheckoutSession, myPayments, receiptPdf } from '../controllers/payment.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = Router();
@@ -32,6 +33,11 @@ router.post('/courses/:courseId/activities/:activityId/complete', asyncHandler(s
 router.get('/courses/:courseId/survey', asyncHandler(getSurveyForStudent));
 router.post('/courses/:courseId/survey', asyncHandler(submitSurvey));
 router.get('/courses/:courseId/certificate', asyncHandler(studentCertificate));
+
+// Pago de la matrícula
+router.post('/courses/:courseId/checkout', asyncHandler(createCheckoutSession));
+router.get('/payments', asyncHandler(myPayments));
+router.get('/payments/:id/receipt', asyncHandler(receiptPdf));
 
 // Asistencia presencial: escaneo del QR que muestra el profesor
 router.get('/attendance', asyncHandler(myAttendance));

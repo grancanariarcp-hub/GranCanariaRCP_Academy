@@ -20,6 +20,8 @@ import notificationRoutes from './routes/notification.routes.js';
 import institutionRoutes from './routes/institution.routes.js';
 import documentsRoutes from './routes/documents.routes.js';
 import maestroRoutes from './routes/maestro.routes.js';
+import { stripeWebhook } from './controllers/payment.controller.js';
+import { asyncHandler } from './utils/asyncHandler.js';
 
 const app = express();
 
@@ -52,6 +54,10 @@ app.use(
     credentials: true,
   }),
 );
+// El webhook de Stripe se monta ANTES del parseo de JSON: su firma se calcula
+// sobre el cuerpo en crudo y cualquier reinterpretación la invalidaría.
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), asyncHandler(stripeWebhook));
+
 app.use(express.json({ limit: '1mb' }));
 app.use(globalLimiter);
 
