@@ -5,6 +5,7 @@ import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { assertEditor } from '../services/courseAuth.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { r2Configured, buildKey, uploadObject, withImageUrls } from '../services/r2.js';
 
 /** Exams live inside a module; each is also an activity in that module. */
 
@@ -62,11 +63,11 @@ export async function getExam(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
   const exam = await query('SELECT id, title, kind, attempts_allowed, pass_pct, time_limit_min FROM exams WHERE id = $1', [req.params.examId]);
-  const questions = await query(
-    'SELECT id, format, text, options, correct_index, sort_order FROM exam_questions WHERE exam_id = $1 ORDER BY sort_order',
+  const questions = await query<{ id: string; image_key: string | null }>(
+    'SELECT id, format, text, options, correct_index, video_url, image_key, sort_order FROM exam_questions WHERE exam_id = $1 ORDER BY sort_order',
     [req.params.examId],
   );
-  res.json({ exam: exam.rows[0], questions: questions.rows });
+  res.json({ exam: exam.rows[0], questions: await withImageUrls(questions.rows) });
 }
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,7 @@ const addQuestionSchema = z.object({
   text: z.string().min(3),
   options: z.array(z.string().min(1)).optional(),
   correctIndex: z.number().int().min(0).optional(),
+  videoUrl: z.string().url('URL de vídeo no válida').optional().or(z.literal('')),
 });
 
 export async function addExamQuestion(req: Request, res: Response): Promise<void> {
@@ -127,10 +129,10 @@ export async function addExamQuestion(req: Request, res: Response): Promise<void
   } // abierta: sin opciones ni correcta
 
   const { rows } = await query(
-    `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, sort_order)
-     VALUES ($1,$2,$3,$4::jsonb,$5, COALESCE((SELECT MAX(sort_order)+1 FROM exam_questions WHERE exam_id=$1),0))
-     RETURNING id, format, text, options, correct_index`,
-    [req.params.examId, d.format, d.text.trim(), JSON.stringify(options), correctIndex],
+    `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, sort_order)
+     VALUES ($1,$2,$3,$4::jsonb,$5,$6, COALESCE((SELECT MAX(sort_order)+1 FROM exam_questions WHERE exam_id=$1),0))
+     RETURNING id, format, text, options, correct_index, video_url`,
+    [req.params.examId, d.format, d.text.trim(), JSON.stringify(options), correctIndex, d.videoUrl || null],
   );
   res.status(201).json({ question: rows[0] });
 }
@@ -407,4 +409,46 @@ export async function createExamWizard(req: Request, res: Response): Promise<voi
 
   await audit({ actorId: req.auth!.sub, actorType: req.auth!.role, action: 'EXAM_WIZARD', entity: 'exam', entityId: exam.id, ip: clientIp(req), metadata: { preguntas: picked.length } });
   res.status(201).json({ exam, preguntas: picked.length, minutosSugeridos: suggestedMinutes(picked.length) });
+}
+
+/**
+ * Añade una pregunta CON IMAGEN (multipart). La imagen va a R2 y la pregunta
+ * sigue siendo de tipo test o V/F: el alumno responde a partir de lo que ve.
+ */
+export async function addExamQuestionWithImage(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  if (!r2Configured()) throw badRequest('El almacén de imágenes no está configurado', 'R2_NOT_CONFIGURED');
+  const file = req.file;
+  if (!file || !file.mimetype.startsWith('image/')) throw badRequest('Sube una imagen', 'NOT_IMAGE');
+
+  const format = String(req.body.format ?? 'test');
+  if (format !== 'test' && format !== 'vf') throw badRequest('Una pregunta con imagen debe ser tipo test o V/F', 'BAD_FORMAT');
+  const text = String(req.body.text ?? '').trim();
+  if (text.length < 3) throw badRequest('Escribe el enunciado', 'NO_TEXT');
+
+  let options: string[] = [];
+  const correctIndex = Number(req.body.correctIndex);
+  if (format === 'vf') {
+    options = ['Verdadero', 'Falso'];
+    if (correctIndex !== 0 && correctIndex !== 1) throw badRequest('Indica si es Verdadero o Falso', 'BAD_VF');
+  } else {
+    try { options = JSON.parse(String(req.body.options ?? '[]')); } catch { options = []; }
+    options = options.map((o) => String(o).trim()).filter(Boolean);
+    if (options.length < 2) throw badRequest('Un test necesita al menos 2 opciones', 'FEW_OPTIONS');
+    if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length) {
+      throw badRequest('Marca la opción correcta', 'BAD_CORRECT');
+    }
+  }
+
+  const key = buildKey(file.originalname, 'exam-questions');
+  await uploadObject(key, file.buffer, file.mimetype);
+
+  const { rows } = await query<{ id: string; image_key: string }>(
+    `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, image_key, sort_order)
+     VALUES ($1,$2,$3,$4::jsonb,$5,$6, COALESCE((SELECT MAX(sort_order)+1 FROM exam_questions WHERE exam_id=$1),0))
+     RETURNING id, format, text, options, correct_index, image_key`,
+    [req.params.examId, format, text, JSON.stringify(options), correctIndex, key],
+  );
+  res.status(201).json({ question: (await withImageUrls(rows))[0] });
 }

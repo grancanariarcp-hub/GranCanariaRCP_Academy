@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, uploadFile } from '@/lib/api';
 
 type Format = 'test' | 'vf' | 'abierta';
 interface ExamQuestion {
@@ -42,6 +42,12 @@ export default function ExamEditorPage() {
   const [qText, setQText] = useState('');
   const [options, setOptions] = useState<string[]>(['', '', '', '']);
   const [correct, setCorrect] = useState(0);
+  // Tipo elegido en la pestaña: los de media generan una pregunta test o V/F
+  // que además lleva imagen o vídeo.
+  const [tipo, setTipo] = useState<'test' | 'vf' | 'abierta' | 'imagen' | 'video'>('test');
+  const [mediaFormat, setMediaFormat] = useState<'test' | 'vf'>('test');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [imgFile, setImgFile] = useState<File | null>(null);
 
   // JSON import
   const [jsonText, setJsonText] = useState('');
@@ -91,14 +97,39 @@ export default function ExamEditorPage() {
     }
   }
 
+  /** Formato real que se guarda (los tipos de media son test o V/F). */
+  function realFormat(): 'test' | 'vf' | 'abierta' {
+    return tipo === 'imagen' || tipo === 'video' ? mediaFormat : tipo;
+  }
+
+  async function addQuestionWithImage() {
+    if (!imgFile) return;
+    setError(null);
+    try {
+      const f = realFormat();
+      await uploadFile(`/api/courses/${courseId}/exams/${examId}/questions/image`, imgFile, {
+        format: f,
+        text: qText,
+        correctIndex: String(correct),
+        options: JSON.stringify(f === 'test' ? options.map((o) => o.trim()).filter(Boolean) : []),
+      });
+      setQText(''); setOptions(['', '', '', '']); setCorrect(0); setImgFile(null);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al añadir la pregunta');
+    }
+  }
+
   async function addQuestion() {
     setError(null);
     try {
-      const body: Record<string, unknown> = { format, text: qText };
-      if (format === 'test') {
+      const f = realFormat();
+      const body: Record<string, unknown> = { format: f, text: qText };
+      if (tipo === 'video' && videoUrl) body.videoUrl = videoUrl;
+      if (f === 'test') {
         body.options = options.map((o) => o.trim()).filter(Boolean);
         body.correctIndex = correct;
-      } else if (format === 'vf') {
+      } else if (f === 'vf') {
         body.correctIndex = correct; // 0 = Verdadero, 1 = Falso
       }
       await api(`/api/courses/${courseId}/exams/${examId}/questions`, { method: 'POST', auth: true, body: JSON.stringify(body) });
@@ -194,18 +225,53 @@ export default function ExamEditorPage() {
           <div className="card">
             <div className="card-header"><div className="card-title">Añadir pregunta</div></div>
             <div className="tabs">
-              {(['test', 'vf', 'abierta'] as Format[]).map((f) => (
-                <button key={f} type="button" className={`tab ${format === f ? 'active' : ''}`} onClick={() => { setFormat(f); setCorrect(0); }}>
-                  {FORMAT_LABEL[f]}
+              {([
+                ['test', 'Test'], ['vf', 'Verdadero / Falso'], ['abierta', 'Abierta'],
+                ['imagen', 'Con imagen'], ['video', 'Con vídeo'],
+              ] as Array<[typeof tipo, string]>).map(([t, label]) => (
+                <button key={t} type="button" className={`tab ${tipo === t ? 'active' : ''}`}
+                  onClick={() => { setTipo(t); setCorrect(0); }}>
+                  {label}
                 </button>
               ))}
             </div>
+
+            {(tipo === 'imagen' || tipo === 'video') && (
+              <>
+                <div className="info-box" style={{ fontSize: 13, marginBottom: 10 }}>
+                  El alumno responderá a partir de {tipo === 'imagen' ? 'la imagen' : 'el vídeo'}. Elige si la pregunta será tipo test o Verdadero/Falso.
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Formato de la respuesta</label>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input type="radio" name="mf" checked={mediaFormat === 'test'} onChange={() => { setMediaFormat('test'); setCorrect(0); }} /> Test
+                    </label>
+                    <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <input type="radio" name="mf" checked={mediaFormat === 'vf'} onChange={() => { setMediaFormat('vf'); setCorrect(0); }} /> Verdadero / Falso
+                    </label>
+                  </div>
+                </div>
+                {tipo === 'video' ? (
+                  <div className="form-group">
+                    <label className="form-label">URL del vídeo</label>
+                    <input className="form-input" placeholder="https://…" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} />
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label className="form-label">Imagen</label>
+                    <input type="file" accept="image/*" onChange={(e) => setImgFile(e.target.files?.[0] ?? null)} />
+                    {imgFile && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{imgFile.name}</div>}
+                  </div>
+                )}
+              </>
+            )}
             <div className="form-group">
               <label className="form-label">Enunciado</label>
               <textarea className="form-input" style={{ height: 64, padding: 10 }} value={qText} onChange={(e) => setQText(e.target.value)} />
             </div>
 
-            {format === 'test' && (
+            {realFormat() === 'test' && tipo !== 'abierta' && (
               <div className="form-group">
                 <label className="form-label">Opciones (marca la correcta)</label>
                 {options.map((opt, i) => (
@@ -216,7 +282,7 @@ export default function ExamEditorPage() {
                 ))}
               </div>
             )}
-            {format === 'vf' && (
+            {realFormat() === 'vf' && (
               <div className="form-group">
                 <label className="form-label">Respuesta correcta</label>
                 <div style={{ display: 'flex', gap: 12 }}>
@@ -229,13 +295,17 @@ export default function ExamEditorPage() {
                 </div>
               </div>
             )}
-            {format === 'abierta' && (
+            {tipo === 'abierta' && (
               <div className="info-box" style={{ marginBottom: 12, fontSize: 13 }}>
                 Pregunta de respuesta libre (se corrige manualmente).
               </div>
             )}
 
-            <button className="btn btn-primary btn-full" onClick={addQuestion} disabled={qText.trim().length < 3}>Añadir pregunta</button>
+            <button className="btn btn-primary btn-full"
+              onClick={tipo === 'imagen' ? addQuestionWithImage : addQuestion}
+              disabled={qText.trim().length < 3 || (tipo === 'imagen' && !imgFile) || (tipo === 'video' && !videoUrl.trim())}>
+              Añadir pregunta
+            </button>
           </div>
 
           {/* Importar por JSON */}
