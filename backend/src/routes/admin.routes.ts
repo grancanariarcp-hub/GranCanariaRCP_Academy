@@ -7,6 +7,7 @@ import {
   listAdmins,
   createAdmin,
   createQuestion,
+  createQuestionWithImage,
   listQuestions,
   listProfessors,
   setProfessorStatus,
@@ -49,6 +50,7 @@ router.post('/professors/:id/:action', asyncHandler(setProfessorStatus));
 
 router.get('/questions', asyncHandler(listQuestions));
 router.post('/questions', asyncHandler(createQuestion));
+router.post('/questions/image', upload.single('file'), asyncHandler(createQuestionWithImage));
 router.get('/questions/template', getTemplate);
 router.post('/questions/import', upload.single('file'), asyncHandler(importQuestions));
 

@@ -32,6 +32,8 @@ export default function PreguntasPage() {
   const [banks, setBanks] = useState<Array<{ id: string; name: string; kind: string }>>([]);
   const [bankId, setBankId] = useState('');
   const [tema, setTema] = useState('');
+  const [qImage, setQImage] = useState<File | null>(null);
+  const [filterMedia, setFilterMedia] = useState('');
   const [category, setCategory] = useState<Level>('SVB');
   const [audiences, setAudiences] = useState<Audience[]>(['jovenes', 'adultos']);
   const [qtype, setQtype] = useState<QType>('teorica');
@@ -67,10 +69,10 @@ export default function PreguntasPage() {
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
-  async function loadList() {
+  async function loadList(media?: string) {
     try {
       const [q, d, b] = await Promise.all([
-        api<{ questions: QuestionRow[] }>('/api/admin/questions', { auth: true }),
+        api<{ questions: QuestionRow[] }>(`/api/admin/questions${media ? `?media=${media}` : ''}`, { auth: true }),
         api<{ documents: Array<{ id: string; title: string }> }>('/api/admin/documents', { auth: true }),
         api<{ banks: Array<{ id: string; name: string; kind: string }> }>('/api/admin/banks', { auth: true }).catch(() => ({ banks: [] })),
       ]);
@@ -143,10 +145,7 @@ export default function PreguntasPage() {
     setMsg(null);
     setSaving(true);
     try {
-      await api('/api/admin/questions', {
-        method: 'POST',
-        auth: true,
-        body: JSON.stringify({
+      const payload = {
           bankId,
           tema: tema || undefined,
           category,
@@ -169,9 +168,23 @@ export default function PreguntasPage() {
           isCritical,
           refDocumentId: refDocumentId || undefined,
           refPage: refPage ? Number(refPage) : undefined,
-        }),
-      });
-      setMsg({ ok: true, text: 'Pregunta creada correctamente ✅' });
+      };
+      if (qImage) {
+        // Con imagen: va como multipart, pero conserva TODAS las etiquetas.
+        await uploadFile('/api/admin/questions/image', qImage, {
+          bankId, tema: tema || '', category, audiences: JSON.stringify(audiences),
+          qtype, difficulty: String(difficulty), text,
+          clinicalContext: qtype === 'caso_clinico' ? clinicalContext : '',
+          options: JSON.stringify(options.map((o) => o.trim()).filter(Boolean)),
+          correctIndex: String(correctIndex), explanation: explanation || '',
+          videoUrl: videoUrl || '', tags: JSON.stringify(tags.split(',').map((t) => t.trim()).filter(Boolean)),
+          isCritical: String(isCritical),
+        });
+      } else {
+        await api('/api/admin/questions', { method: 'POST', auth: true, body: JSON.stringify(payload) });
+      }
+      setMsg({ ok: true, text: `Pregunta creada${qImage ? ' con imagen' : videoUrl ? ' con vídeo' : ''} ✅` });
+      setQImage(null);
       resetForm();
       loadList();
     } catch (err) {
@@ -470,6 +483,16 @@ export default function PreguntasPage() {
           <div className="card-header">
             <div className="card-title">Banco de preguntas</div>
             <div className="card-subtitle">{list.length} preguntas</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+            <span className="muted" style={{ fontSize: 13 }}>Filtrar:</span>
+            {([['', 'Todas'], ['any', 'Con imagen o vídeo'], ['imagen', 'Con imagen'], ['video', 'Con vídeo']] as Array<[string, string]>).map(([v, label]) => (
+              <button key={v} type="button" className={`link-action ${filterMedia === v ? '' : ''}`}
+                style={{ fontWeight: filterMedia === v ? 700 : 400 }}
+                onClick={() => { setFilterMedia(v); loadList(v || undefined); }}>
+                {label}
+              </button>
+            ))}
           </div>
           <div className="table-responsive">
             <table>

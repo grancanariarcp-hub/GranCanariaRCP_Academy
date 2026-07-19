@@ -6,6 +6,7 @@ import { badRequest, conflict, forbidden, notFound } from '../utils/httpError.js
 import { audit } from '../services/audit.js';
 import { notify } from '../services/notify.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { r2Configured, buildKey, uploadObject, withImageUrls } from '../services/r2.js';
 
 /**
  * All handlers here assume requireRole('super_admin') has run,
@@ -292,7 +293,7 @@ export async function createQuestion(req: Request, res: Response): Promise<void>
 
 // GET /api/admin/questions -> list with optional filters (level/audience/type)
 export async function listQuestions(req: Request, res: Response): Promise<void> {
-  const { level, audience, type } = req.query as Record<string, string | undefined>;
+  const { level, audience, type, bankId, media } = req.query as Record<string, string | undefined>;
   const conditions: string[] = [];
   const params: unknown[] = [];
 
@@ -309,15 +310,79 @@ export async function listQuestions(req: Request, res: Response): Promise<void> 
     conditions.push(`qtype = $${params.length}`);
   }
 
+  if (bankId) {
+    params.push(bankId);
+    conditions.push(`bank_id = $${params.length}`);
+  }
+  // Filtro por soporte: preguntas con imagen, con vídeo o con cualquiera.
+  if (media === 'imagen') conditions.push('image_key IS NOT NULL');
+  else if (media === 'video') conditions.push("video_url IS NOT NULL AND video_url <> ''");
+  else if (media === 'any') conditions.push("(image_key IS NOT NULL OR (video_url IS NOT NULL AND video_url <> ''))");
+
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const { rows } = await query(
-    `SELECT id, category, audiences, qtype, difficulty, text, is_critical, is_active, created_at
-     FROM questions ${where}
-     ORDER BY created_at DESC
+    `SELECT q.id, q.category, q.audiences, q.qtype, q.difficulty, q.text, q.tema, q.is_critical, q.is_active,
+            q.image_key, q.video_url, q.created_at, b.name AS bank_name
+     FROM questions q LEFT JOIN question_banks b ON b.id = q.bank_id
+     ${where.replace(/(category|audiences|qtype|bank_id|image_key|video_url)/g, 'q.$1')}
+     ORDER BY q.created_at DESC
      LIMIT 200`,
     params,
   );
   res.json({ questions: rows });
+}
+
+/**
+ * Crear una pregunta CON IMAGEN (multipart). Igual que la creación normal —va a
+ * un banco y lleva todas sus etiquetas— pero además sube la imagen a R2, para
+ * que después se pueda filtrar por "preguntas con imagen".
+ */
+export async function createQuestionWithImage(req: Request, res: Response): Promise<void> {
+  if (!r2Configured()) throw badRequest('El almacén de imágenes no está configurado', 'R2_NOT_CONFIGURED');
+  const file = req.file;
+  if (!file || !file.mimetype.startsWith('image/')) throw badRequest('Sube una imagen', 'NOT_IMAGE');
+
+  // Los campos llegan como texto en el multipart.
+  const body = req.body as Record<string, string>;
+  const parsed = createQuestionSchema.parse({
+    bankId: body.bankId,
+    tema: body.tema || undefined,
+    category: body.category || undefined,
+    audiences: JSON.parse(body.audiences || '[]'),
+    qtype: body.qtype || 'teorica',
+    difficulty: Number(body.difficulty || 1),
+    text: body.text,
+    clinicalContext: body.clinicalContext || undefined,
+    options: JSON.parse(body.options || '[]'),
+    correctIndex: Number(body.correctIndex || 0),
+    explanation: body.explanation || undefined,
+    videoUrl: body.videoUrl || '',
+    tags: JSON.parse(body.tags || '[]'),
+    isCritical: body.isCritical === 'true',
+  });
+
+  const dup = await query(
+    `SELECT 1 FROM questions
+      WHERE bank_id = $1 AND text_norm = md5(lower(regexp_replace($2, '[^[:alnum:]]+', '', 'g')))`,
+    [parsed.bankId, parsed.text],
+  );
+  if (dup.rows.length > 0) throw conflict('Esa pregunta ya existe en este banco', 'DUPLICATE_QUESTION');
+
+  const key = buildKey(file.originalname, 'questions');
+  await uploadObject(key, file.buffer, file.mimetype);
+
+  const { rows } = await query(
+    `INSERT INTO questions
+       (bank_id, tema, category, audiences, qtype, difficulty, text, clinical_context, options, correct_index,
+        explanation, video_url, image_key, tags, is_critical, created_by, text_norm)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,
+             md5(lower(regexp_replace($7, '[^[:alnum:]]+', '', 'g'))))
+     RETURNING id, text, image_key`,
+    [parsed.bankId, parsed.tema ?? null, parsed.category ?? null, parsed.audiences, parsed.qtype, parsed.difficulty,
+     parsed.text, parsed.clinicalContext ?? null, JSON.stringify(parsed.options), parsed.correctIndex,
+     parsed.explanation ?? null, parsed.videoUrl || null, key, parsed.tags ?? [], parsed.isCritical, req.auth!.sub],
+  );
+  res.status(201).json({ question: (await withImageUrls(rows))[0] });
 }
 
 // ---------------------------------------------------------------------------
