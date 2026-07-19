@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Campus de formación · Gran Canaria RCP',
   description:
-    'Fórmate en reanimación y emergencias con cursos acreditados, evaluación real y certificado verificable por QR.',
+    'Fórmate con cursos acreditados, evaluación real y certificados verificables.',
   openGraph: {
     title: 'Campus de formación · Gran Canaria RCP',
     description:

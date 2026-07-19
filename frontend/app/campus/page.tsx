@@ -55,6 +55,9 @@ export default function CampusPage() {
     return true;
   });
 
+  const hayFiltros = fMatricula !== 'todas' || !!fTema || !!fPublico || fCfc;
+  const limpiarFiltros = () => { setFMatricula('todas'); setFTema(''); setFPublico(''); setFCfc(false); };
+
   return (
     <div style={{ minHeight: '100vh' }}>
       {/* ---------- Portada ---------- */}
@@ -123,27 +126,58 @@ export default function CampusPage() {
           </p>
 
           {courses.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', marginBottom: 22 }}>
-              <select className="form-select" style={{ width: 'auto' }} value={fMatricula} onChange={(e) => setFMatricula(e.target.value as typeof fMatricula)}>
-                <option value="todas">Todas las matrículas</option>
-                <option value="abierta">Matrícula abierta</option>
-                <option value="proximamente">Próximamente</option>
-              </select>
-              {temas.length > 0 && (
-                <select className="form-select" style={{ width: 'auto' }} value={fTema} onChange={(e) => setFTema(e.target.value)}>
-                  <option value="">Todos los temas</option>
-                  {temas.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              )}
-              {publicos.length > 0 && (
-                <select className="form-select" style={{ width: 'auto' }} value={fPublico} onChange={(e) => setFPublico(e.target.value)}>
-                  <option value="">Cualquier público</option>
-                  {publicos.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              )}
-              <label className="btn btn-outline btn-small" style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="checkbox" checked={fCfc} onChange={(e) => setFCfc(e.target.checked)} /> Con CFC
-              </label>
+            <div className="filter-bar">
+              {/* Rejilla simétrica: cada filtro ocupa una celda idéntica, etiqueta arriba
+                  y control de la misma altura, incluida la acreditación CFC. */}
+              <div className="filter-grid">
+                <div>
+                  <label className="form-label" htmlFor="f-matricula">Matrícula</label>
+                  <select id="f-matricula" className="form-select" value={fMatricula} onChange={(e) => setFMatricula(e.target.value as typeof fMatricula)}>
+                    <option value="todas">Todas</option>
+                    <option value="abierta">Abierta</option>
+                    <option value="proximamente">Próximamente</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" htmlFor="f-tema">Tema</label>
+                  <select id="f-tema" className="form-select" value={fTema} onChange={(e) => setFTema(e.target.value)} disabled={temas.length === 0}>
+                    <option value="">Todos</option>
+                    {temas.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="form-label" htmlFor="f-publico">Público</label>
+                  <select id="f-publico" className="form-select" value={fPublico} onChange={(e) => setFPublico(e.target.value)} disabled={publicos.length === 0}>
+                    <option value="">Cualquiera</option>
+                    {publicos.map((p) => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <span className="form-label">Acreditación</span>
+                  <button
+                    type="button"
+                    className={`filter-toggle press${fCfc ? ' is-on' : ''}`}
+                    aria-pressed={fCfc}
+                    onClick={() => setFCfc((v) => !v)}
+                  >
+                    Solo con créditos CFC
+                  </button>
+                </div>
+              </div>
+
+              <div className="filter-foot">
+                <span className="muted">
+                  {filtered.length === courses.length
+                    ? `${courses.length} curso${courses.length === 1 ? '' : 's'}`
+                    : `${filtered.length} de ${courses.length} cursos`}
+                </span>
+                {hayFiltros && (
+                  <button type="button" className="link-action" onClick={limpiarFiltros}>Limpiar filtros</button>
+                )}
+              </div>
             </div>
           )}
         </Reveal>

@@ -587,3 +587,74 @@ tbody tr:hover {
     font-size: 22px;
   }
 }
+
+/* ---------- Barra de filtros del catálogo ---------- */
+.filter-bar {
+  max-width: 880px;
+  margin: 0 auto 26px;
+  padding: 16px 18px 12px;
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+.filter-grid .form-label {
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.filter-grid .form-select:disabled {
+  background: var(--gray-100);
+  color: var(--gray-500);
+  cursor: not-allowed;
+}
+/* El filtro de acreditación comparte altura y radio con los selects para que
+   la fila quede alineada en lugar de descolgada. */
+.filter-toggle {
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--gray-700);
+  background: #fff;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.filter-toggle:hover {
+  border-color: var(--secondary-dark);
+}
+.filter-toggle.is-on {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+  font-weight: 600;
+}
+.filter-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--gray-200);
+  font-size: 13px;
+}
+@media (max-width: 767px) {
+  .filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
