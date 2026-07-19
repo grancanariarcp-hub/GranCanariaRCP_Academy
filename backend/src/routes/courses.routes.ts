@@ -12,6 +12,7 @@ import {
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
 import { courseDashboard } from '../controllers/dashboard.controller.js';
+import { examQuality, setQuestionGrading } from '../controllers/questionQuality.controller.js';
 import { cfcAssistant } from '../controllers/cfc.controller.js';
 import { surveyResults, setSurveyOpen } from '../controllers/survey.controller.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -58,6 +59,8 @@ router.post('/:id/exams/:examId/questions/import', asyncHandler(importExamQuesti
 router.post('/:id/exams/:examId/questions/from-bank', asyncHandler(addExamQuestionsFromBank));
 router.delete('/:id/exams/:examId/questions/:questionId', asyncHandler(deleteExamQuestion));
 router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
+router.get('/:id/exams/:examId/quality', asyncHandler(examQuality));
+router.patch('/:id/exams/:examId/questions/:questionId/grading', asyncHandler(setQuestionGrading));
 
 router.get('/:id/students', asyncHandler(listCourseStudents));
 router.get('/:id/duration', asyncHandler(courseDuration));

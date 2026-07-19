@@ -20,7 +20,8 @@ interface ExamRow {
 
 async function examForStudent(examId: string, studentId: string): Promise<ExamRow> {
   const { rows } = await query<ExamRow>(
-    `SELECT e.id, e.title, e.kind, e.attempts_allowed, e.pass_pct, e.time_limit_min, e.shuffle, m.course_id
+    `SELECT e.id, e.title, e.kind, e.attempts_allowed, e.pass_pct, e.time_limit_min, e.shuffle,
+            e.random_per_student, e.questions_per_attempt, m.course_id
      FROM exams e JOIN modules m ON m.id = e.module_id
      WHERE e.id = $1`,
     [examId],
@@ -53,14 +54,23 @@ export async function startExam(req: Request, res: Response): Promise<void> {
     'INSERT INTO exam_attempts (exam_id, student_id) VALUES ($1, $2) RETURNING id, started_at',
     [exam.id, req.auth!.sub],
   );
-  // Preguntas SIN la respuesta correcta. Si el examen baraja, cada alumno las
-  // recibe en un orden distinto (misma dificultad, más difícil de copiar).
-  const shuffle = (exam as { shuffle?: boolean }).shuffle !== false;
+
+  // Preguntas SIN la respuesta correcta.
+  //  · shuffle: mismo contenido en distinto orden para cada alumno.
+  //  · random_per_student (opcional): además, a cada alumno le tocan N preguntas
+  //    distintas sacadas del conjunto. Se guarda cuáles, para corregir sobre esas.
+  const e = exam as { shuffle?: boolean; random_per_student?: boolean; questions_per_attempt?: number | null };
+  const shuffle = e.shuffle !== false;
+  const limit = e.random_per_student && e.questions_per_attempt ? e.questions_per_attempt : null;
   const q = await query<{ id: string; image_key: string | null }>(
     `SELECT id, format, text, options, video_url, image_key FROM exam_questions
-      WHERE exam_id = $1 ORDER BY ${shuffle ? 'RANDOM()' : 'sort_order'}`,
-    [exam.id],
+      WHERE exam_id = $1 AND excluded_from_grading = FALSE
+      ORDER BY ${limit || shuffle ? 'RANDOM()' : 'sort_order'}
+      ${limit ? 'LIMIT $2' : ''}`,
+    limit ? [exam.id, limit] : [exam.id],
   );
+  await query('UPDATE exam_attempts SET served_questions = $1::jsonb WHERE id = $2',
+    [JSON.stringify(q.rows.map((x) => x.id)), att.rows[0].id]);
   res.status(201).json({
     attemptId: att.rows[0].id,
     startedAt: att.rows[0].started_at,
@@ -72,17 +82,22 @@ export async function startExam(req: Request, res: Response): Promise<void> {
 // POST /api/student/exams/:examId/attempts/:attemptId/submit
 export async function submitExam(req: Request, res: Response): Promise<void> {
   const exam = await examForStudent(req.params.examId, req.auth!.sub);
-  const att = await query<{ started_at: string; submitted_at: string | null }>(
-    'SELECT started_at, submitted_at FROM exam_attempts WHERE id = $1 AND exam_id = $2 AND student_id = $3',
+  const att = await query<{ started_at: string; submitted_at: string | null; served_questions: string[] | null }>(
+    'SELECT started_at, submitted_at, served_questions FROM exam_attempts WHERE id = $1 AND exam_id = $2 AND student_id = $3',
     [req.params.attemptId, exam.id, req.auth!.sub],
   );
   if (att.rows.length === 0) throw notFound('Intento no encontrado');
   if (att.rows[0].submitted_at) throw badRequest('Este intento ya fue enviado', 'ALREADY_SUBMITTED');
 
   const answers = z.record(z.union([z.number(), z.string()])).parse(req.body.answers ?? {});
+  // Se corrige solo sobre las preguntas que le tocaron a ESTE alumno y que no
+  // estén anuladas por el profesorado.
+  const served = att.rows[0].served_questions;
   const q = await query<{ id: string; format: string; correct_index: number | null }>(
-    'SELECT id, format, correct_index FROM exam_questions WHERE exam_id = $1',
-    [exam.id],
+    `SELECT id, format, correct_index FROM exam_questions
+      WHERE exam_id = $1 AND excluded_from_grading = FALSE
+      ${served && served.length > 0 ? 'AND id = ANY($2)' : ''}`,
+    served && served.length > 0 ? [exam.id, served] : [exam.id],
   );
 
   let autoTotal = 0;

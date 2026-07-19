@@ -333,6 +333,9 @@ const wizardSchema = z.object({
   passPct: z.number().int().min(0).max(100).default(60),
   attemptsAllowed: z.number().int().min(1).max(10).default(1),
   shuffle: z.boolean().optional().default(true),
+  // Opcional: cada alumno recibe N preguntas distintas del conjunto.
+  randomPerStudent: z.boolean().optional().default(false),
+  questionsPerAttempt: z.number().int().min(1).max(200).nullable().optional(),
 });
 
 /** Crea el examen y lo llena de preguntas en un solo paso. */
@@ -386,9 +389,11 @@ export async function createExamWizard(req: Request, res: Response): Promise<voi
 
   const exam = await withTransaction(async (client) => {
     const { rows } = await client.query(
-      `INSERT INTO exams (module_id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle`,
-      [req.params.moduleId, d.title, d.kind, d.attemptsAllowed, d.passPct, minutos, d.shuffle],
+      `INSERT INTO exams (module_id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt`,
+      [req.params.moduleId, d.title, d.kind, d.attemptsAllowed, d.passPct, minutos, d.shuffle,
+       d.randomPerStudent ?? false, d.randomPerStudent ? (d.questionsPerAttempt ?? null) : null],
     );
     const created = rows[0];
     await client.query(

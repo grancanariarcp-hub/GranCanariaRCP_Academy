@@ -14,6 +14,7 @@ import { studentCertificate } from '../controllers/certificate.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { getSurveyForStudent, submitSurvey } from '../controllers/survey.controller.js';
+import { reportQuestion } from '../controllers/questionQuality.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = Router();
@@ -36,5 +37,6 @@ router.get('/exams/:examId/attempts', asyncHandler(listMyAttempts));
 router.post('/exams/:examId/start', asyncHandler(startExam));
 router.post('/exams/:examId/attempts/:attemptId/submit', asyncHandler(submitExam));
 router.get('/exams/:examId/attempts/:attemptId', asyncHandler(reviewAttempt));
+router.post('/exams/:examId/questions/:questionId/report', asyncHandler(reportQuestion));
 
 export default router;
