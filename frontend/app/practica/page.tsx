@@ -17,6 +17,7 @@ interface Stats {
   daily: Array<{ day: string; answered: number; correct: number }>;
   totalHours: number;
   hoursDaily: Array<{ day: string; hours: number }>;
+  porTema: Array<{ tema: string; total: number; vistas: number; falladas: number; coberturaPct: number }>;
 }
 interface FailedGeneral { id: string; tema: string | null; category: string | null; text: string; fallos: string; respuestas: string; pct_fallo: string }
 
@@ -52,9 +53,10 @@ export default function PracticaPage() {
   const [feedback, setFeedback] = useState<Feedback[] | null>(null);
   const [score, setScore] = useState<{ correct: number; total: number } | null>(null);
 
-  async function loadStats() {
+  async function loadStats(bank?: string) {
     try {
-      setStats(await api<Stats>('/api/practice/stats', { auth: true }));
+      const qs = bank ? `?bankId=${bank}` : '';
+      setStats(await api<Stats>(`/api/practice/stats${qs}`, { auth: true }));
     } catch {
       /* ignore */
     }
@@ -78,6 +80,7 @@ export default function PracticaPage() {
   // Al elegir un banco concreto, cargar sus temas para el selector.
   useEffect(() => {
     setTema('');
+    if (user) loadStats(bankId || undefined);
     if (!bankId) { setBankTemas([]); return; }
     api<{ temas: Array<{ tema: string; questions: string }> }>(`/api/public/banks/${bankId}/temas`)
       .then((r) => setBankTemas(r.temas))
@@ -152,7 +155,7 @@ export default function PracticaPage() {
       setFeedback(r.feedback);
       setScore({ correct: r.correct, total: r.total });
       setPhase('result');
-      loadStats();
+      loadStats(bankId || undefined);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al enviar');
     }
@@ -197,7 +200,10 @@ export default function PracticaPage() {
             {/* Estadísticas */}
             {stats && phase === 'config' && (
               <div className="card animate-in" style={{ marginBottom: 20 }}>
-                <div className="card-header"><div className="card-title">Tu progreso</div></div>
+                <div className="card-header">
+                  <div className="card-title">{selectedBank ? `Tu progreso en ${selectedBank.name}` : 'Tu progreso'}</div>
+                  {selectedBank && <div className="card-subtitle">Solo de esta oposición</div>}
+                </div>
                 <div className="grid grid-4" style={{ marginBottom: 12 }}>
                   <div className="info-box">Respondidas: <strong>{stats.totalAnswered}</strong></div>
                   <div className="info-box">Distintas: <strong>{stats.distinctAnswered}</strong></div>
@@ -206,9 +212,34 @@ export default function PracticaPage() {
                 </div>
                 {stats.failedByCategory.length > 0 && (
                   <p style={{ fontSize: 14 }}>
-                    <strong>Dónde más fallas:</strong>{' '}
+                    <strong>Dónde más fallas{selectedBank ? ' (por tema)' : ''}:</strong>{' '}
                     {stats.failedByCategory.map((f) => `${f.category} (${f.count})`).join(' · ')}
                   </p>
+                )}
+
+                {stats.porTema.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Cobertura del temario</div>
+                    <div className="table-responsive">
+                      <table>
+                        <thead><tr><th>Tema</th><th>Avance</th><th>Falladas</th></tr></thead>
+                        <tbody>
+                          {stats.porTema.map((t) => (
+                            <tr key={t.tema}>
+                              <td><strong>{t.tema}</strong><div className="muted" style={{ fontSize: 11 }}>{t.vistas}/{t.total} preguntas</div></td>
+                              <td style={{ minWidth: 130 }}>
+                                <div style={{ height: 8, background: 'var(--gray-200)', borderRadius: 999, overflow: 'hidden' }}>
+                                  <div style={{ width: `${t.coberturaPct}%`, height: '100%', background: t.coberturaPct === 100 ? 'var(--success)' : 'linear-gradient(90deg,#2c5282,#22c55e)' }} />
+                                </div>
+                                <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>{t.coberturaPct}%</div>
+                              </td>
+                              <td>{t.falladas > 0 ? <span className="badge" style={{ background: 'var(--danger)', color: '#fff' }}>{t.falladas}</span> : <span className="muted">—</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 )}
                 <div className="grid grid-2" style={{ gap: 8, marginBottom: 8 }}>
                   <div className="info-box" style={{ fontSize: 13 }}>

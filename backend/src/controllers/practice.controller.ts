@@ -99,32 +99,56 @@ export async function submitPractice(req: Request, res: Response): Promise<void>
   res.json({ correct, total: qs.rows.length, feedback });
 }
 
-// GET /api/practice/stats
+/**
+ * GET /api/practice/stats?bankId=…
+ * Sin bankId son las estadísticas globales del usuario. Con bankId son las de
+ * ESA oposición: los fallos se agrupan por TEMA (las preguntas de OPE no usan
+ * la categoría de RCP) y "por responder" cuenta solo las preguntas del banco.
+ */
 export async function getPracticeStats(req: Request, res: Response): Promise<void> {
   const uid = req.auth!.sub;
+  const bankId = (req.query.bankId as string) || null;
+  const scope = bankId ? 'AND bank_id = $2' : '';
+  const p: unknown[] = bankId ? [uid, bankId] : [uid];
 
-  const [failed, totals, daily, bankTotal, timeAgg] = await Promise.all([
-    query<{ category: string; count: string }>(
-      `WITH latest AS (
-         SELECT DISTINCT ON (question_id) question_id, category, is_correct
-         FROM answer_log WHERE user_id = $1 ORDER BY question_id, answered_at DESC
-       )
-       SELECT category, COUNT(*) FROM latest WHERE is_correct = FALSE GROUP BY category ORDER BY COUNT(*) DESC`,
-      [uid],
-    ),
+  const [failed, totals, daily, bankTotal, timeAgg, porTema] = await Promise.all([
+    // Con banco agrupamos por tema; sin banco, por categoría (RCP).
+    bankId
+      ? query<{ category: string; count: string }>(
+          `WITH latest AS (
+             SELECT DISTINCT ON (al.question_id) al.question_id, q.tema, al.is_correct
+             FROM answer_log al JOIN questions q ON q.id = al.question_id
+             WHERE al.user_id = $1 AND al.bank_id = $2
+             ORDER BY al.question_id, al.answered_at DESC
+           )
+           SELECT COALESCE(tema, '(sin tema)') AS category, COUNT(*)
+             FROM latest WHERE is_correct = FALSE GROUP BY tema ORDER BY COUNT(*) DESC`,
+          [uid, bankId],
+        )
+      : query<{ category: string; count: string }>(
+          `WITH latest AS (
+             SELECT DISTINCT ON (question_id) question_id, category, is_correct
+             FROM answer_log WHERE user_id = $1 ORDER BY question_id, answered_at DESC
+           )
+           SELECT category, COUNT(*) FROM latest WHERE is_correct = FALSE GROUP BY category ORDER BY COUNT(*) DESC`,
+          [uid],
+        ),
     query<{ total: string; distinctq: string; correct: string }>(
       `SELECT COUNT(*) AS total, COUNT(DISTINCT question_id) AS distinctq,
-              COUNT(*) FILTER (WHERE is_correct) AS correct FROM answer_log WHERE user_id = $1`,
-      [uid],
+              COUNT(*) FILTER (WHERE is_correct) AS correct
+         FROM answer_log WHERE user_id = $1 ${scope}`,
+      p,
     ),
     query<{ day: string; answered: string; correct: string }>(
       `SELECT to_char(answered_at::date, 'YYYY-MM-DD') AS day, COUNT(*) AS answered,
               COUNT(*) FILTER (WHERE is_correct) AS correct
-       FROM answer_log WHERE user_id = $1 AND answered_at > NOW() - INTERVAL '30 days'
+       FROM answer_log WHERE user_id = $1 ${scope} AND answered_at > NOW() - INTERVAL '30 days'
        GROUP BY answered_at::date ORDER BY answered_at::date`,
-      [uid],
+      p,
     ),
-    query<{ count: string }>('SELECT COUNT(*) FROM questions WHERE is_active = TRUE'),
+    bankId
+      ? query<{ count: string }>('SELECT COUNT(*) FROM questions WHERE is_active = TRUE AND bank_id = $1', [bankId])
+      : query<{ count: string }>('SELECT COUNT(*) FROM questions WHERE is_active = TRUE'),
     query<{ day: string; seconds: string; total_seconds: string }>(
       `SELECT to_char(created_at::date, 'YYYY-MM-DD') AS day, SUM(seconds) AS seconds,
               (SELECT COALESCE(SUM(seconds),0) FROM practice_sessions WHERE user_id = $1) AS total_seconds
@@ -132,6 +156,25 @@ export async function getPracticeStats(req: Request, res: Response): Promise<voi
        GROUP BY created_at::date ORDER BY created_at::date`,
       [uid],
     ),
+    // Cobertura del temario: cuánto lleva visto y cómo va en cada tema.
+    bankId
+      ? query<{ tema: string; total: string; vistas: string; falladas: string }>(
+          `WITH latest AS (
+             SELECT DISTINCT ON (al.question_id) al.question_id, al.is_correct
+             FROM answer_log al WHERE al.user_id = $1 AND al.bank_id = $2
+             ORDER BY al.question_id, al.answered_at DESC
+           )
+           SELECT COALESCE(q.tema, '(sin tema)') AS tema,
+                  COUNT(*) AS total,
+                  COUNT(l.question_id) AS vistas,
+                  COUNT(*) FILTER (WHERE l.is_correct = FALSE) AS falladas
+             FROM questions q
+             LEFT JOIN latest l ON l.question_id = q.id
+            WHERE q.bank_id = $2 AND q.is_active = TRUE
+            GROUP BY q.tema ORDER BY q.tema`,
+          [uid, bankId],
+        )
+      : Promise.resolve({ rows: [] as Array<{ tema: string; total: string; vistas: string; falladas: string }> }),
   ]);
 
   const total = Number(totals.rows[0].total);
@@ -149,5 +192,13 @@ export async function getPracticeStats(req: Request, res: Response): Promise<voi
     daily: daily.rows.map((r) => ({ day: r.day, answered: Number(r.answered), correct: Number(r.correct) })),
     totalHours: Math.round((totalSeconds / 3600) * 10) / 10,
     hoursDaily: timeAgg.rows.map((r) => ({ day: r.day, hours: Math.round((Number(r.seconds) / 3600) * 100) / 100 })),
+    // Cobertura por tema (solo cuando se consulta una oposición concreta).
+    porTema: porTema.rows.map((t) => ({
+      tema: t.tema,
+      total: Number(t.total),
+      vistas: Number(t.vistas),
+      falladas: Number(t.falladas),
+      coberturaPct: Number(t.total) > 0 ? Math.round((Number(t.vistas) / Number(t.total)) * 100) : 0,
+    })),
   });
 }
