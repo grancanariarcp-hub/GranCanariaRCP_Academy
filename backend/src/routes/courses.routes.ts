@@ -13,6 +13,7 @@ import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../con
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
 import { courseDashboard } from '../controllers/dashboard.controller.js';
 import { cfcAssistant } from '../controllers/cfc.controller.js';
+import { surveyResults, setSurveyOpen } from '../controllers/survey.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -59,6 +60,8 @@ router.get('/:id/students', asyncHandler(listCourseStudents));
 router.get('/:id/duration', asyncHandler(courseDuration));
 router.get('/:id/dashboard', asyncHandler(courseDashboard));
 router.get('/:id/cfc', asyncHandler(cfcAssistant));
+router.get('/:id/survey/results', asyncHandler(surveyResults));
+router.patch('/:id/survey', asyncHandler(setSurveyOpen));
 router.post('/:id/students/:studentId/reset-password', asyncHandler(directorResetStudentPassword));
 
 // Certificado (director / super_admin)

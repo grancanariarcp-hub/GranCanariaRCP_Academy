@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { CourseForum } from '@/components/CourseForum';
 import { TimeTracker } from '@/components/TimeTracker';
+import { CourseSurvey } from '@/components/CourseSurvey';
 import { api, ApiError, downloadFile } from '@/lib/api';
 
 interface Activity {
@@ -159,6 +160,8 @@ export default function StudentCoursePage() {
         </div>
       ))}
       {modules.length === 0 && !error && <div className="muted">Cargando contenido…</div>}
+
+      <CourseSurvey courseId={courseId} />
 
       <div className="card" style={{ marginTop: 24 }}>
         <CourseForum courseId={courseId} />

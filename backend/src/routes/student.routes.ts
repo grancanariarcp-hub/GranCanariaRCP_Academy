@@ -13,6 +13,7 @@ import {
 import { studentCertificate } from '../controllers/certificate.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
+import { getSurveyForStudent, submitSurvey } from '../controllers/survey.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = Router();
@@ -26,6 +27,8 @@ router.post('/enroll/:courseId', asyncHandler(enrollCourse));
 router.get('/courses', asyncHandler(listMyCourses));
 router.get('/courses/:courseId', asyncHandler(getMyCourseContent));
 router.post('/courses/:courseId/activities/:activityId/complete', asyncHandler(setActivityCompleted));
+router.get('/courses/:courseId/survey', asyncHandler(getSurveyForStudent));
+router.post('/courses/:courseId/survey', asyncHandler(submitSurvey));
 router.get('/courses/:courseId/certificate', asyncHandler(studentCertificate));
 
 // Exámenes (realizar / revisar)

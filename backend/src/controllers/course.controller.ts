@@ -57,6 +57,9 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
       [created.id],
     );
 
+    // Y su encuesta de satisfacción, lista desde el primer momento.
+    await client.query('INSERT INTO course_surveys (course_id) VALUES ($1) ON CONFLICT (course_id) DO NOTHING', [created.id]);
+
     return created;
   });
 

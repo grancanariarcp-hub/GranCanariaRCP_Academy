@@ -73,6 +73,12 @@ export default function CourseDetailPage() {
     examenes: { aprobados: string; presentados: string };
     pendientes: Array<{ activity_id: string; title: string; type: string; pendientes: string }>;
   }>(null);
+  const [surv, setSurv] = useState<null | {
+    respuestas: number; matriculados: number; participacionPct: number;
+    mediaGlobal: number | null; recomiendanPct: number | null;
+    porItem: Array<{ kind: string; label: string; media: number; n: number }>;
+    comentarios: Array<{ comments: string; submitted_at: string }>;
+  }>(null);
   const [cfc, setCfc] = useState<null | {
     checks: Array<{ clave: string; titulo: string; estado: 'ok' | 'aviso' | 'falta'; detalle: string; comoMejorar?: string }>;
     resumen: { ok: number; avisos: number; faltan: number; total: number };
@@ -134,6 +140,8 @@ export default function CourseDetailPage() {
         .then((r) => setCdash(r)).catch(() => {});
       api<typeof cfc>(`/api/courses/${courseId}/cfc`, { auth: true })
         .then((r) => setCfc(r)).catch(() => {});
+      api<typeof surv>(`/api/courses/${courseId}/survey/results`, { auth: true })
+        .then((r) => setSurv(r)).catch(() => {});
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
@@ -538,6 +546,55 @@ export default function CourseDetailPage() {
                 Estimación: {dur.parametros.minPerPage} min por página de documento · {dur.parametros.wordsPerMin} palabras/min de lectura ·
                 {' '}{dur.parametros.minPerQuestion} min por pregunta en tests sin límite de tiempo. Los exámenes con tiempo configurado usan ese tiempo.
               </p>
+            </div>
+          )}
+
+          {/* Resultados de la encuesta */}
+          {surv && (
+            <div className="card animate-in" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <div className="card-title">Encuesta de satisfacción</div>
+                <div className="card-subtitle">{surv.respuestas} de {surv.matriculados} alumnos ({surv.participacionPct}%)</div>
+              </div>
+              {surv.respuestas === 0 ? (
+                <div className="info-box">Aún no hay respuestas. La encuesta aparece a tus alumnos dentro del curso.</div>
+              ) : (
+                <>
+                  <div className="grid grid-2" style={{ marginBottom: 14 }}>
+                    <div className="info-box">Valoración global: <strong style={{ fontSize: 20 }}>{surv.mediaGlobal ?? '—'}</strong> / 5</div>
+                    <div className="info-box">Lo recomendarían: <strong style={{ fontSize: 20 }}>{surv.recomiendanPct ?? '—'}%</strong></div>
+                  </div>
+                  {(['modulo', 'profesor', 'general'] as const).map((k) => {
+                    const del = surv.porItem.filter((i) => i.kind === k);
+                    if (del.length === 0) return null;
+                    const titulo = k === 'modulo' ? 'Por módulo' : k === 'profesor' ? 'Por profesor' : 'Aspectos generales';
+                    return (
+                      <div key={k} style={{ marginBottom: 12 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{titulo}</div>
+                        {del.map((i) => (
+                          <div key={i.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '5px 0', borderBottom: '1px solid var(--gray-200)' }}>
+                            <span style={{ fontSize: 13 }}>{i.label}</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ width: 90, height: 8, background: 'var(--gray-200)', borderRadius: 999, overflow: 'hidden', display: 'inline-block' }}>
+                                <span style={{ display: 'block', width: `${(i.media / 5) * 100}%`, height: '100%', background: i.media >= 4 ? 'var(--success)' : i.media >= 3 ? 'var(--secondary-dark)' : 'var(--danger)' }} />
+                              </span>
+                              <strong style={{ fontSize: 13, minWidth: 32 }}>{i.media}</strong>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                  {surv.comentarios.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Sugerencias de los alumnos</div>
+                      {surv.comentarios.slice(0, 6).map((c, i) => (
+                        <div key={i} className="info-box" style={{ fontSize: 13, marginBottom: 6 }}>{c.comments}</div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           )}
 

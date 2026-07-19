@@ -36,7 +36,7 @@ export async function cfcAssistant(req: Request, res: Response): Promise<void> {
   if (c.rows.length === 0) throw notFound('Curso no encontrado');
   const co = c.rows[0];
 
-  const [acts, exams, docs, staff, cvs] = await Promise.all([
+  const [acts, exams, docs, staff, cvs, encuestas] = await Promise.all([
     query<{ type: string; n: string; sin_duracion: string }>(
       `SELECT a.type, COUNT(*) AS n,
               COUNT(*) FILTER (WHERE a.duration_min IS NULL AND a.type IN ('video','enlace')) AS sin_duracion
@@ -64,6 +64,11 @@ export async function cfcAssistant(req: Request, res: Response): Promise<void> {
     query<{ n: string }>(
       `SELECT COUNT(DISTINCT ci.user_id) AS n FROM cv_items ci
         WHERE ci.user_id IN (SELECT user_id FROM course_staff WHERE course_id = $1)`,
+      [id],
+    ),
+    query<{ n: string }>(
+      `SELECT COUNT(*) AS n FROM survey_responses r
+         JOIN course_surveys cs ON cs.id = r.survey_id WHERE cs.course_id = $1`,
       [id],
     ),
   ]);
@@ -153,9 +158,11 @@ export async function cfcAssistant(req: Request, res: Response): Promise<void> {
     {
       clave: 'encuesta',
       titulo: 'Encuesta de satisfacción',
-      estado: 'aviso',
-      detalle: 'La plataforma aún no incluye encuesta de satisfacción del alumnado.',
-      comoMejorar: 'Las comisiones suelen pedir evaluación de la propia actividad. Podemos añadirla como módulo; mientras tanto, pásala por otro medio y guarda los resultados.',
+      estado: Number(encuestas.rows[0]?.n ?? 0) > 0 ? 'ok' : 'aviso',
+      detalle: Number(encuestas.rows[0]?.n ?? 0) > 0
+        ? `${encuestas.rows[0].n} respuesta(s) recogidas.`
+        : 'La encuesta está creada pero aún no la ha respondido nadie.',
+      comoMejorar: 'Pide a los alumnos que la completen al terminar: las comisiones piden evaluación de la propia actividad.',
     },
   ];
 
