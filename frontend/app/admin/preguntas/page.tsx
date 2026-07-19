@@ -29,6 +29,9 @@ export default function PreguntasPage() {
   const user = useSession(['super_admin'], '/login/admin');
 
   // form state
+  const [banks, setBanks] = useState<Array<{ id: string; name: string; kind: string }>>([]);
+  const [bankId, setBankId] = useState('');
+  const [tema, setTema] = useState('');
   const [category, setCategory] = useState<Level>('SVB');
   const [audiences, setAudiences] = useState<Audience[]>(['jovenes', 'adultos']);
   const [qtype, setQtype] = useState<QType>('teorica');
@@ -57,19 +60,23 @@ export default function PreguntasPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{
     created: number;
+    duplicadas?: number;
     total: number;
     errors: Array<{ fila: number; errores: string[] }>;
+    posibleReimport?: boolean;
   } | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
 
   async function loadList() {
     try {
-      const [q, d] = await Promise.all([
+      const [q, d, b] = await Promise.all([
         api<{ questions: QuestionRow[] }>('/api/admin/questions', { auth: true }),
         api<{ documents: Array<{ id: string; title: string }> }>('/api/admin/documents', { auth: true }),
+        api<{ banks: Array<{ id: string; name: string; kind: string }> }>('/api/admin/banks', { auth: true }).catch(() => ({ banks: [] })),
       ]);
       setList(q.questions);
       setDocs(d.documents);
+      setBanks(b.banks);
     } catch {
       /* ignore */
     }
@@ -114,11 +121,13 @@ export default function PreguntasPage() {
     if (!file) return;
     setImportError(null);
     setImportResult(null);
+    if (!bankId) { setImportError('Elige primero el banco de destino (arriba, en el formulario).'); return; }
     setImporting(true);
     try {
-      const res = await uploadFile<{ created: number; total: number; errors: Array<{ fila: number; errores: string[] }> }>(
+      const res = await uploadFile<{ created: number; duplicadas: number; total: number; errors: Array<{ fila: number; errores: string[] }>; posibleReimport: boolean }>(
         '/api/admin/questions/import',
         file,
+        { bankId },
       );
       setImportResult(res);
       loadList();
@@ -138,6 +147,8 @@ export default function PreguntasPage() {
         method: 'POST',
         auth: true,
         body: JSON.stringify({
+          bankId,
+          tema: tema || undefined,
           category,
           audiences,
           qtype,
@@ -235,9 +246,11 @@ export default function PreguntasPage() {
         {importError && <div className="alert alert-error" style={{ marginTop: 16 }}>{importError}</div>}
         {importResult && (
           <div style={{ marginTop: 16 }}>
-            <div className={`alert ${importResult.errors.length === 0 ? 'alert-success' : 'alert-error'}`}>
-              Creadas <strong>{importResult.created}</strong> de {importResult.total} ·{' '}
+            <div className={`alert ${importResult.errors.length === 0 && !importResult.posibleReimport ? 'alert-success' : 'alert-error'}`}>
+              Creadas <strong>{importResult.created}</strong> de {importResult.total}
+              {importResult.duplicadas ? ` · ${importResult.duplicadas} duplicadas omitidas` : ''} ·{' '}
               {importResult.errors.length} con errores
+              {importResult.posibleReimport && <div style={{ marginTop: 6 }}>⚠️ Ninguna pregunta nueva: parece que ya habías importado este fichero en este banco.</div>}
             </div>
             {importResult.errors.length > 0 && (
               <div className="table-responsive">
@@ -271,6 +284,20 @@ export default function PreguntasPage() {
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
 
           <form onSubmit={onSubmit}>
+            {/* Toda pregunta pertenece a un banco: así nunca quedan huérfanas. */}
+            <div className="grid grid-2" style={{ gap: 12 }}>
+              <div className="form-group">
+                <label className="form-label">Banco (obligatorio)</label>
+                <select className="form-select" value={bankId} onChange={(e) => setBankId(e.target.value)} required>
+                  <option value="">Elige el banco…</option>
+                  {banks.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.kind.toUpperCase()})</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Tema</label>
+                <input className="form-input" placeholder="Ej.: Compresiones" value={tema} onChange={(e) => setTema(e.target.value)} />
+              </div>
+            </div>
             <div className="grid grid-2" style={{ gap: 12 }}>
               <div className="form-group">
                 <label className="form-label">Nivel</label>

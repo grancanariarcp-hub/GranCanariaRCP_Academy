@@ -203,7 +203,9 @@ export async function createProfessor(req: Request, res: Response): Promise<void
 // ---------------------------------------------------------------------------
 const createQuestionSchema = z
   .object({
-    category: z.enum(['SVB', 'SVI', 'SVA']), // nivel
+    bankId: z.string().uuid('Elige el banco al que pertenece'), // obligatorio: nunca preguntas huérfanas
+    tema: z.string().max(160).optional(),
+    category: z.enum(['SVB', 'SVI', 'SVA']).optional(), // nivel (solo bancos de RCP)
     audiences: z.array(z.enum(['ninos', 'jovenes', 'adultos'])).min(1, 'Elige al menos un público'),
     qtype: z.enum(['teorica', 'caso_clinico']).default('teorica'),
     difficulty: z.number().int().min(1).max(3).default(1),
@@ -233,15 +235,26 @@ const createQuestionSchema = z
 export async function createQuestion(req: Request, res: Response): Promise<void> {
   const data = createQuestionSchema.parse(req.body);
 
+  // El banco debe existir y la pregunta no puede estar ya en él.
+  const bank = await query('SELECT 1 FROM question_banks WHERE id = $1', [data.bankId]);
+  if (bank.rows.length === 0) throw badRequest('Banco no encontrado', 'BAD_BANK');
+  const dup = await query(
+    `SELECT 1 FROM questions
+      WHERE bank_id = $1 AND text_norm = md5(lower(regexp_replace($2, '[^[:alnum:]]+', '', 'g')))`,
+    [data.bankId, data.text],
+  );
+  if (dup.rows.length > 0) throw conflict('Esa pregunta ya existe en este banco', 'DUPLICATE_QUESTION');
+
   const { rows } = await query(
     `INSERT INTO questions
-       (category, audiences, qtype, difficulty, text, clinical_context, options, correct_index,
+       (bank_id, tema, category, audiences, qtype, difficulty, text, clinical_context, options, correct_index,
         explanation, source_erc, source_plan_nacional, video_url, flashcard, tags, is_critical,
-        ref_document_id, ref_page, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+        ref_document_id, ref_page, created_by, text_norm)
+     VALUES ($19, $20, $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+             md5(lower(regexp_replace($5, '[^[:alnum:]]+', '', 'g'))))
      RETURNING id, category, audiences, qtype, difficulty, text, created_at`,
     [
-      data.category,
+      data.category ?? null,
       data.audiences,
       data.qtype,
       data.difficulty,
@@ -259,6 +272,8 @@ export async function createQuestion(req: Request, res: Response): Promise<void>
       data.refDocumentId || null,
       data.refPage ?? null,
       req.auth!.sub,
+      data.bankId,        // $19
+      data.tema ?? null,  // $20
     ],
   );
 

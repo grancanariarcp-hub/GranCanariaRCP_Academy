@@ -200,6 +200,12 @@ export async function importQuestions(req: Request, res: Response): Promise<void
   const file = req.file;
   if (!file) throw badRequest('Falta el archivo (.xlsx o .json)', 'NO_FILE');
 
+  // Toda importación va a un banco concreto: así no quedan preguntas huérfanas.
+  const bankId = String(req.body?.bankId ?? '').trim();
+  if (!bankId) throw badRequest('Elige el banco de destino antes de importar', 'NO_BANK');
+  const bank = await query('SELECT 1 FROM question_banks WHERE id = $1', [bankId]);
+  if (bank.rows.length === 0) throw badRequest('Banco no encontrado', 'BAD_BANK');
+
   const isJson = /\.json$/i.test(file.originalname) || file.mimetype === 'application/json';
   const rows = isJson ? parseJson(file.buffer) : parseExcel(file.buffer);
 
@@ -208,6 +214,7 @@ export async function importQuestions(req: Request, res: Response): Promise<void
 
   const errors: Array<{ fila: number; errores: string[] }> = [];
   let created = 0;
+  let duplicadas = 0;
 
   for (const row of rows) {
     const rowErrors: string[] = [];
@@ -246,19 +253,28 @@ export async function importQuestions(req: Request, res: Response): Promise<void
       continue;
     }
 
+    // No duplicar preguntas ya existentes en el mismo banco.
+    const dup = await query(
+      `SELECT 1 FROM questions
+        WHERE bank_id = $1 AND text_norm = md5(lower(regexp_replace($2, '[^[:alnum:]]+', '', 'g')))`,
+      [bankId, row.enunciado.trim()],
+    );
+    if (dup.rows.length > 0) { duplicadas += 1; continue; }
+
     try {
       await query(
         `INSERT INTO questions
            (category, audiences, qtype, difficulty, text, clinical_context, options, correct_index,
-            explanation, flashcard, tags, is_critical, ref_document_id, ref_page, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15)`,
+            explanation, flashcard, tags, is_critical, ref_document_id, ref_page, created_by, bank_id, text_norm)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,$16,
+                 md5(lower(regexp_replace($5, '[^[:alnum:]]+', '', 'g'))))`,
         [
           nivel, audiences, qtype, difficulty, row.enunciado.trim(),
           qtype === 'caso_clinico' ? row.contexto_clinico.trim() : null,
           JSON.stringify(row.opciones), correctIndex,
           row.explicacion.trim() || null, row.flashcard.trim() || null, row.etiquetas,
           ['si', 'sí', 'x', 'true', '1', 'verdadero'].includes(norm(row.critica)),
-          refDocumentId, refPage, req.auth!.sub,
+          refDocumentId, refPage, req.auth!.sub, bankId,
         ],
       );
       created += 1;
@@ -272,5 +288,11 @@ export async function importQuestions(req: Request, res: Response): Promise<void
     entity: 'question', ip: clientIp(req), metadata: { created, errores: errors.length, formato: isJson ? 'json' : 'xlsx' },
   });
 
-  res.json({ created, total: created + errors.length, errors });
+  res.json({
+    created,
+    duplicadas,
+    total: created + duplicadas + errors.length,
+    errors,
+    posibleReimport: duplicadas > 0 && created === 0,
+  });
 }
