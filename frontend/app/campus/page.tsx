@@ -73,8 +73,8 @@ export default function CampusPage() {
             <img src="/logo-horizontal.png" alt="Gran Canaria RCP" style={{ maxWidth: 280, width: '100%', filter: 'brightness(0) invert(1)' }} />
             <h1 style={{ fontSize: 34, marginTop: 14, lineHeight: 1.15 }}>Campus de formación</h1>
             <p style={{ fontSize: 17, opacity: 0.95, maxWidth: 640, margin: '12px auto 0' }}>
-              Fórmate en <strong>reanimación y emergencias</strong> con cursos acreditados, evaluación real y
-              <strong> certificado verificable</strong>.
+              Fórmate con <strong>cursos acreditados</strong>, evaluación real y
+              <strong> certificados verificables</strong>.
             </p>
           </div>
 
@@ -108,7 +108,7 @@ export default function CampusPage() {
         <div className="grid grid-4" style={{ marginBottom: 44 }}>
           {VENTAJAS.map((v, i) => (
             <Reveal key={v.titulo} delay={i * 80}>
-              <div className="card" style={{ height: '100%', borderTop: `4px solid ${v.color}` }}>
+              <div className="card" style={{ height: '100%', borderTop: `4px solid ${v.color}`, textAlign: 'center' }}>
                 <div style={{ fontWeight: 700, marginBottom: 6, color: v.color }}>{v.titulo}</div>
                 <div className="muted" style={{ fontSize: 13.5 }}>{v.texto}</div>
               </div>
