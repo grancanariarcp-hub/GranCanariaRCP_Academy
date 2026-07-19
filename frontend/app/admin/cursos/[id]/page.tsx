@@ -64,7 +64,7 @@ export default function CourseDetailPage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
-  const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean; completadas: string }>>([]);
+  const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean; completadas: string; active_seconds: string }>>([]);
   const [totalActivities, setTotalActivities] = useState(0);
   const [dur, setDur] = useState<null | {
     parametros: { minPerPage: number; wordsPerMin: number; minPerQuestion: number };
@@ -641,7 +641,7 @@ export default function CourseDetailPage() {
               ) : (
                 <div className="table-responsive">
                   <table>
-                    <thead><tr><th>Alumno</th><th>Avance</th><th>Examen</th><th></th></tr></thead>
+                    <thead><tr><th>Alumno</th><th>Avance</th><th>Estudio</th><th>Examen</th><th></th></tr></thead>
                     <tbody>
                       {students.map((s) => (
                         <tr key={s.id}>
@@ -659,6 +659,7 @@ export default function CourseDetailPage() {
                               );
                             })()}
                           </td>
+                          <td>{Number(s.active_seconds) > 0 ? `${Math.round((Number(s.active_seconds) / 3600) * 10) / 10} h` : <span className="muted">—</span>}</td>
                           <td>{s.aprobado ? <span className="badge badge-success">aprobado</span> : <span className="muted" style={{ fontSize: 12 }}>{Number(s.intentos) > 0 ? `${s.intentos} intento(s)` : 'sin intentos'}</span>}</td>
                           <td>
                             <div className="row-actions">

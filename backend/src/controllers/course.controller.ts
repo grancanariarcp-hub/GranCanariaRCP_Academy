@@ -236,6 +236,8 @@ export async function listCourseStudents(req: Request, res: Response): Promise<v
               WHERE ac.student_id = s.id
                 AND ac.activity_id IN (SELECT id FROM activities WHERE module_id IN (SELECT id FROM modules WHERE course_id = $1))
             ) AS completadas,
+            (SELECT COALESCE(SUM(lt.active_seconds),0) FROM learning_time lt
+              WHERE lt.student_id = s.id AND lt.course_id = $1) AS active_seconds,
             (SELECT COUNT(*) FROM exam_attempts a
                JOIN exams ex ON ex.id = a.exam_id
                JOIN modules m ON m.id = ex.module_id

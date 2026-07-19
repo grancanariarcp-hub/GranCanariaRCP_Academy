@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { CourseForum } from '@/components/CourseForum';
+import { TimeTracker } from '@/components/TimeTracker';
 import { api, ApiError, downloadFile } from '@/lib/api';
 
 interface Activity {
@@ -42,6 +43,7 @@ export default function StudentCoursePage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [certAvailable, setCertAvailable] = useState(false);
   const [progress, setProgress] = useState<{ total: number; completed: number; pct: number } | null>(null);
+  const [time, setTime] = useState<{ activeHours: number; sessionHours: number; focusPct: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,6 +51,8 @@ export default function StudentCoursePage() {
     api<{ course: Course; modules: Module[]; certificateAvailable: boolean; progress: { total: number; completed: number; pct: number } }>(`/api/student/courses/${courseId}`, { auth: true })
       .then((r) => { setCourse(r.course); setModules(r.modules); setCertAvailable(r.certificateAvailable); setProgress(r.progress); })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Error cargando el curso'));
+    api<{ activeHours: number; sessionHours: number; focusPct: number | null }>(`/api/profile/time?courseId=${courseId}`, { auth: true })
+      .then(setTime).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -80,6 +84,7 @@ export default function StudentCoursePage() {
 
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={[{ label: 'Inicio', href: '/student', active: true }]}>
+      <TimeTracker courseId={courseId} />
       <p style={{ marginBottom: 16 }}><Link href="/student">← Volver a mis cursos</Link></p>
       {error && <div className="alert alert-error">{error}</div>}
 
@@ -94,7 +99,10 @@ export default function StudentCoursePage() {
         <div className="card animate-in" style={{ marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <strong>Tu avance en el curso</strong>
-            <span className="muted">{progress.completed} de {progress.total} actividades · <strong>{progress.pct}%</strong></span>
+            <span className="muted">
+              {progress.completed} de {progress.total} actividades · <strong>{progress.pct}%</strong>
+              {time && time.activeHours > 0 && <> · <strong>{time.activeHours} h</strong> de estudio</>}
+            </span>
           </div>
           <div style={{ height: 12, background: 'var(--gray-200)', borderRadius: 999, overflow: 'hidden' }}>
             <div style={{ width: `${progress.pct}%`, height: '100%', background: 'linear-gradient(90deg,#2c5282,#22c55e)', transition: 'width .5s ease' }} />
