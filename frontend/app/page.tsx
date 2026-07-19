@@ -364,6 +364,25 @@ export default function CampusPage() {
 
         <Reveal><Faq items={FAQ} /></Reveal>
 
+        {/* Captación de docentes: banda propia, para no competir con la
+            llamada principal, que es la matrícula de alumnos. */}
+        <Reveal>
+          <Link href="/docentes" className="press" style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+            textDecoration: 'none', marginBottom: 30, padding: '20px 24px', borderRadius: 14,
+            border: '1px solid var(--gray-200)', borderLeft: '5px solid #28e0a0', background: '#fff',
+          }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 19, color: 'var(--primary-dark)' }}>Eres docente, conócenos</div>
+              <div className="muted" style={{ fontSize: 14, marginTop: 4, maxWidth: 620 }}>
+                Publica tus cursos sanitarios en el campus: matrículas, cobros, evaluación y certificados
+                verificables. Tú fijas el precio y la modalidad.
+              </div>
+            </div>
+            <span className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>Ver condiciones</span>
+          </Link>
+        </Reveal>
+
         {/* ---------- Cierre ---------- */}
         <Reveal>
           <div className="card" style={{ textAlign: 'center', marginBottom: 24 }}>

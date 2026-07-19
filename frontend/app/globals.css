@@ -803,3 +803,17 @@ tbody tr:hover {
 @media (prefers-reduced-motion: reduce) {
   .faq summary::after { transition: none; }
 }
+
+/* Foco de teclado visible en toda la plataforma: requisito de accesibilidad
+   que el navegador oculta en cuanto se personalizan botones y enlaces. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid #28e0a0;
+  outline-offset: 2px;
+  border-radius: 4px;
+}

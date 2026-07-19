@@ -5,7 +5,7 @@ import { InstallButton } from '@/components/InstallButton';
 
 export const metadata: Metadata = {
   // Base para resolver las imágenes de vista previa al compartir el enlace.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://grancanariarcp.vercel.app'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://campus.grancanariarcp.es'),
   title: 'Campus de formación · Gran Canaria RCP',
   description: 'Fórmate con cursos acreditados, evaluación real y certificados verificables.',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'RCP Academy' },
