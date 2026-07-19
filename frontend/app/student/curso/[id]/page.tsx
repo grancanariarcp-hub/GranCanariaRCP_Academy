@@ -10,6 +10,7 @@ import { api, ApiError, downloadFile } from '@/lib/api';
 
 interface Activity {
   id: string;
+  completed?: boolean;
   type: 'documento' | 'video' | 'enlace' | 'test' | 'examen' | 'texto' | 'imagen';
   title: string;
   url: string | null;
@@ -40,15 +41,32 @@ export default function StudentCoursePage() {
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
   const [certAvailable, setCertAvailable] = useState(false);
+  const [progress, setProgress] = useState<{ total: number; completed: number; pct: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    api<{ course: Course; modules: Module[]; certificateAvailable: boolean }>(`/api/student/courses/${courseId}`, { auth: true })
-      .then((r) => { setCourse(r.course); setModules(r.modules); setCertAvailable(r.certificateAvailable); })
+    api<{ course: Course; modules: Module[]; certificateAvailable: boolean; progress: { total: number; completed: number; pct: number } }>(`/api/student/courses/${courseId}`, { auth: true })
+      .then((r) => { setCourse(r.course); setModules(r.modules); setCertAvailable(r.certificateAvailable); setProgress(r.progress); })
       .catch((err) => setError(err instanceof ApiError ? err.message : 'Error cargando el curso'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function reload() {
+    const r = await api<{ course: Course; modules: Module[]; certificateAvailable: boolean; progress: { total: number; completed: number; pct: number } }>(`/api/student/courses/${courseId}`, { auth: true });
+    setModules(r.modules); setCertAvailable(r.certificateAvailable); setProgress(r.progress);
+  }
+
+  async function toggleDone(a: Activity) {
+    try {
+      await api(`/api/student/courses/${courseId}/activities/${a.id}/complete`, {
+        method: 'POST', auth: true, body: JSON.stringify({ completed: !a.completed }),
+      });
+      reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
 
   async function downloadCertificate() {
     try {
@@ -72,6 +90,18 @@ export default function StudentCoursePage() {
         </div>
       )}
 
+      {progress && progress.total > 0 && (
+        <div className="card animate-in" style={{ marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+            <strong>Tu avance en el curso</strong>
+            <span className="muted">{progress.completed} de {progress.total} actividades · <strong>{progress.pct}%</strong></span>
+          </div>
+          <div style={{ height: 12, background: 'var(--gray-200)', borderRadius: 999, overflow: 'hidden' }}>
+            <div style={{ width: `${progress.pct}%`, height: '100%', background: 'linear-gradient(90deg,#2c5282,#22c55e)', transition: 'width .5s ease' }} />
+          </div>
+        </div>
+      )}
+
       {course?.objetivo_general && (
         <div className="info-box" style={{ marginBottom: 24 }}>{course.objetivo_general}</div>
       )}
@@ -83,7 +113,7 @@ export default function StudentCoursePage() {
             <div className="muted">Este módulo aún no tiene contenido.</div>
           ) : (
             m.activities.map((a) => (
-              <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--gray-200)' }}>
+              <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--gray-200)', opacity: a.completed ? 0.75 : 1 }}>
                 {a.type === 'texto' ? (
                   <div>
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>{TYPE_ICON.texto} {a.title}</div>
@@ -105,6 +135,15 @@ export default function StudentCoursePage() {
                       <Link className="btn btn-primary btn-small" href={`/student/curso/${courseId}/examen/${a.exam_id}`}>Realizar</Link>
                     ) : null}
                   </div>
+                )}
+                {a.type !== 'test' && a.type !== 'examen' && (
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginTop: 8, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!a.completed} onChange={() => toggleDone(a)} />
+                    {a.completed ? 'Completada' : 'Marcar como completada'}
+                  </label>
+                )}
+                {(a.type === 'test' || a.type === 'examen') && a.completed && (
+                  <div className="badge badge-success" style={{ marginTop: 8 }}>Superado</div>
                 )}
               </div>
             ))

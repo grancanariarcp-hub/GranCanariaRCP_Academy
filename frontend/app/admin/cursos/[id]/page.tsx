@@ -64,7 +64,8 @@ export default function CourseDetailPage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
-  const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean }>>([]);
+  const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean; completadas: string }>>([]);
+  const [totalActivities, setTotalActivities] = useState(0);
   const [tempPw, setTempPw] = useState<{ name: string; pw: string } | null>(null);
   const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = useState<string | null>(null);
@@ -107,8 +108,8 @@ export default function CourseDetailPage() {
       ]);
       setCourse(c.course);
       setGallery(c.gallery ?? []);
-      api<{ students: typeof students }>(`/api/courses/${courseId}/students`, { auth: true })
-        .then((r) => setStudents(r.students)).catch(() => {});
+      api<{ students: typeof students; totalActivities: number }>(`/api/courses/${courseId}/students`, { auth: true })
+        .then((r) => { setStudents(r.students); setTotalActivities(r.totalActivities); }).catch(() => {});
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
@@ -569,12 +570,24 @@ export default function CourseDetailPage() {
               ) : (
                 <div className="table-responsive">
                   <table>
-                    <thead><tr><th>Alumno</th><th>Estado</th><th>Examen</th><th></th></tr></thead>
+                    <thead><tr><th>Alumno</th><th>Avance</th><th>Examen</th><th></th></tr></thead>
                     <tbody>
                       {students.map((s) => (
                         <tr key={s.id}>
                           <td><strong>{s.name}</strong>{s.email && <div className="muted" style={{ fontSize: 12 }}>{s.email}</div>}</td>
-                          <td><span className={`badge ${s.status === 'completado' ? 'badge-success' : s.status === 'pendiente_pago' ? 'badge-warning' : 'badge-primary'}`}>{s.status}</span></td>
+                          <td style={{ minWidth: 140 }}>
+                            {(() => {
+                              const pct = totalActivities > 0 ? Math.round((Number(s.completadas) / totalActivities) * 100) : 0;
+                              return (
+                                <>
+                                  <div style={{ height: 8, background: 'var(--gray-200)', borderRadius: 999, overflow: 'hidden' }}>
+                                    <div style={{ width: `${pct}%`, height: '100%', background: pct === 100 ? 'var(--success)' : 'linear-gradient(90deg,#2c5282,#22c55e)' }} />
+                                  </div>
+                                  <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{s.completadas}/{totalActivities} · {pct}%</div>
+                                </>
+                              );
+                            })()}
+                          </td>
                           <td>{s.aprobado ? <span className="badge badge-success">aprobado</span> : <span className="muted" style={{ fontSize: 12 }}>{Number(s.intentos) > 0 ? `${s.intentos} intento(s)` : 'sin intentos'}</span>}</td>
                           <td>
                             <div className="row-actions">

@@ -5,6 +5,7 @@ import {
   enrollCourse,
   listMyCourses,
   getMyCourseContent,
+  setActivityCompleted,
 } from '../controllers/student.controller.js';
 import {
   startExam, submitExam, reviewAttempt, listMyAttempts,
@@ -24,6 +25,7 @@ router.get('/available-courses', asyncHandler(listAvailableCourses));
 router.post('/enroll/:courseId', asyncHandler(enrollCourse));
 router.get('/courses', asyncHandler(listMyCourses));
 router.get('/courses/:courseId', asyncHandler(getMyCourseContent));
+router.post('/courses/:courseId/activities/:activityId/complete', asyncHandler(setActivityCompleted));
 router.get('/courses/:courseId/certificate', asyncHandler(studentCertificate));
 
 // Exámenes (realizar / revisar)

@@ -90,6 +90,16 @@ export async function submitExam(req: Request, res: Response): Promise<void> {
        answers = $4::jsonb, auto_total = $5, auto_correct = $6 WHERE id = $7`,
     [score, passed, timeSpent, JSON.stringify(answers), autoTotal, autoCorrect, req.params.attemptId],
   );
+  // Al aprobar, la actividad de ese examen queda completada automáticamente.
+  if (passed) {
+    await query(
+      `INSERT INTO activity_completions (student_id, activity_id)
+       SELECT $1, a.id FROM activities a WHERE a.exam_id = $2
+       ON CONFLICT (student_id, activity_id) DO NOTHING`,
+      [req.auth!.sub, exam.id],
+    ).catch(() => { /* el progreso no debe romper el envío del examen */ });
+  }
+
   await audit({ actorId: req.auth!.sub, actorType: 'student', action: 'EXAM_SUBMIT', entity: 'exam', entityId: exam.id, ip: clientIp(req), metadata: { score, passed } });
 
   res.json({ score, passed, autoCorrect, autoTotal, hasOpen: q.rows.some((x) => x.format === 'abierta') });

@@ -143,9 +143,20 @@ export async function listCourses(req: Request, res: Response): Promise<void> {
 export async function listCourseStudents(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
   await assertCanAccess(id, req);
+  // Total de actividades del curso: denominador de la barra de avance.
+  const tot = await query<{ n: string }>(
+    'SELECT COUNT(*) AS n FROM activities WHERE module_id IN (SELECT id FROM modules WHERE course_id = $1)',
+    [id],
+  );
+  const totalActivities = Number(tot.rows[0].n);
+
   const { rows } = await query(
     `SELECT s.id, s.display_name AS name, s.email, s.is_minor,
             e.status, e.enrolled_at,
+            (SELECT COUNT(*) FROM activity_completions ac
+              WHERE ac.student_id = s.id
+                AND ac.activity_id IN (SELECT id FROM activities WHERE module_id IN (SELECT id FROM modules WHERE course_id = $1))
+            ) AS completadas,
             (SELECT COUNT(*) FROM exam_attempts a
                JOIN exams ex ON ex.id = a.exam_id
                JOIN modules m ON m.id = ex.module_id
@@ -160,7 +171,7 @@ export async function listCourseStudents(req: Request, res: Response): Promise<v
      ORDER BY s.display_name`,
     [id],
   );
-  res.json({ students: rows });
+  res.json({ students: rows, totalActivities });
 }
 
 async function assertCanAccess(courseId: string, req: Request): Promise<void> {

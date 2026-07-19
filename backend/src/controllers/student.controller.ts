@@ -125,7 +125,7 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
 
   const modules = await query<{ id: string }>('SELECT id, title, sort_order FROM modules WHERE course_id = $1 ORDER BY sort_order', [courseId]);
-  const activities = await query<{ module_id: string; image_key: string | null }>(
+  const activities = await query<{ id: string; module_id: string; image_key: string | null }>(
     `SELECT a.id, a.module_id, a.type, a.title, a.url, a.body, a.image_key, a.document_id, a.exam_id, d.title AS document_title
      FROM activities a LEFT JOIN documents d ON d.id = a.document_id
      WHERE a.module_id IN (SELECT id FROM modules WHERE course_id = $1)
@@ -133,12 +133,55 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
     [courseId],
   );
   const acts = await withImageUrls(activities.rows);
-  const mods = modules.rows.map((m) => ({ ...m, activities: acts.filter((a) => a.module_id === m.id) }));
+
+  // Actividades ya completadas por este alumno (para la barra de avance).
+  const done = await query<{ activity_id: string }>(
+    `SELECT ac.activity_id FROM activity_completions ac
+      WHERE ac.student_id = $1
+        AND ac.activity_id IN (SELECT id FROM activities WHERE module_id IN (SELECT id FROM modules WHERE course_id = $2))`,
+    [req.auth!.sub, courseId],
+  );
+  const doneSet = new Set(done.rows.map((d) => d.activity_id));
+  const actsWithDone = acts.map((a) => ({ ...a, completed: doneSet.has(a.id) }));
+  const mods = modules.rows.map((m) => ({ ...m, activities: actsWithDone.filter((a) => a.module_id === m.id) }));
+
+  const total = acts.length;
+  const completed = doneSet.size;
 
   const passed = await query(
     `SELECT 1 FROM exam_attempts a JOIN exams e ON e.id = a.exam_id JOIN modules m ON m.id = e.module_id
      WHERE m.course_id = $1 AND a.student_id = $2 AND a.passed = TRUE LIMIT 1`,
     [courseId, req.auth!.sub],
   );
-  res.json({ course: course.rows[0], modules: mods, certificateAvailable: passed.rows.length > 0 });
+  res.json({
+    course: course.rows[0],
+    modules: mods,
+    certificateAvailable: passed.rows.length > 0,
+    progress: { total, completed, pct: total > 0 ? Math.round((completed / total) * 100) : 0 },
+  });
+}
+
+/** El alumno marca una actividad como completada (o la desmarca). */
+export async function setActivityCompleted(req: Request, res: Response): Promise<void> {
+  const { courseId, activityId } = req.params;
+  const enr = await query('SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2', [req.auth!.sub, courseId]);
+  if (enr.rows.length === 0) throw forbidden('No estás matriculado en este curso');
+
+  const act = await query(
+    'SELECT 1 FROM activities WHERE id = $1 AND module_id IN (SELECT id FROM modules WHERE course_id = $2)',
+    [activityId, courseId],
+  );
+  if (act.rows.length === 0) throw notFound('Actividad no encontrada');
+
+  const completed = req.body?.completed !== false;
+  if (completed) {
+    await query(
+      `INSERT INTO activity_completions (student_id, activity_id) VALUES ($1,$2)
+       ON CONFLICT (student_id, activity_id) DO NOTHING`,
+      [req.auth!.sub, activityId],
+    );
+  } else {
+    await query('DELETE FROM activity_completions WHERE student_id = $1 AND activity_id = $2', [req.auth!.sub, activityId]);
+  }
+  res.json({ ok: true, completed });
 }
