@@ -66,6 +66,13 @@ export default function CourseDetailPage() {
   const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
   const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean; completadas: string; active_seconds: string }>>([]);
   const [totalActivities, setTotalActivities] = useState(0);
+  const [cdash, setCdash] = useState<null | {
+    matriculas: { mes_anterior: string; mes_actual: string; anio: string; total: string };
+    avance: { total_actividades: string; media_pct: string | null };
+    tiempo: { horas: string; media_horas: string | null };
+    examenes: { aprobados: string; presentados: string };
+    pendientes: Array<{ activity_id: string; title: string; type: string; pendientes: string }>;
+  }>(null);
   const [dur, setDur] = useState<null | {
     parametros: { minPerPage: number; wordsPerMin: number; minPerQuestion: number };
     porTipo: Record<string, number>; totalMinutos: number; totalHoras: number;
@@ -118,6 +125,8 @@ export default function CourseDetailPage() {
         .then((r) => { setStudents(r.students); setTotalActivities(r.totalActivities); }).catch(() => {});
       api<typeof dur>(`/api/courses/${courseId}/duration`, { auth: true })
         .then((r) => setDur(r)).catch(() => {});
+      api<typeof cdash>(`/api/courses/${courseId}/dashboard`, { auth: true })
+        .then((r) => setCdash(r)).catch(() => {});
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
@@ -361,6 +370,49 @@ export default function CourseDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Panel del curso */}
+          {cdash && (
+            <div className="card animate-in" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <div className="card-title">Panel del curso</div>
+                <div className="card-subtitle">Cómo va tu curso ahora mismo</div>
+              </div>
+              <div className="grid grid-4" style={{ marginBottom: 14 }}>
+                <div className="info-box">Matriculados: <strong style={{ fontSize: 20 }}>{cdash.matriculas.total}</strong>
+                  <div className="muted" style={{ fontSize: 11 }}>este mes: {cdash.matriculas.mes_actual} · mes anterior: {cdash.matriculas.mes_anterior}</div>
+                </div>
+                <div className="info-box">Avance medio: <strong style={{ fontSize: 20 }}>{cdash.avance.media_pct ?? 0}%</strong>
+                  <div className="muted" style={{ fontSize: 11 }}>{cdash.avance.total_actividades} actividades</div>
+                </div>
+                <div className="info-box">Estudio: <strong style={{ fontSize: 20 }}>{cdash.tiempo.horas} h</strong>
+                  <div className="muted" style={{ fontSize: 11 }}>media: {cdash.tiempo.media_horas ?? 0} h/alumno</div>
+                </div>
+                <div className="info-box">Aprobados: <strong style={{ fontSize: 20 }}>{cdash.examenes.aprobados}</strong>
+                  <div className="muted" style={{ fontSize: 11 }}>de {cdash.examenes.presentados} presentados</div>
+                </div>
+              </div>
+              {cdash.pendientes.filter((p) => Number(p.pendientes) > 0).length > 0 && (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Alumnos pendientes por actividad</div>
+                  <div className="table-responsive">
+                    <table>
+                      <thead><tr><th>Actividad</th><th>Tipo</th><th>Pendientes</th></tr></thead>
+                      <tbody>
+                        {cdash.pendientes.filter((p) => Number(p.pendientes) > 0).slice(0, 8).map((p) => (
+                          <tr key={p.activity_id}>
+                            <td>{p.title}</td>
+                            <td className="muted" style={{ fontSize: 12 }}>{p.type}</td>
+                            <td><span className="badge badge-warning">{p.pendientes}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Ficha del curso */}
           <div className="card" style={{ marginBottom: 24 }}>

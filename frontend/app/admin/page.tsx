@@ -26,6 +26,15 @@ interface Institution {
   student_count: string;
 }
 
+interface Periodo { mes_anterior: string; mes_actual: string; anio: string; total: string }
+interface Dash {
+  personasRegistradas: Periodo; matriculas: Periodo; instituciones: Periodo; profesores: Periodo; bajas: Periodo;
+  cursos: { publicados: string; matricula_abierta: string; total: string };
+  desafios: { activos: string; total: string };
+  actividad: { alumnos_con_curso: string; aprobados: string; horas: string };
+  suscriptores: null; facturacion: null;
+}
+
 interface AuditLog {
   id: string;
   actor_type: string;
@@ -37,6 +46,7 @@ interface AuditLog {
 export default function AdminDashboard() {
   const user = useSession(['super_admin'], '/login/admin');
   const [stats, setStats] = useState<Stats | null>(null);
+  const [dash, setDash] = useState<Dash | null>(null);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -61,6 +71,7 @@ export default function AdminDashboard() {
       setStats(s);
       setInstitutions(inst.institutions);
       setLogs(audit.logs);
+      api<Dash>('/api/admin/dashboard', { auth: true }).then(setDash).catch(() => {});
       api<{ url: string | null }>('/api/admin/whatsapp', { auth: true })
         .then((r) => setWaUrl(r.url ?? '')).catch(() => {});
     } catch (err) {
@@ -137,11 +148,54 @@ export default function AdminDashboard() {
       {error && <div className="alert alert-error">{error}</div>}
 
       {/* KPIs */}
-      <div className="grid grid-4" style={{ marginBottom: 24 }}>
-        <Kpi value={stats?.students ?? '—'} label="Alumnos activos" />
-        <Kpi value={stats?.institutions ?? '—'} label="Instituciones" />
-        <Kpi value={stats?.testResponses ?? '—'} label="Respuestas de test" />
-        <Kpi value={stats?.averageScore != null ? `${stats.averageScore}%` : '—'} label="Promedio global" />
+      <div className="grid grid-4" style={{ marginBottom: 16 }}>
+        <Kpi value={dash?.personasRegistradas.total ?? '—'} label="Personas registradas" />
+        <Kpi value={dash?.actividad.alumnos_con_curso ?? '—'} label="Alumnos matriculados" />
+        <Kpi value={dash?.instituciones.total ?? '—'} label="Instituciones" />
+        <Kpi value={dash?.profesores.total ?? '—'} label="Profesores" />
+      </div>
+      <div className="grid grid-4" style={{ marginBottom: 16 }}>
+        <Kpi value={dash ? `${dash.cursos.publicados}/${dash.cursos.total}` : '—'} label="Cursos activos / históricos" />
+        <Kpi value={dash?.desafios.activos ?? '—'} label="Desafíos activos" />
+        <Kpi value={dash?.actividad.horas ?? '—'} label="Horas de estudio" />
+        <Kpi value={dash?.actividad.aprobados ?? '—'} label="Alumnos aprobados" />
+      </div>
+      <div className="grid grid-2" style={{ marginBottom: 24 }}>
+        <Kpi value="—" label="Suscriptores (con el módulo de pagos)" />
+        <Kpi value="—" label="Facturación (con el módulo de pagos)" />
+      </div>
+
+      {/* Evolución por periodos */}
+      <div className="card animate-in" style={{ marginBottom: 24 }}>
+        <div className="card-header">
+          <div className="card-title">Altas y bajas por periodo</div>
+          <div className="card-subtitle">Meses naturales · «este mes» va del día 1 a hoy</div>
+        </div>
+        <div className="table-responsive">
+          <table>
+            <thead><tr><th></th><th>Mes anterior</th><th>Este mes</th><th>Este año</th><th>Total</th></tr></thead>
+            <tbody>
+              {([
+                ['Personas registradas', dash?.personasRegistradas],
+                ['Matrículas en cursos', dash?.matriculas],
+                ['Instituciones', dash?.instituciones],
+                ['Profesores', dash?.profesores],
+                ['Bajas (cuentas borradas)', dash?.bajas],
+              ] as Array<[string, Periodo | undefined]>).map(([label, p]) => (
+                <tr key={label}>
+                  <td><strong>{label}</strong></td>
+                  <td>{p?.mes_anterior ?? '—'}</td>
+                  <td><strong>{p?.mes_actual ?? '—'}</strong></td>
+                  <td>{p?.anio ?? '—'}</td>
+                  <td className="muted">{p?.total ?? '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+          Las cancelaciones de suscripción se sumarán a «bajas» cuando activemos el módulo de pagos.
+        </p>
       </div>
 
       <div className="grid grid-2">

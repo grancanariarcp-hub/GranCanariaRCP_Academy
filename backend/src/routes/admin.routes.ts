@@ -20,6 +20,7 @@ import { createBank, updateBank, deleteBank, exportBank, listBanks, getBankTemas
 import { setInstitutionStatus } from '../controllers/institution.controller.js';
 import { adminResetPassword } from '../controllers/credentials.controller.js';
 import { getGlobalWhatsapp, setGlobalWhatsapp } from '../controllers/whatsapp.controller.js';
+import { adminDashboard } from '../controllers/dashboard.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -33,6 +34,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 40 
 router.use(requireAuth, requireRole('super_admin'));
 
 router.get('/stats', asyncHandler(getStats));
+router.get('/dashboard', asyncHandler(adminDashboard));
 
 router.get('/institutions', asyncHandler(listInstitutions));
 router.post('/institutions', asyncHandler(createInstitution));

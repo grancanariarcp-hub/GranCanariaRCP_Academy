@@ -11,6 +11,7 @@ import {
 } from '../controllers/exam.controller.js';
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
+import { courseDashboard } from '../controllers/dashboard.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -55,6 +56,7 @@ router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
 
 router.get('/:id/students', asyncHandler(listCourseStudents));
 router.get('/:id/duration', asyncHandler(courseDuration));
+router.get('/:id/dashboard', asyncHandler(courseDashboard));
 router.post('/:id/students/:studentId/reset-password', asyncHandler(directorResetStudentPassword));
 
 // Certificado (director / super_admin)

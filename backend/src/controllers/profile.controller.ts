@@ -132,6 +132,37 @@ export async function changeEmail(req: Request, res: Response): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// DELETE /api/profile — baja de la cuenta (derecho de supresión, RGPD).
+// Anonimiza los datos personales pero conserva la fila para no romper
+// resultados, certificados emitidos ni estadísticas históricas.
+// ---------------------------------------------------------------------------
+export async function deleteMyAccount(req: Request, res: Response): Promise<void> {
+  const { currentPassword, reason } = z.object({
+    currentPassword: z.string().min(1, 'Confirma tu contraseña'),
+    reason: z.string().max(200).optional(),
+  }).parse(req.body);
+  const { sub, role } = req.auth!;
+  const table = role === 'student' ? 'students' : 'users';
+  const nameCol = role === 'student' ? 'display_name' : 'name';
+
+  const cur = await query<{ password_hash: string | null }>(`SELECT password_hash FROM ${table} WHERE id = $1`, [sub]);
+  const hash = cur.rows[0]?.password_hash;
+  if (!hash || !(await verifyPassword(currentPassword, hash))) {
+    throw badRequest('La contraseña no es correcta', 'BAD_CURRENT');
+  }
+
+  await query(
+    `UPDATE ${table}
+        SET ${nameCol} = 'Usuario dado de baja', email = NULL, password_hash = NULL,
+            is_active = FALSE, deleted_at = NOW(), deletion_reason = $1
+      WHERE id = $2`,
+    [reason ?? null, sub],
+  );
+  await audit({ actorId: sub, actorType: role, action: 'ACCOUNT_DELETE', ip: clientIp(req), metadata: { reason } });
+  res.json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
 // POST /api/profile/photo  (staff: professors) — image to R2
 // ---------------------------------------------------------------------------
 export async function uploadProfilePhoto(req: Request, res: Response): Promise<void> {

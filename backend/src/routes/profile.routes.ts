@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getProfile, changePassword, changeEmail, getConsents, updateConsents, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
+import { getProfile, changePassword, changeEmail, getConsents, updateConsents, deleteMyAccount, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
 import { myPendingGroups, markJoined } from '../controllers/whatsapp.controller.js';
 import { heartbeat, myLearningTime } from '../controllers/learningTime.controller.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -18,6 +18,7 @@ router.post('/heartbeat', asyncHandler(heartbeat));
 router.get('/time', asyncHandler(myLearningTime));
 router.get('/whatsapp', asyncHandler(myPendingGroups));
 router.post('/whatsapp/joined', asyncHandler(markJoined));
+router.delete('/', asyncHandler(deleteMyAccount));
 router.get('/consents', asyncHandler(getConsents));
 router.post('/consents', asyncHandler(updateConsents));
 router.post('/photo', upload.single('file'), asyncHandler(uploadProfilePhoto));
