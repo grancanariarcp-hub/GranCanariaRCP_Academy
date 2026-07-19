@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, downloadFile } from '@/lib/api';
 
 interface Bank {
   id: string;
@@ -19,33 +19,49 @@ interface Bank {
   sim_pass_pct: number | null;
 }
 
+const INSTITUCIONES = ['ERC', 'AHA', 'PNRCP', 'ILCOR', 'Cruz Roja', 'Otra'];
+const POBLACIONES = ['Niños de 6 a 12 años', 'Jóvenes de 13 a 17 años', 'Adultos +18 años'];
+
+/**
+ * Las dos dimensiones del banco se etiquetan según el tipo:
+ *  RCP        → Institución (desplegable) + Población objetivo (desplegable)
+ *  Formativo  → Especialidad + Tema
+ *  OPE/MIR/Otro → Comunidad autónoma + Categoría profesional (+ oficiales y simulacro)
+ */
+function shapeFor(kind: string) {
+  if (kind === 'rcp') {
+    return { d1: 'Institución', d2: 'Población objetivo', o1: INSTITUCIONES, o2: POBLACIONES, official: false, sim: false };
+  }
+  if (kind === 'formativo') {
+    return { d1: 'Especialidad', d2: 'Tema', o1: null, o2: null, official: false, sim: false };
+  }
+  return { d1: 'Comunidad autónoma', d2: 'Categoría profesional', o1: null, o2: null, official: true, sim: true };
+}
+
 export default function BancosPage() {
   const user = useSession(['super_admin'], '/login');
   const [banks, setBanks] = useState<Bank[]>([]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // create
+  // Formulario (sirve para crear y para editar)
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [kind, setKind] = useState('ope');
-  const [ca, setCa] = useState('');
+  const [kind, setKind] = useState('rcp');
   const [anio, setAnio] = useState('');
-  const [categoria, setCategoria] = useState('');
+  const [dim1, setDim1] = useState('');
+  const [dim2, setDim2] = useState('');
   const [official, setOfficial] = useState(false);
   const [simQ, setSimQ] = useState('');
   const [simMin, setSimMin] = useState('');
   const [simPass, setSimPass] = useState('');
 
-  // edit simulacro del banco seleccionado
-  const [eSimQ, setESimQ] = useState('');
-  const [eSimMin, setESimMin] = useState('');
-  const [eSimPass, setESimPass] = useState('');
-  const [simMsg, setSimMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  // import
+  // Importar preguntas
   const [selBank, setSelBank] = useState('');
   const [json, setJson] = useState('');
   const [temas, setTemas] = useState<Array<{ tema: string; questions: string }>>([]);
   const [impMsg, setImpMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const shape = shapeFor(kind);
 
   async function load() {
     try {
@@ -54,69 +70,83 @@ export default function BancosPage() {
   }
   useEffect(() => { if (user) load(); /* eslint-disable-next-line */ }, [user]);
 
-  async function loadTemas(id: string) {
-    setSelBank(id);
-    setSimMsg(null);
-    const b = banks.find((x) => x.id === id);
-    setESimQ(b?.sim_questions?.toString() ?? '');
-    setESimMin(b?.sim_minutes?.toString() ?? '');
-    setESimPass(b?.sim_pass_pct?.toString() ?? '');
-    try {
-      setTemas((await api<{ temas: Array<{ tema: string; questions: string }> }>(`/api/public/banks/${id}/temas`)).temas);
-    } catch { setTemas([]); }
+  function resetForm() {
+    setEditingId(null); setName(''); setKind('rcp'); setAnio('');
+    setDim1(''); setDim2(''); setOfficial(false); setSimQ(''); setSimMin(''); setSimPass('');
   }
 
-  async function saveSim() {
-    setSimMsg(null);
-    try {
-      await api(`/api/admin/banks/${selBank}`, {
-        method: 'PATCH', auth: true,
-        body: JSON.stringify({
-          simQuestions: eSimQ ? Number(eSimQ) : undefined,
-          simMinutes: eSimMin ? Number(eSimMin) : undefined,
-          simPassPct: eSimPass ? Number(eSimPass) : undefined,
-        }),
-      });
-      setSimMsg({ ok: true, text: 'Simulacro guardado ✅' });
-      load();
-    } catch (err) {
-      setSimMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
-    }
+  function startEdit(b: Bank) {
+    setEditingId(b.id);
+    setName(b.name); setKind(b.kind); setAnio(b.anio?.toString() ?? '');
+    setDim1(b.comunidad_autonoma ?? ''); setDim2(b.categoria_profesional ?? '');
+    setOfficial(b.official);
+    setSimQ(b.sim_questions?.toString() ?? ''); setSimMin(b.sim_minutes?.toString() ?? ''); setSimPass(b.sim_pass_pct?.toString() ?? '');
+    setMsg(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  async function createBank(e: React.FormEvent) {
+  async function submitForm(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
+    const s = shapeFor(kind);
+    // Los campos que no aplican a este tipo se envían en null para limpiarlos.
+    const body = {
+      name, kind,
+      anio: anio ? Number(anio) : null,
+      comunidadAutonoma: dim1 || null,
+      categoriaProfesional: dim2 || null,
+      official: s.official ? official : false,
+      simQuestions: s.sim && simQ ? Number(simQ) : null,
+      simMinutes: s.sim && simMin ? Number(simMin) : null,
+      simPassPct: s.sim && simPass ? Number(simPass) : null,
+    };
     try {
-      await api('/api/admin/banks', {
-        method: 'POST', auth: true,
-        body: JSON.stringify({
-          name, kind, comunidadAutonoma: ca || undefined, anio: anio ? Number(anio) : undefined,
-          categoriaProfesional: categoria || undefined, official,
-          simQuestions: simQ ? Number(simQ) : undefined,
-          simMinutes: simMin ? Number(simMin) : undefined,
-          simPassPct: simPass ? Number(simPass) : undefined,
-        }),
-      });
-      setMsg({ ok: true, text: 'Banco creado ✅' });
-      setName(''); setCa(''); setAnio(''); setCategoria(''); setOfficial(false); setSimQ(''); setSimMin(''); setSimPass('');
+      if (editingId) {
+        await api(`/api/admin/banks/${editingId}`, { method: 'PATCH', auth: true, body: JSON.stringify(body) });
+        setMsg({ ok: true, text: 'Banco actualizado ✅' });
+      } else {
+        await api('/api/admin/banks', { method: 'POST', auth: true, body: JSON.stringify(body) });
+        setMsg({ ok: true, text: 'Banco creado ✅' });
+      }
+      resetForm();
       load();
     } catch (err) {
       setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
     }
   }
 
+  async function removeBank(b: Bank) {
+    if (!confirm(`¿Borrar el banco «${b.name}» y sus ${b.questions} preguntas? Esta acción no se puede deshacer.`)) return;
+    try {
+      await api(`/api/admin/banks/${b.id}`, { method: 'DELETE', auth: true });
+      if (selBank === b.id) setSelBank('');
+      if (editingId === b.id) resetForm();
+      load();
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error al borrar' });
+    }
+  }
+
+  async function download(b: Bank) {
+    try { await downloadFile(`/api/admin/banks/${b.id}/export`, `${b.name}.json`); } catch { /* ignore */ }
+  }
+
+  async function loadTemas(id: string) {
+    setSelBank(id); setImpMsg(null);
+    try {
+      setTemas((await api<{ temas: Array<{ tema: string; questions: string }> }>(`/api/public/banks/${id}/temas`)).temas);
+    } catch { setTemas([]); }
+  }
+
   async function importJson() {
     setImpMsg(null);
-    if (!selBank) { setImpMsg({ ok: false, text: 'Elige un banco primero' }); return; }
     let parsed: unknown;
     try { parsed = JSON.parse(json); } catch { setImpMsg({ ok: false, text: 'JSON no válido' }); return; }
     if (!Array.isArray(parsed)) { setImpMsg({ ok: false, text: 'Debe ser una lista [ ... ]' }); return; }
     try {
       const r = await api<{ created: number; total: number; errors: Array<{ fila: number }> }>(`/api/admin/banks/${selBank}/import`, { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) });
       setImpMsg({ ok: r.errors.length === 0, text: `Creadas ${r.created}/${r.total}.` + (r.errors.length ? ` Errores en filas: ${r.errors.map((e) => e.fila).join(', ')}` : '') });
-      setJson('');
-      loadTemas(selBank); load();
+      setJson(''); loadTemas(selBank); load();
     } catch (err) {
       setImpMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
     }
@@ -137,48 +167,108 @@ export default function BancosPage() {
       ]}
     >
       <div className="grid grid-2">
-        <div className="card">
-          <div className="card-header"><div className="card-title">Nuevo banco (OPE / MIR)</div></div>
+        {/* Crear / editar */}
+        <div className="card animate-in">
+          <div className="card-header">
+            <div className="card-title">{editingId ? 'Editar banco' : 'Nuevo banco'}</div>
+            {editingId && <button className="btn btn-outline btn-small" onClick={resetForm}>Cancelar edición</button>}
+          </div>
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
-          <form onSubmit={createBank}>
+          <form onSubmit={submitForm}>
             <div className="form-group"><label className="form-label">Nombre</label><input className="form-input" value={name} onChange={(e) => setName(e.target.value)} required /></div>
+
             <div className="grid grid-2" style={{ gap: 12 }}>
               <div className="form-group">
                 <label className="form-label">Tipo</label>
-                <select className="form-select" value={kind} onChange={(e) => setKind(e.target.value)}>
-                  <option value="ope">OPE</option><option value="mir">MIR</option><option value="rcp">RCP</option><option value="otro">Otro</option>
+                <select className="form-select" value={kind} onChange={(e) => { setKind(e.target.value); setDim1(''); setDim2(''); }}>
+                  <option value="rcp">RCP</option>
+                  <option value="formativo">Formativo</option>
+                  <option value="ope">OPE</option>
+                  <option value="mir">MIR</option>
+                  <option value="otro">Otro</option>
                 </select>
               </div>
-              <div className="form-group"><label className="form-label">Año</label><input className="form-input" type="number" value={anio} onChange={(e) => setAnio(e.target.value)} /></div>
+              <div className="form-group">
+                <label className="form-label">Año</label>
+                <input className="form-input" type="number" value={anio} onChange={(e) => setAnio(e.target.value)} title="Año de publicación de la fuente usada" />
+              </div>
             </div>
+
             <div className="grid grid-2" style={{ gap: 12 }}>
-              <div className="form-group"><label className="form-label">Comunidad autónoma</label><input className="form-input" value={ca} onChange={(e) => setCa(e.target.value)} /></div>
-              <div className="form-group"><label className="form-label">Categoría profesional</label><input className="form-input" value={categoria} onChange={(e) => setCategoria(e.target.value)} /></div>
+              <div className="form-group">
+                <label className="form-label">{shape.d1}</label>
+                {shape.o1 ? (
+                  <select className="form-select" value={dim1} onChange={(e) => setDim1(e.target.value)}>
+                    <option value="">—</option>
+                    {shape.o1.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : (
+                  <input className="form-input" value={dim1} onChange={(e) => setDim1(e.target.value)} />
+                )}
+              </div>
+              <div className="form-group">
+                <label className="form-label">{shape.d2}</label>
+                {shape.o2 ? (
+                  <select className="form-select" value={dim2} onChange={(e) => setDim2(e.target.value)}>
+                    <option value="">—</option>
+                    {shape.o2.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                ) : (
+                  <input className="form-input" value={dim2} onChange={(e) => setDim2(e.target.value)} />
+                )}
+              </div>
             </div>
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, marginBottom: 12 }}>
-              <input type="checkbox" checked={official} onChange={(e) => setOfficial(e.target.checked)} /> Preguntas oficiales (no pool)
-            </label>
-            <div style={{ fontSize: 13, fontWeight: 600, margin: '4px 0 8px' }}>Simulacro (opcional, personalizado por OPE)</div>
-            <div className="grid grid-3" style={{ gap: 10 }}>
-              <div className="form-group"><label className="form-label">Nº preguntas</label><input className="form-input" type="number" value={simQ} onChange={(e) => setSimQ(e.target.value)} placeholder="p.ej. 100" /></div>
-              <div className="form-group"><label className="form-label">Minutos</label><input className="form-input" type="number" value={simMin} onChange={(e) => setSimMin(e.target.value)} placeholder="p.ej. 120" /></div>
-              <div className="form-group"><label className="form-label">Corte %</label><input className="form-input" type="number" value={simPass} onChange={(e) => setSimPass(e.target.value)} placeholder="p.ej. 50" /></div>
-            </div>
-            <button className="btn btn-primary btn-full">Crear banco</button>
+
+            {shape.official && (
+              <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, marginBottom: 12 }}>
+                <input type="checkbox" checked={official} onChange={(e) => setOfficial(e.target.checked)} /> Preguntas oficiales (no pool)
+              </label>
+            )}
+
+            {shape.sim && (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 600, margin: '4px 0 8px' }}>Simulacro (opcional, personalizado)</div>
+                <div className="grid grid-3" style={{ gap: 10 }}>
+                  <div className="form-group"><label className="form-label">Nº preguntas</label><input className="form-input" type="number" value={simQ} onChange={(e) => setSimQ(e.target.value)} placeholder="p.ej. 100" /></div>
+                  <div className="form-group"><label className="form-label">Minutos</label><input className="form-input" type="number" value={simMin} onChange={(e) => setSimMin(e.target.value)} placeholder="p.ej. 120" /></div>
+                  <div className="form-group"><label className="form-label">Corte %</label><input className="form-input" type="number" value={simPass} onChange={(e) => setSimPass(e.target.value)} placeholder="p.ej. 50" /></div>
+                </div>
+              </>
+            )}
+
+            <button className="btn btn-primary btn-full">{editingId ? 'Guardar cambios' : 'Crear banco'}</button>
           </form>
         </div>
 
-        <div className="card">
+        {/* Listado */}
+        <div className="card animate-in">
           <div className="card-header"><div className="card-title">Bancos</div><div className="card-subtitle">{banks.length}</div></div>
           <div className="table-responsive">
             <table>
-              <thead><tr><th>Banco</th><th>Preguntas</th><th></th></tr></thead>
+              <thead><tr><th>Banco</th><th>Preguntas</th><th>Acciones</th></tr></thead>
               <tbody>
                 {banks.map((b) => (
                   <tr key={b.id}>
-                    <td>{b.name}<div className="muted" style={{ fontSize: 12 }}>{b.kind.toUpperCase()}{b.comunidad_autonoma ? ` · ${b.comunidad_autonoma}` : ''}{b.anio ? ` · ${b.anio}` : ''}{b.official ? ' · oficial' : ''}{b.sim_questions ? ` · sim ${b.sim_questions}p/${b.sim_minutes ?? '∞'}min` : ''}</div></td>
+                    <td>
+                      {b.name}
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        {b.kind.toUpperCase()}
+                        {b.anio ? ` · ${b.anio}` : ''}
+                        {b.comunidad_autonoma ? ` · ${b.comunidad_autonoma}` : ''}
+                        {b.categoria_profesional ? ` · ${b.categoria_profesional}` : ''}
+                        {b.official ? ' · oficial' : ''}
+                        {b.sim_questions ? ` · sim ${b.sim_questions}p/${b.sim_minutes ?? '∞'}min` : ''}
+                      </div>
+                    </td>
                     <td>{b.questions}</td>
-                    <td><button className="btn btn-outline btn-small" onClick={() => loadTemas(b.id)}>Importar/ver</button></td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        <button className="btn btn-outline btn-small" onClick={() => loadTemas(b.id)}>Importar/ver</button>
+                        <button className="btn btn-outline btn-small" onClick={() => startEdit(b)}>Editar</button>
+                        <button className="btn btn-outline btn-small" onClick={() => download(b)} title="Descargar preguntas en JSON">Descargar</button>
+                        <button className="btn btn-outline btn-small" style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }} onClick={() => removeBank(b)}>Borrar</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
                 {banks.length === 0 && <tr><td colSpan={3} className="muted">Sin bancos</td></tr>}
@@ -188,28 +278,11 @@ export default function BancosPage() {
         </div>
       </div>
 
-      {/* Editar simulacro del banco seleccionado */}
-      {selBank && (
-        <div className="card" style={{ marginTop: 24 }}>
-          <div className="card-header">
-            <div className="card-title">Simulacro del banco</div>
-            <div className="card-subtitle">Cada OPE define su propio nº de preguntas, tiempo y nota de corte</div>
-          </div>
-          {simMsg && <div className={`alert ${simMsg.ok ? 'alert-success' : 'alert-error'}`}>{simMsg.text}</div>}
-          <div className="grid grid-3" style={{ gap: 10 }}>
-            <div className="form-group"><label className="form-label">Nº preguntas</label><input className="form-input" type="number" value={eSimQ} onChange={(e) => setESimQ(e.target.value)} /></div>
-            <div className="form-group"><label className="form-label">Minutos (vacío = libre)</label><input className="form-input" type="number" value={eSimMin} onChange={(e) => setESimMin(e.target.value)} /></div>
-            <div className="form-group"><label className="form-label">Nota de corte %</label><input className="form-input" type="number" value={eSimPass} onChange={(e) => setESimPass(e.target.value)} /></div>
-          </div>
-          <button className="btn btn-primary btn-small" onClick={saveSim}>Guardar simulacro</button>
-        </div>
-      )}
-
       {/* Importar preguntas al banco seleccionado */}
       {selBank && (
-        <div className="card" style={{ marginTop: 24 }}>
+        <div className="card animate-in" style={{ marginTop: 24 }}>
           <div className="card-header">
-            <div className="card-title">Importar preguntas (JSON) al banco</div>
+            <div className="card-title">Importar preguntas (JSON)</div>
             <div className="card-subtitle">Cada pregunta: tema, text, options, correcta (A/B/C/D), explicacion</div>
           </div>
           {temas.length > 0 && <p style={{ fontSize: 13, marginBottom: 8 }}><strong>Temas actuales:</strong> {temas.map((t) => `${t.tema} (${t.questions})`).join(' · ')}</p>}

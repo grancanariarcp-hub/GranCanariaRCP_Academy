@@ -22,17 +22,27 @@ function resolveCorrect(v: unknown, n: number): number | null {
 // ---------------------------------------------------------------------------
 // super_admin: create / list banks
 // ---------------------------------------------------------------------------
+/**
+ * Los bancos tienen dos "dimensiones" genéricas que se etiquetan distinto según
+ * el tipo (así no hacen falta columnas nuevas por cada tipo):
+ *   comunidad_autonoma  → OPE/MIR: comunidad autónoma · RCP: institución (ERC,
+ *                          AHA, PNRCP, ILCOR, Cruz Roja, Otra) · Formativo: especialidad
+ *   categoria_profesional → OPE/MIR: categoría profesional · RCP: población
+ *                          objetivo (niños/jóvenes/adultos) · Formativo: tema
+ * `official` y la configuración de simulacro solo aplican a OPE/MIR.
+ * `anio` siempre es el año de publicación de la fuente usada.
+ */
 const createSchema = z.object({
   name: z.string().min(2).max(160),
-  kind: z.enum(['rcp', 'ope', 'mir', 'otro']).default('ope'),
-  comunidadAutonoma: z.string().max(120).optional(),
-  anio: z.number().int().min(1990).max(2100).optional(),
-  categoriaProfesional: z.string().max(160).optional(),
+  kind: z.enum(['rcp', 'ope', 'mir', 'formativo', 'otro']).default('ope'),
+  comunidadAutonoma: z.string().max(120).nullable().optional(),
+  anio: z.number().int().min(1990).max(2100).nullable().optional(),
+  categoriaProfesional: z.string().max(160).nullable().optional(),
   official: z.boolean().optional().default(false),
-  descripcion: z.string().optional(),
-  simQuestions: z.number().int().min(1).max(300).optional(),
-  simMinutes: z.number().int().min(1).max(600).optional(),
-  simPassPct: z.number().int().min(0).max(100).optional(),
+  descripcion: z.string().nullable().optional(),
+  simQuestions: z.number().int().min(1).max(300).nullable().optional(),
+  simMinutes: z.number().int().min(1).max(600).nullable().optional(),
+  simPassPct: z.number().int().min(0).max(100).nullable().optional(),
 });
 
 export async function createBank(req: Request, res: Response): Promise<void> {
@@ -47,24 +57,66 @@ export async function createBank(req: Request, res: Response): Promise<void> {
   res.status(201).json({ bank: rows[0] });
 }
 
-/** Editar la configuración del simulacro (y metadatos) de un banco. */
+/** Editar un banco. Solo se tocan los campos enviados (null = limpiar). */
 export async function updateBank(req: Request, res: Response): Promise<void> {
   const d = createSchema.partial().parse(req.body);
+  const map: Record<string, unknown> = {
+    name: d.name,
+    kind: d.kind,
+    comunidad_autonoma: d.comunidadAutonoma,
+    anio: d.anio,
+    categoria_profesional: d.categoriaProfesional,
+    official: d.official,
+    descripcion: d.descripcion,
+    sim_questions: d.simQuestions,
+    sim_minutes: d.simMinutes,
+    sim_pass_pct: d.simPassPct,
+  };
+  const fields: string[] = [];
+  const params: unknown[] = [];
+  for (const [col, val] of Object.entries(map)) {
+    if (val !== undefined) { params.push(val === '' ? null : val); fields.push(`${col} = $${params.length}`); }
+  }
+  if (fields.length === 0) throw badRequest('Nada que actualizar');
+  params.push(req.params.id);
   const { rows } = await query(
-    `UPDATE question_banks SET
-       name = COALESCE($2, name),
-       comunidad_autonoma = COALESCE($3, comunidad_autonoma),
-       anio = COALESCE($4, anio),
-       categoria_profesional = COALESCE($5, categoria_profesional),
-       official = COALESCE($6, official),
-       sim_questions = $7, sim_minutes = $8, sim_pass_pct = $9
-     WHERE id = $1
-     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, sim_questions, sim_minutes, sim_pass_pct`,
-    [req.params.id, d.name ?? null, d.comunidadAutonoma ?? null, d.anio ?? null, d.categoriaProfesional ?? null,
-      d.official ?? null, d.simQuestions ?? null, d.simMinutes ?? null, d.simPassPct ?? null],
+    `UPDATE question_banks SET ${fields.join(', ')} WHERE id = $${params.length}
+     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct`,
+    params,
   );
   if (rows.length === 0) throw notFound('Banco no encontrado');
   res.json({ bank: rows[0] });
+}
+
+/** Borra un banco y todas sus preguntas. */
+export async function deleteBank(req: Request, res: Response): Promise<void> {
+  const bank = await query('SELECT 1 FROM question_banks WHERE id = $1', [req.params.id]);
+  if (bank.rows.length === 0) throw notFound('Banco no encontrado');
+  await query('DELETE FROM questions WHERE bank_id = $1', [req.params.id]);
+  await query('DELETE FROM question_banks WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}
+
+/** Descarga las preguntas del banco en JSON (mismo formato que la importación). */
+export async function exportBank(req: Request, res: Response): Promise<void> {
+  const bank = await query<{ name: string }>('SELECT name FROM question_banks WHERE id = $1', [req.params.id]);
+  if (bank.rows.length === 0) throw notFound('Banco no encontrado');
+
+  const { rows } = await query<{ tema: string | null; text: string; options: string[]; correct_index: number; explanation: string | null }>(
+    'SELECT tema, text, options, correct_index, explanation FROM questions WHERE bank_id = $1 ORDER BY created_at',
+    [req.params.id],
+  );
+  const data = rows.map((q) => ({
+    tema: q.tema ?? undefined,
+    text: q.text,
+    options: q.options,
+    correcta: 'ABCDEF'[q.correct_index] ?? String(q.correct_index + 1),
+    explicacion: q.explanation ?? undefined,
+  }));
+  const safe = bank.rows[0].name.replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '-') || 'banco';
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${safe}.json"`);
+  res.send(JSON.stringify(data, null, 2));
 }
 
 export async function listBanks(_req: Request, res: Response): Promise<void> {
