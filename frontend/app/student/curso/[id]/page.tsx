@@ -10,6 +10,7 @@ import { TimeTracker } from '@/components/TimeTracker';
 import { CourseSurvey } from '@/components/CourseSurvey';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
+import { MyAttendance } from '@/components/MyAttendance';
 
 interface Activity {
   id: string;
@@ -87,6 +88,7 @@ export default function StudentCoursePage() {
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={[{ label: 'Inicio', href: '/student', active: true }]}>
       <TimeTracker courseId={courseId} />
+      <MyAttendance courseId={courseId} />
       <PageNav backHref="/student" backLabel="Volver a mis cursos" />
       {error && <div className="alert alert-error">{error}</div>}
 

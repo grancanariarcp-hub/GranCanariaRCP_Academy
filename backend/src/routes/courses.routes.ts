@@ -17,7 +17,7 @@ import { cfcAssistant } from '../controllers/cfc.controller.js';
 import { surveyResults, setSurveyOpen } from '../controllers/survey.controller.js';
 import {
   createAttendanceSession, listAttendanceSessions, updateAttendanceSession, deleteAttendanceSession,
-  attendanceQrToken, listAttendanceRecords, markAttendanceManually,
+  attendanceQrToken, listAttendanceRecords, markAttendanceManually, attendanceListPdf,
 } from '../controllers/attendance.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
@@ -75,6 +75,7 @@ router.patch('/:id/survey', asyncHandler(setSurveyOpen));
 router.post('/:id/students/:studentId/reset-password', asyncHandler(directorResetStudentPassword));
 
 // Asistencia presencial
+router.get('/:id/attendance/list.pdf', asyncHandler(attendanceListPdf));
 router.get('/:id/attendance/sessions', asyncHandler(listAttendanceSessions));
 router.post('/:id/attendance/sessions', asyncHandler(createAttendanceSession));
 router.patch('/:id/attendance/sessions/:sessionId', asyncHandler(updateAttendanceSession));

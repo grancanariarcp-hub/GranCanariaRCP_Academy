@@ -9,6 +9,7 @@ import { CourseForum } from '@/components/CourseForum';
 import { ExamWizard } from '@/components/ExamWizard';
 import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
+import { AttendancePanel } from '@/components/AttendancePanel';
 
 interface Activity {
   id: string;
@@ -431,7 +432,10 @@ export default function CourseDetailPage() {
             </div>
           )}
 
-          {/* Ficha del curso */}
+          {/* Asistencia presencial: jornadas, QR y lista de clase */}
+        <AttendancePanel courseId={courseId} />
+
+        {/* Ficha del curso */}
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <div className="card-title">Ficha del curso</div>

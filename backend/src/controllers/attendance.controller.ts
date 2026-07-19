@@ -1,9 +1,12 @@
 import type { Request, Response } from 'express';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import PDFDocument from 'pdfkit';
+import QRCode from 'qrcode';
 import { z } from 'zod';
 import { query } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { assertEditor } from '../services/courseAuth.js';
+import { renderListaAsistencia } from '../services/attendanceListPdf.js';
 
 /**
  * Asistencia presencial.
@@ -17,6 +20,11 @@ import { assertEditor } from '../services/courseAuth.js';
  * se acepta antes de la permanencia mínima de la jornada, para que entrada y
  * salida seguidas no puedan constar como asistencia completa.
  */
+
+/** Base pública del frontend, para construir la URL que codifica el QR. */
+function frontendBase(): string {
+  return (process.env.FRONTEND_URL || (process.env.CORS_ORIGIN || '').split(',')[0] || '').replace(/\/$/, '');
+}
 
 /** Token del QR: caduca al cambiar de franja. */
 function qrToken(secret: string, sessionId: string, windowSeconds: number, offset = 0): string {
@@ -163,9 +171,15 @@ export async function attendanceQrToken(req: Request, res: Response): Promise<vo
   const s = await loadSession(req.params.sessionId, req.params.id);
   if (!s.is_open) throw badRequest('La jornada está cerrada');
   const token = qrToken(s.qr_secret, s.id, s.qr_window_seconds);
+  const payload = `${s.id}:${token}`;
+  // El QR codifica una URL completa: así se puede escanear tanto desde el botón
+  // de la app como con la cámara nativa del móvil, que es lo que hace la mayoría.
+  const url = `${frontendBase()}/asistencia?p=${encodeURIComponent(payload)}`;
   res.json({
-    // Lo que se codifica en el QR; el alumno lo abre desde su perfil.
-    payload: `${s.id}:${token}`,
+    payload,
+    url,
+    // Imagen ya renderizada: evita depender de una librería de QR en el navegador.
+    qrDataUrl: await QRCode.toDataURL(url, { margin: 1, width: 420 }),
     expiresInSeconds: s.qr_window_seconds - (Math.floor(Date.now() / 1000) % s.qr_window_seconds),
     windowSeconds: s.qr_window_seconds,
     title: s.title,
@@ -227,6 +241,64 @@ export async function markAttendanceManually(req: Request, res: Response): Promi
     [s.id, studentId, req.auth!.sub, d.incidencia || null],
   );
   res.json({ ok: true, estado: d.action === 'in' ? 'entrada' : 'salida' });
+}
+
+/**
+ * GET /api/courses/:id/attendance/list.pdf?sessionId=...
+ * Listado para firmar a mano, A4 apaisado. Sin sessionId usa la jornada más
+ * próxima, que es lo que quiere el profesor al imprimir antes de clase.
+ */
+export async function attendanceListPdf(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const courseId = req.params.id;
+
+  const curso = await query<{ title: string; director: string | null }>(
+    `SELECT c.title,
+            (SELECT u.name FROM course_staff cs JOIN users u ON u.id = cs.user_id
+              WHERE cs.course_id = c.id AND cs.role = 'director' LIMIT 1) AS director
+       FROM courses c WHERE c.id = $1`,
+    [courseId],
+  );
+  if (curso.rows.length === 0) throw notFound('Curso no encontrado');
+
+  const sesion = await query<{ id: string; title: string; session_date: string; starts_at: string | null; ends_at: string | null }>(
+    req.query.sessionId
+      ? `SELECT id, title, session_date, starts_at, ends_at FROM attendance_sessions WHERE id = $2 AND course_id = $1`
+      : `SELECT id, title, session_date, starts_at, ends_at FROM attendance_sessions
+          WHERE course_id = $1 ORDER BY ABS(session_date - CURRENT_DATE), session_date DESC LIMIT 1`,
+    req.query.sessionId ? [courseId, String(req.query.sessionId)] : [courseId],
+  );
+  if (sesion.rows.length === 0) throw badRequest('Crea primero una jornada presencial', 'NO_SESSION');
+  const s = sesion.rows[0];
+
+  const alumnos = await query<{ apellidos: string | null; nombre: string | null; dni: string | null; display_name: string }>(
+    `SELECT st.apellidos, st.nombre, st.dni, st.display_name
+       FROM enrollments e JOIN students st ON st.id = e.student_id
+      WHERE e.course_id = $1
+      ORDER BY COALESCE(NULLIF(st.apellidos, ''), st.display_name), st.nombre NULLS FIRST`,
+    [courseId],
+  );
+
+  const horario = s.starts_at ? `${s.starts_at.slice(0, 5)}${s.ends_at ? ` – ${s.ends_at.slice(0, 5)}` : ''}` : '';
+  const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 0 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="listado-asistencia.pdf"');
+  doc.pipe(res);
+  renderListaAsistencia(doc, {
+    courseTitle: curso.rows[0].title,
+    sessionTitle: s.title,
+    fecha: new Date(s.session_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }),
+    horario,
+    director: curso.rows[0].director || '',
+    alumnos: alumnos.rows.map((a) => ({
+      // Sin datos identificativos aún, se imprime el seudónimo para que la fila
+      // sea reconocible y el docente pueda completarla a mano.
+      apellidos: a.apellidos || a.display_name,
+      nombre: a.nombre || '',
+      dni: a.dni || '',
+    })),
+  });
+  doc.end();
 }
 
 // -------------------------------------------------------------------- alumnos
