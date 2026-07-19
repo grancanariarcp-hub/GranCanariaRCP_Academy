@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
 import { Reveal } from '@/components/Reveal';
+import { StickyCampusBar } from '@/components/StickyCampusBar';
 import { temaPalette } from '@/lib/temaColors';
 
 interface OpenCourse {
@@ -153,7 +154,7 @@ export default function Home() {
 
         {/* Salto al campus de pago */}
         <Reveal>
-          <Link href="/campus" className="press cta-blink"
+          <Link href="/campus" id="bloque-campus" className="press cta-blink"
             style={{ display: 'block', textDecoration: 'none', color: '#fff', borderRadius: 16, padding: 34, textAlign: 'center',
               background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--secondary-dark) 55%,#0d9488 100%)',
               boxShadow: 'var(--shadow-md)', marginBottom: 40 }}>
@@ -174,6 +175,9 @@ export default function Home() {
         </p>
         <p style={{ textAlign: 'center', marginTop: 8 }}><AppVersion /></p>
       </div>
+
+      {/* Llamada al campus siempre visible mientras se navega la zona gratuita */}
+      <StickyCampusBar anchorId="bloque-campus" />
     </div>
   );
 }
