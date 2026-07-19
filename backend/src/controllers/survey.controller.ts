@@ -35,7 +35,11 @@ export async function getSurveyForStudent(req: Request, res: Response): Promise<
   const surveyId = await surveyIdFor(courseId);
   const [survey, mods, profes, mine] = await Promise.all([
     query<{ is_open: boolean }>('SELECT is_open FROM course_surveys WHERE id = $1', [surveyId]),
-    query<{ id: string; title: string }>('SELECT id, title FROM modules WHERE course_id = $1 ORDER BY sort_order', [courseId]),
+    // El módulo de bienvenida no se evalúa: no es contenido formativo.
+    query<{ id: string; title: string }>(
+      "SELECT id, title FROM modules WHERE course_id = $1 AND title NOT ILIKE 'bienvenida%' ORDER BY sort_order",
+      [courseId],
+    ),
     query<{ id: string; name: string; role: string }>(
       `SELECT u.id, u.name, cs.role FROM course_staff cs JOIN users u ON u.id = cs.user_id
         WHERE cs.course_id = $1 ORDER BY cs.role, u.name`,
@@ -47,6 +51,7 @@ export async function getSurveyForStudent(req: Request, res: Response): Promise<
   res.json({
     abierta: survey.rows[0]?.is_open ?? true,
     yaRespondida: mine.rows.length > 0,
+    escala: { min: 1, max: 10, etiquetaMin: 'Muy deficiente', etiquetaMax: 'Excelente' },
     items: [
       ...mods.rows.map((m) => ({ kind: 'modulo' as const, ref: m.id, label: m.title })),
       ...profes.rows.map((p) => ({ kind: 'profesor' as const, ref: p.id, label: `${p.name} (${p.role})` })),
@@ -61,9 +66,13 @@ const submitSchema = z.object({
     kind: z.enum(['modulo', 'profesor', 'general']),
     ref: z.string().uuid().nullable().optional(),
     label: z.string().min(1).max(200),
-    score: z.number().int().min(1).max(5),
+    score: z.number().int().min(1).max(10).nullable().optional(),
+    skipped: z.boolean().optional().default(false),
+    comment: z.string().max(1000).optional(),
+  }).refine((i) => i.skipped || (i.score != null), {
+    message: 'Valora el ítem o marca «No deseo evaluar este ítem»',
   })).min(1),
-  globalRating: z.number().int().min(1).max(5),
+  globalRating: z.number().int().min(1).max(10),
   wouldRecommend: z.boolean(),
   comments: z.string().max(2000).optional(),
 });
@@ -89,8 +98,9 @@ export async function submitSurvey(req: Request, res: Response): Promise<void> {
     );
     for (const s of d.scores) {
       await client.query(
-        'INSERT INTO survey_item_scores (response_id, item_kind, item_ref, item_label, score) VALUES ($1,$2,$3,$4,$5)',
-        [r.rows[0].id, s.kind, s.ref ?? null, s.label, s.score],
+        `INSERT INTO survey_item_scores (response_id, item_kind, item_ref, item_label, score, skipped, comment)
+         VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+        [r.rows[0].id, s.kind, s.ref ?? null, s.label, s.skipped ? null : s.score, s.skipped ?? false, s.comment ?? null],
       );
     }
   });
@@ -115,13 +125,17 @@ export async function surveyResults(req: Request, res: Response): Promise<void> 
          FROM survey_responses WHERE survey_id = $1`,
       [surveyId],
     ),
-    query<{ item_kind: string; item_label: string; media: string; n: string }>(
-      `SELECT si.item_kind, si.item_label, ROUND(AVG(si.score), 2) AS media, COUNT(*) AS n
+    query<{ item_kind: string; item_label: string; media: string | null; n: string; sin_evaluar: string; comentarios: string[] }>(
+      `SELECT si.item_kind, si.item_label,
+              ROUND(AVG(si.score) FILTER (WHERE NOT si.skipped), 2) AS media,
+              COUNT(*) FILTER (WHERE NOT si.skipped) AS n,
+              COUNT(*) FILTER (WHERE si.skipped) AS sin_evaluar,
+              COALESCE(ARRAY_AGG(si.comment) FILTER (WHERE si.comment IS NOT NULL AND si.comment <> ''), '{}') AS comentarios
          FROM survey_item_scores si
          JOIN survey_responses r ON r.id = si.response_id
         WHERE r.survey_id = $1
         GROUP BY si.item_kind, si.item_label
-        ORDER BY si.item_kind, AVG(si.score) DESC`,
+        ORDER BY si.item_kind, AVG(si.score) FILTER (WHERE NOT si.skipped) DESC NULLS LAST`,
       [surveyId],
     ),
     query<{ comments: string; submitted_at: string }>(
@@ -141,7 +155,11 @@ export async function surveyResults(req: Request, res: Response): Promise<void> 
     participacionPct: matric > 0 ? Math.round((n / matric) * 100) : 0,
     mediaGlobal: resumen.rows[0].media_global ? Number(resumen.rows[0].media_global) : null,
     recomiendanPct: n > 0 ? Math.round((Number(resumen.rows[0].recomiendan) / n) * 100) : null,
-    porItem: porItem.rows.map((i) => ({ kind: i.item_kind, label: i.item_label, media: Number(i.media), n: Number(i.n) })),
+    porItem: porItem.rows.map((i) => ({
+      kind: i.item_kind, label: i.item_label,
+      media: i.media != null ? Number(i.media) : null,
+      n: Number(i.n), sinEvaluar: Number(i.sin_evaluar), comentarios: i.comentarios ?? [],
+    })),
     comentarios: comentarios.rows,
   });
 }

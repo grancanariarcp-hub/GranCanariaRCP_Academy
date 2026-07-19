@@ -17,6 +17,9 @@ export function CourseSurvey({ courseId }: { courseId: string }) {
   const [abierta, setAbierta] = useState(true);
   const [ya, setYa] = useState(false);
   const [scores, setScores] = useState<Record<string, number>>({});
+  const [skipped, setSkipped] = useState<Record<string, boolean>>({});
+  const [itemComments, setItemComments] = useState<Record<string, string>>({});
+  const [escala, setEscala] = useState({ min: 1, max: 10, etiquetaMin: 'Muy deficiente', etiquetaMax: 'Excelente' });
   const [globalRating, setGlobalRating] = useState(0);
   const [recomienda, setRecomienda] = useState<boolean | null>(null);
   const [comments, setComments] = useState('');
@@ -24,25 +27,30 @@ export function CourseSurvey({ courseId }: { courseId: string }) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    api<{ abierta: boolean; yaRespondida: boolean; items: Item[] }>(`/api/student/courses/${courseId}/survey`, { auth: true })
-      .then((r) => { setItems(r.items); setAbierta(r.abierta); setYa(r.yaRespondida); })
+    api<{ abierta: boolean; yaRespondida: boolean; items: Item[]; escala: typeof escala }>(`/api/student/courses/${courseId}/survey`, { auth: true })
+      .then((r) => { setItems(r.items); setAbierta(r.abierta); setYa(r.yaRespondida); if (r.escala) setEscala(r.escala); })
       .catch(() => {});
   }, [courseId]);
 
   const key = (i: Item) => `${i.kind}:${i.ref ?? i.label}`;
-  const faltan = items.filter((i) => !scores[key(i)]).length;
+  const faltan = items.filter((i) => !scores[key(i)] && !skipped[key(i)]).length;
 
   async function enviar() {
     setMsg(null);
     if (faltan > 0 || !globalRating || recomienda === null) {
-      setMsg({ ok: false, text: 'Completa todas las valoraciones antes de enviar.' });
+      setMsg({ ok: false, text: 'Valora todos los ítems (o marca «No deseo evaluar este ítem») y completa la valoración global.' });
       return;
     }
     try {
       await api(`/api/student/courses/${courseId}/survey`, {
         method: 'POST', auth: true,
         body: JSON.stringify({
-          scores: items.map((i) => ({ kind: i.kind, ref: i.ref, label: i.label, score: scores[key(i)] })),
+          scores: items.map((i) => ({
+            kind: i.kind, ref: i.ref, label: i.label,
+            score: skipped[key(i)] ? null : scores[key(i)],
+            skipped: !!skipped[key(i)],
+            comment: itemComments[key(i)] || undefined,
+          })),
           globalRating, wouldRecommend: recomienda, comments: comments || undefined,
         }),
       });
@@ -64,15 +72,20 @@ export function CourseSurvey({ courseId }: { courseId: string }) {
   }
   if (!abierta) return null;
 
-  const Estrellas = ({ value, onChange }: { value: number; onChange: (v: number) => void }) => (
-    <span style={{ whiteSpace: 'nowrap' }}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button key={n} type="button" onClick={() => onChange(n)} title={`${n} de 5`}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, padding: '0 1px', lineHeight: 1, filter: n <= value ? 'none' : 'grayscale(1) opacity(0.35)' }}>
-          ⭐
+  const Escala = ({ value, onChange, disabled }: { value: number; onChange: (v: number) => void; disabled?: boolean }) => (
+    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', opacity: disabled ? 0.4 : 1 }}>
+      {Array.from({ length: escala.max }, (_, k) => k + 1).map((n) => (
+        <button key={n} type="button" disabled={disabled} onClick={() => onChange(n)} title={`${n} de ${escala.max}`}
+          style={{
+            width: 28, height: 28, borderRadius: 6, cursor: disabled ? 'default' : 'pointer', fontSize: 12, fontWeight: 700,
+            border: '1px solid ' + (n === value ? 'var(--primary-dark)' : 'var(--gray-300)'),
+            background: n === value ? 'var(--primary-dark)' : '#fff',
+            color: n === value ? '#fff' : 'var(--text-secondary)',
+          }}>
+          {n}
         </button>
       ))}
-    </span>
+    </div>
   );
 
   return (
@@ -82,10 +95,19 @@ export function CourseSurvey({ courseId }: { courseId: string }) {
         <button className="link-action" onClick={() => setOpen((v) => !v)}>{open ? 'Ocultar' : 'Responder ahora'}</button>
       </div>
       {!open ? (
-        <p className="muted" style={{ fontSize: 14 }}>Tu opinión es anónima para el resto de alumnos y nos ayuda a mejorar el curso. Tarda menos de 2 minutos.</p>
+        <p className="muted" style={{ fontSize: 14 }}>
+          Tu opinión nos ayuda a mejorar el curso y es <strong>necesaria para acceder al examen final</strong>
+          {' '}(o al certificado, si el curso no tiene examen). Tarda un par de minutos.
+        </p>
       ) : (
         <>
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
+
+          <div className="info-box" style={{ fontSize: 13, marginBottom: 14 }}>
+            Valora del <strong>{escala.min}</strong> al <strong>{escala.max}</strong>, donde
+            {' '}<strong>{escala.min} = {escala.etiquetaMin}</strong> y <strong>{escala.max} = {escala.etiquetaMax}</strong>.
+            Todos los ítems son obligatorios; si prefieres no valorar alguno, marca «No deseo evaluar este ítem».
+          </div>
 
           {GRUPOS.map((g) => {
             const del = items.filter((i) => i.kind === g.kind);
@@ -94,19 +116,28 @@ export function CourseSurvey({ courseId }: { courseId: string }) {
               <div key={g.kind} style={{ marginBottom: 16 }}>
                 <div style={{ fontWeight: 600, marginBottom: 2 }}>{g.titulo}</div>
                 <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>{g.ayuda}</div>
-                {del.map((i) => (
-                  <div key={key(i)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: '6px 0', borderBottom: '1px solid var(--gray-200)' }}>
-                    <span style={{ fontSize: 14 }}>{i.label}</span>
-                    <Estrellas value={scores[key(i)] ?? 0} onChange={(v) => setScores({ ...scores, [key(i)]: v })} />
-                  </div>
-                ))}
+                {del.map((i) => {
+                  const k = key(i);
+                  return (
+                    <div key={k} style={{ padding: '10px 0', borderBottom: '1px solid var(--gray-200)' }}>
+                      <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{i.label}</div>
+                      <Escala value={scores[k] ?? 0} onChange={(v) => setScores({ ...scores, [k]: v })} disabled={!!skipped[k]} />
+                      <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, marginTop: 6, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={!!skipped[k]} onChange={(e) => setSkipped({ ...skipped, [k]: e.target.checked })} />
+                        No deseo evaluar este ítem
+                      </label>
+                      <input className="form-input" style={{ marginTop: 6, fontSize: 13 }} placeholder="Comentario sobre este ítem (opcional)"
+                        value={itemComments[k] ?? ''} onChange={(e) => setItemComments({ ...itemComments, [k]: e.target.value })} maxLength={1000} />
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
 
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Valoración global del curso</div>
-            <Estrellas value={globalRating} onChange={setGlobalRating} />
+            <Escala value={globalRating} onChange={setGlobalRating} />
           </div>
 
           <div style={{ marginBottom: 14 }}>

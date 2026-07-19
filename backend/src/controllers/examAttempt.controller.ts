@@ -4,6 +4,7 @@ import { query } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { hasAnsweredSurvey } from '../services/surveyGate.js';
 
 /** Student side: taking exams. All routes assume role 'student'. */
 
@@ -18,7 +19,7 @@ interface ExamRow {
 
 async function examForStudent(examId: string, studentId: string): Promise<ExamRow> {
   const { rows } = await query<ExamRow>(
-    `SELECT e.id, e.title, e.attempts_allowed, e.pass_pct, e.time_limit_min, m.course_id
+    `SELECT e.id, e.title, e.kind, e.attempts_allowed, e.pass_pct, e.time_limit_min, m.course_id
      FROM exams e JOIN modules m ON m.id = e.module_id
      WHERE e.id = $1`,
     [examId],
@@ -40,6 +41,10 @@ async function submittedCount(examId: string, studentId: string): Promise<number
 // POST /api/student/exams/:examId/start
 export async function startExam(req: Request, res: Response): Promise<void> {
   const exam = await examForStudent(req.params.examId, req.auth!.sub);
+  // El examen FINAL solo se habilita tras responder la encuesta de satisfacción.
+  if ((exam as { kind?: string }).kind === 'examen' && !(await hasAnsweredSurvey(exam.course_id, req.auth!.sub))) {
+    throw badRequest('Antes de realizar el examen final debes responder la encuesta de satisfacción del curso.', 'SURVEY_REQUIRED');
+  }
   if ((await submittedCount(exam.id, req.auth!.sub)) >= exam.attempts_allowed) {
     throw badRequest('Has agotado los intentos de este examen', 'NO_ATTEMPTS');
   }
