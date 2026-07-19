@@ -658,3 +658,26 @@ tbody tr:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ---------- Navegación superior común ---------- */
+.page-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.page-nav-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--secondary-dark);
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.page-nav-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}

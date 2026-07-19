@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
 
 /**
  * Condiciones de uso. PLANTILLA BASE: completar datos fiscales del titular y
@@ -11,7 +12,7 @@ export default function TerminosPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/">← Inicio</Link></p>
+        <PageNav />
         <div className="card animate-in">
           <h1 style={{ color: 'var(--primary-dark)', marginBottom: 6 }}>Condiciones de uso</h1>
           <p className="muted" style={{ marginBottom: 20 }}>Versión 1.0 · Última actualización: julio de 2026</p>

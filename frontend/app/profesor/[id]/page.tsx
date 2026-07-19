@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
 
 type CvCat = 'formacion' | 'investigacion' | 'publicaciones' | 'reconocimientos' | 'experiencia';
 const LABELS: Record<CvCat, string> = {
@@ -29,7 +30,7 @@ export default function PublicProfessorPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 720, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/">← Volver</Link></p>
+        <PageNav />
         {error && <div className="alert alert-error">{error}</div>}
         {data && (
           <div className="card animate-pop" style={{ padding: 0, overflow: 'hidden' }}>

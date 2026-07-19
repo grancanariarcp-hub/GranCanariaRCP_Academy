@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { saveSession, type SessionUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
 
 type Role = 'alumno' | 'profesor' | 'institucion';
 
@@ -80,6 +81,7 @@ export default function RegistroPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
+        <PageNav />
         <div className="auth-logo">
           <img src="/logo-horizontal.png" alt="Gran Canaria RCP" />
           <h1>Crear cuenta</h1>

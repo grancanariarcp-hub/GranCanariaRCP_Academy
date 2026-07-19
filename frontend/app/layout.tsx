@@ -4,6 +4,8 @@ import { ServiceWorker } from '@/components/ServiceWorker';
 import { InstallButton } from '@/components/InstallButton';
 
 export const metadata: Metadata = {
+  // Base para resolver las imágenes de vista previa al compartir el enlace.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://grancanariarcp.vercel.app'),
   title: 'Gran Canaria RCP · Aprende a salvar vidas',
   description: 'Aprende soporte vital básico y primeros auxilios gratis, ponte a prueba en los desafíos y fórmate con certificado.',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'RCP Academy' },

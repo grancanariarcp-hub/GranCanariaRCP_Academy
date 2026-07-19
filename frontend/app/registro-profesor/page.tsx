@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
 
 export default function RegistroProfesorPage() {
   const [name, setName] = useState('');
@@ -34,6 +35,7 @@ export default function RegistroProfesorPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
+        <PageNav />
         <div className="auth-logo">
           <img src="/logo-horizontal.png" alt="Gran Canaria RCP" />
           <h1>Registro de profesor</h1>

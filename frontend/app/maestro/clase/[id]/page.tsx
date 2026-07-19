@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, apiBase } from '@/lib/api';
+import { PageNav } from '@/components/PageNav';
 
 interface Clase { id: string; name: string }
 interface Alumno { id: string; display_name: string; access_code: string; age: number | null; activo: boolean }
@@ -46,7 +47,7 @@ export default function ClaseDetallePage() {
 
   return (
     <AppShell user={user} title={clase?.name ?? 'Clase'} nav={[{ label: 'Mis clases', href: '/maestro', active: true }]}>
-      <p style={{ marginBottom: 16 }}><Link href="/maestro">← Mis clases</Link></p>
+      <PageNav backHref="/maestro" backLabel="Mis clases" />
       {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card animate-in no-print" style={{ marginBottom: 20 }}>

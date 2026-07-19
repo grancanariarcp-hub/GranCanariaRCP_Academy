@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
 
 interface Q { id: string; text: string; options: string[] }
 interface RankRow { position: number; participant_name: string; correct: number; total: number; time_seconds: number; days_in_position: number }
@@ -88,7 +89,7 @@ export default function DesafioPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 820, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/desafios">← Desafíos</Link></p>
+        <PageNav backHref="/desafios" backLabel="Desafíos" />
         {error && <div className="alert alert-error">{error}</div>}
         {challenge && <h1 style={{ color: 'var(--primary-dark)', marginBottom: 4 }}>{challenge.title}</h1>}
         {challenge && <p className="muted" style={{ marginBottom: 20 }}>{challenge.area} · {challenge.num_questions} preguntas · {Math.round(challenge.time_limit_seconds / 60)} min</p>}

@@ -8,6 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { CourseForum } from '@/components/CourseForum';
 import { ExamWizard } from '@/components/ExamWizard';
 import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
+import { PageNav } from '@/components/PageNav';
 
 interface Activity {
   id: string;
@@ -347,7 +348,7 @@ export default function CourseDetailPage() {
 
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={nav}>
-      <p style={{ marginBottom: 16 }}><Link href="/admin/cursos">← Volver a cursos</Link></p>
+      <PageNav backHref="/admin/cursos" backLabel="Volver a cursos" />
       {error && <div className="alert alert-error">{error}</div>}
       {!course ? (
         <div className="muted">Cargando…</div>

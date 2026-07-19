@@ -8,7 +8,7 @@ import Link from 'next/link';
  * se oculta cuando el bloque real del campus entra en pantalla, para no repetir
  * el mismo mensaje dos veces. Se puede cerrar.
  */
-export function StickyCampusBar({ anchorId }: { anchorId: string }) {
+export function StickyCampusBar({ anchorId }: { anchorId?: string }) {
   const [visible, setVisible] = useState(false);
   const [atAnchor, setAtAnchor] = useState(false);
   const [closed, setClosed] = useState(false);
@@ -19,7 +19,8 @@ export function StickyCampusBar({ anchorId }: { anchorId: string }) {
     window.addEventListener('scroll', onScroll, { passive: true });
 
     let obs: IntersectionObserver | undefined;
-    const target = document.getElementById(anchorId);
+    // Sin ancla la barra permanece visible: la página no repite el mensaje.
+    const target = anchorId ? document.getElementById(anchorId) : null;
     if (target && typeof IntersectionObserver !== 'undefined') {
       obs = new IntersectionObserver(([e]) => setAtAnchor(e.isIntersecting), { threshold: 0.25 });
       obs.observe(target);
@@ -30,6 +31,9 @@ export function StickyCampusBar({ anchorId }: { anchorId: string }) {
   const shown = visible && !atAnchor && !closed;
 
   return (
+    <>
+    {/* Reserva el alto de la barra para que no tape el final de la página */}
+    <div aria-hidden="true" style={{ height: 72 }} />
     <div
       aria-hidden={!shown}
       style={{
@@ -57,5 +61,6 @@ export function StickyCampusBar({ anchorId }: { anchorId: string }) {
         </button>
       </div>
     </div>
+    </>
   );
 }

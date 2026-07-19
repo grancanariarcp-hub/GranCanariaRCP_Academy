@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { saveSession, homeForRole, type SessionUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,6 +42,7 @@ export default function LoginPage() {
   return (
     <div className="auth-wrap">
       <div className="auth-card">
+        <PageNav />
         <div className="auth-logo">
           <img src="/logo-horizontal.png" alt="Gran Canaria RCP" />
           <h1>Acceso</h1>

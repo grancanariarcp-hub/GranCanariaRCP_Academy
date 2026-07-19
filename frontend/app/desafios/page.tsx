@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
+import { StickyCampusBar } from '@/components/StickyCampusBar';
 
 function ctaCard(background: string): React.CSSProperties {
   return {
@@ -46,7 +48,7 @@ export default function DesafiosPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/">← Inicio</Link></p>
+        <PageNav />
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <h1 style={{ color: 'var(--primary-dark)', fontSize: 30 }}>🏆 ¿Qué tanto sabes de RCP?</h1>
           <p className="muted" style={{ maxWidth: 560, margin: '6px auto 0' }}>Desafíos activos y reto permanente. Demuestra cuánto sabes y sube en el ranking.</p>
@@ -109,6 +111,9 @@ export default function DesafiosPage() {
         )}
         <p style={{ textAlign: 'center', marginTop: 32 }}><AppVersion /></p>
       </div>
+
+      {/* La formación oficial acompaña al usuario mientras explora los desafíos */}
+      <StickyCampusBar />
     </div>
   );
 }

@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { api } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
+import { StickyCampusBar } from '@/components/StickyCampusBar';
 
 interface Inst { id: string; name: string; participants: string; attempts: string; total_correct: string; accuracy_pct: string | null; position: string }
 interface Person { name: string; institution: string | null; challenges: string; points: string; accuracy_pct: string | null; position: string }
@@ -28,7 +30,7 @@ export default function RankingsPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/desafios">← Desafíos</Link> · <Link href="/">Inicio</Link></p>
+        <PageNav backHref="/desafios" backLabel="Desafíos" />
         <h1 style={{ textAlign: 'center', color: 'var(--primary-dark)', marginBottom: 6 }}>Rankings</h1>
         <p className="muted" style={{ textAlign: 'center', marginBottom: 18 }}>Los mejores en los desafíos de RCP y primeros auxilios</p>
 
@@ -96,6 +98,7 @@ export default function RankingsPage() {
         </div>
         <p style={{ textAlign: 'center', marginTop: 24 }}><AppVersion /></p>
       </div>
+      <StickyCampusBar />
     </div>
   );
 }

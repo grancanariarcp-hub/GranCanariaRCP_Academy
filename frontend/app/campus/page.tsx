@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
 import { Reveal } from '@/components/Reveal';
 import { temaPalette } from '@/lib/temaColors';
+import { PageNav } from '@/components/PageNav';
 
 interface OpenCourse {
   id: string;
@@ -66,9 +67,9 @@ export default function CampusPage() {
         color: '#fff', padding: '38px 16px 46px',
       }}>
         <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
-          <p style={{ textAlign: 'left', marginBottom: 18 }}>
-            <Link href="/" style={{ color: 'rgba(255,255,255,0.85)' }}>← Zona gratuita</Link>
-          </p>
+          <div style={{ textAlign: 'left' }}>
+            <PageNav backHref="/" backLabel="Zona gratuita" light />
+          </div>
           <div className="animate-fade">
             <img src="/logo-horizontal.png" alt="Gran Canaria RCP" style={{ maxWidth: 280, width: '100%', filter: 'brightness(0) invert(1)' }} />
             <h1 style={{ fontSize: 34, marginTop: 14, lineHeight: 1.15 }}>Campus de formación</h1>

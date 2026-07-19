@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
+import { StickyCampusBar } from '@/components/StickyCampusBar';
 
 interface Q { id: string; category: string | null; text: string; options: string[] }
 interface Feedback { id: string; correct_index: number; your: number | null; is_correct: boolean; explanation: string | null; document_title: string | null; ref_page: number | null }
@@ -166,7 +168,7 @@ export default function PracticaPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 820, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/">← Inicio</Link></p>
+        <PageNav />
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <h1 style={{ color: 'var(--primary-dark)', fontSize: 30 }}>📚 Práctica libre</h1>
           <p className="muted" style={{ maxWidth: 560, margin: '6px auto 0' }}>Entrena a tu ritmo, repasa tus fallos y prepara simulacros. Cada respuesta mejora tus estadísticas.</p>
@@ -424,6 +426,7 @@ export default function PracticaPage() {
         )}
         <p style={{ textAlign: 'center', marginTop: 32 }}><AppVersion /></p>
       </div>
+      <StickyCampusBar />
     </div>
   );
 }

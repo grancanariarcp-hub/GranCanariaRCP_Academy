@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
+import { PageNav } from '@/components/PageNav';
 
 type Format = 'test' | 'vf' | 'abierta';
 interface Q { id: string; format: Format; text: string; options: string[]; correct_index?: number | null }
@@ -113,7 +114,7 @@ export default function TakeExamPage() {
 
   return (
     <AppShell user={user} title={cfg?.title ?? 'Examen'} nav={[{ label: 'Inicio', href: '/student', active: true }]}>
-      <p style={{ marginBottom: 16 }}><Link href={`/student/curso/${courseId}`}>← Volver al curso</Link></p>
+      <PageNav backHref={`/student/curso/${courseId}`} backLabel="Volver al curso" />
       {error && <div className="alert alert-error">{error}</div>}
 
       {/* INTRO */}

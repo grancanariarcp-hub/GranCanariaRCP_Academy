@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
+import { PageNav } from '@/components/PageNav';
 
 interface Signer { nombre: string | null; cargo: string | null }
 interface Cert {
@@ -43,7 +44,7 @@ export default function CertificadoPage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/">← Inicio</Link></p>
+        <PageNav />
         {error && <div className="alert alert-error">{error}</div>}
         {!cert ? (
           !error && <div className="muted">Cargando…</div>

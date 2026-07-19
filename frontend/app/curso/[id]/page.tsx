@@ -8,6 +8,7 @@ import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 import { Carousel } from '@/components/Carousel';
 import { temaPalette } from '@/lib/temaColors';
+import { PageNav } from '@/components/PageNav';
 
 interface Course {
   id: string;
@@ -67,7 +68,7 @@ export default function PublicCoursePage() {
   return (
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
-        <p style={{ marginBottom: 16 }}><Link href="/">← Volver</Link></p>
+        <PageNav />
         {error && <div className="alert alert-error">{error}</div>}
         {!course ? (
           !error && <div className="muted">Cargando…</div>
