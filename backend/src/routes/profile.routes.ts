@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getProfile, changePassword, changeEmail, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
+import { getProfile, changePassword, changeEmail, getConsents, updateConsents, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -12,6 +12,8 @@ router.use(requireAuth); // any authenticated role
 router.get('/', asyncHandler(getProfile));
 router.post('/password', asyncHandler(changePassword));
 router.post('/email', asyncHandler(changeEmail));
+router.get('/consents', asyncHandler(getConsents));
+router.post('/consents', asyncHandler(updateConsents));
 router.post('/photo', upload.single('file'), asyncHandler(uploadProfilePhoto));
 router.get('/legajo', asyncHandler(generateLegajo));
 

@@ -31,6 +31,11 @@ export default function RegistroPage() {
   const [instContactName, setInstContactName] = useState('');
   const [instPhone, setInstPhone] = useState('');
 
+  // RGPD: aceptación obligatoria + consentimientos opcionales y separados.
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [rankingConsent, setRankingConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
+
   useEffect(() => {
     api<{ institutions: Array<{ id: string; name: string }> }>('/api/public/institutions')
       .then((r) => setInstitutions(r.institutions)).catch(() => {});
@@ -43,7 +48,7 @@ export default function RegistroPage() {
       if (role === 'profesor') {
         await api('/api/auth/professor/register', {
           method: 'POST',
-          body: JSON.stringify({ name, email, password, headline: headline || undefined }),
+          body: JSON.stringify({ name, email, password, headline: headline || undefined, acceptTerms, rankingConsent, marketingConsent }),
         });
         setDone('✅ Solicitud enviada. Un administrador validará tu cuenta de profesor. Después podrás acceder.');
       } else if (role === 'institucion') {
@@ -53,13 +58,14 @@ export default function RegistroPage() {
             name: instName, address: instAddress || undefined, contactName: instContactName || undefined,
             contactEmail: email, contactPhone: instPhone || undefined,
             adminName: name, adminEmail: email, adminPassword: password,
+            acceptTerms, rankingConsent, marketingConsent,
           }),
         });
         setDone('✅ Institución registrada. La validaremos y podrás entrar con tu email para crear maestros y clases.');
       } else {
         const res = await api<{ token: string; user: SessionUser }>('/api/auth/student/register-public', {
           method: 'POST',
-          body: JSON.stringify({ name, email, password, institutionId: institutionId || undefined }),
+          body: JSON.stringify({ name, email, password, institutionId: institutionId || undefined, acceptTerms, rankingConsent, marketingConsent }),
         });
         saveSession(res.token, res.user);
         router.push('/student');
@@ -149,7 +155,33 @@ export default function RegistroPage() {
               <input className="form-input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
             </div>
 
-            <button className="btn btn-primary btn-full" disabled={loading}>
+            {/* RGPD: información básica + consentimientos separados */}
+            <div className="info-box" style={{ fontSize: 11.5, lineHeight: 1.5, marginBottom: 12 }}>
+              <strong>Protección de datos.</strong> Responsable: <strong>Gran Canaria RCP</strong>. Finalidad: gestionar tu
+              cuenta, tu formación y tu participación en la plataforma. Legitimación: ejecución de la relación y tu
+              consentimiento. Conservación: mientras mantengas la cuenta. Destinatarios: proveedores tecnológicos
+              necesarios (alojamiento), sin cesiones a terceros. Derechos: acceso, rectificación, supresión, oposición,
+              limitación y portabilidad, escribiendo a{' '}
+              <a href="mailto:grancanariarcp@gmail.com">grancanariarcp@gmail.com</a>. Más información en la{' '}
+              <Link href="/privacidad" target="_blank">política de privacidad</Link>.
+            </div>
+
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, marginBottom: 8 }}>
+              <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} required style={{ marginTop: 3 }} />
+              <span>He leído y acepto la <Link href="/privacidad" target="_blank">política de privacidad</Link> y las{' '}
+                <Link href="/terminos" target="_blank">condiciones de uso</Link>. <span style={{ color: 'var(--danger)' }}>*</span></span>
+            </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, marginBottom: 8 }}>
+              <input type="checkbox" checked={rankingConsent} onChange={(e) => setRankingConsent(e.target.checked)} style={{ marginTop: 3 }} />
+              <span>Autorizo que mi nombre aparezca en los <strong>rankings públicos</strong>. Si no lo autorizas,
+                participarás igualmente pero aparecerás como <em>«Usuario anónimo»</em>.</span>
+            </label>
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, marginBottom: 14 }}>
+              <input type="checkbox" checked={marketingConsent} onChange={(e) => setMarketingConsent(e.target.checked)} style={{ marginTop: 3 }} />
+              <span>Quiero recibir información sobre cursos y novedades. Puedes retirarlo cuando quieras desde tu perfil.</span>
+            </label>
+
+            <button className="btn btn-primary btn-full" disabled={loading || !acceptTerms}>
               {loading ? 'Enviando…' : role === 'profesor' ? 'Solicitar cuenta de profesor' : role === 'institucion' ? 'Registrar institución' : 'Crear cuenta'}
             </button>
           </form>

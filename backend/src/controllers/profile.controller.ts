@@ -6,6 +6,7 @@ import { badRequest, notFound } from '../utils/httpError.js';
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { logConsent } from '../services/consent.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl } from '../services/r2.js';
 import { renderLegajo, type LegajoCourse } from '../services/legajoPdf.js';
 
@@ -65,6 +66,37 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   await query(`UPDATE ${table} SET password_hash = $1, must_change_password = FALSE WHERE id = $2`,
     [await hashPassword(newPassword), sub]);
   await audit({ actorId: sub, actorType: role, action: 'PASSWORD_CHANGE', ip: clientIp(req) });
+  res.json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
+// GET/POST /api/profile/consents — el usuario puede dar o RETIRAR su
+// consentimiento en cualquier momento (art. 7.3 RGPD).
+// ---------------------------------------------------------------------------
+export async function getConsents(req: Request, res: Response): Promise<void> {
+  const { sub, role } = req.auth!;
+  const table = role === 'student' ? 'students' : 'users';
+  const { rows } = await query(
+    `SELECT ranking_consent, marketing_consent, accepted_terms_at, privacy_version FROM ${table} WHERE id = $1`,
+    [sub],
+  );
+  res.json({ consents: rows[0] ?? null });
+}
+
+export async function updateConsents(req: Request, res: Response): Promise<void> {
+  const d = z.object({ ranking: z.boolean().optional(), marketing: z.boolean().optional() }).parse(req.body);
+  const { sub, role } = req.auth!;
+  const table = role === 'student' ? 'students' : 'users';
+  const type = role === 'student' ? 'student' : 'user';
+
+  if (d.ranking !== undefined) {
+    await query(`UPDATE ${table} SET ranking_consent = $1 WHERE id = $2`, [d.ranking, sub]);
+    await logConsent(sub, type, 'ranking', d.ranking, clientIp(req));
+  }
+  if (d.marketing !== undefined) {
+    await query(`UPDATE ${table} SET marketing_consent = $1 WHERE id = $2`, [d.marketing, sub]);
+    await logConsent(sub, type, 'marketing', d.marketing, clientIp(req));
+  }
   res.json({ ok: true });
 }
 

@@ -6,6 +6,7 @@ import { signToken } from '../utils/jwt.js';
 import { badRequest, conflict, unauthorized } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { recordSignupConsents } from '../services/consent.js';
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -117,10 +118,13 @@ const professorRegisterSchema = z.object({
   email: z.string().email('Email no válido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   headline: z.string().max(160).optional(),
+  acceptTerms: z.literal(true, { errorMap: () => ({ message: 'Debes aceptar la política de privacidad y las condiciones de uso' }) }),
+  rankingConsent: z.boolean().optional().default(false),
+  marketingConsent: z.boolean().optional().default(false),
 });
 
 export async function professorRegister(req: Request, res: Response): Promise<void> {
-  const { name, email, password, headline } = professorRegisterSchema.parse(req.body);
+  const { name, email, password, headline, rankingConsent, marketingConsent } = professorRegisterSchema.parse(req.body);
   const ip = clientIp(req);
 
   const existing = await query('SELECT 1 FROM users WHERE email = $1', [email.toLowerCase()]);
@@ -133,6 +137,8 @@ export async function professorRegister(req: Request, res: Response): Promise<vo
      RETURNING id`,
     [email.toLowerCase(), passwordHash, name, headline ?? null],
   );
+
+  await recordSignupConsents(rows[0].id, 'user', { ranking: rankingConsent, marketing: marketingConsent }, ip);
 
   await audit({
     actorId: rows[0].id, actorType: 'profesor', action: 'PROFESSOR_REGISTER',
@@ -425,10 +431,14 @@ const publicRegisterSchema = z.object({
   email: z.string().email('Email no válido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   institutionId: z.string().uuid().optional(), // institución a la que representa (opcional)
+  // RGPD: aceptación obligatoria + consentimientos separados y opcionales.
+  acceptTerms: z.literal(true, { errorMap: () => ({ message: 'Debes aceptar la política de privacidad y las condiciones de uso' }) }),
+  rankingConsent: z.boolean().optional().default(false),
+  marketingConsent: z.boolean().optional().default(false),
 });
 
 export async function studentRegisterPublic(req: Request, res: Response): Promise<void> {
-  const { name, email, password, institutionId } = publicRegisterSchema.parse(req.body);
+  const { name, email, password, institutionId, rankingConsent, marketingConsent } = publicRegisterSchema.parse(req.body);
   const ip = clientIp(req);
   const lower = email.toLowerCase();
 
@@ -451,6 +461,7 @@ export async function studentRegisterPublic(req: Request, res: Response): Promis
     [instId, name, accessCode, lower, passwordHash],
   );
   const studentId = rows[0].id;
+  await recordSignupConsents(studentId, 'student', { ranking: rankingConsent, marketing: marketingConsent }, ip);
   const token = signToken({ sub: studentId, role: 'student', institutionId: instId, name });
   await audit({ actorId: studentId, actorType: 'student', action: 'STUDENT_REGISTER', entity: 'student', entityId: studentId, ip });
   res.status(201).json({ token, user: { id: studentId, name, role: 'student', institutionId: instId } });

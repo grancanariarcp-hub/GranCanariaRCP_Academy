@@ -37,10 +37,12 @@ export async function getChallengeRanking(req: Request, res: Response): Promise<
        WHERE challenge_id = $1 AND submitted_at IS NOT NULL
        ORDER BY participant_id, correct DESC, time_seconds ASC, submitted_at ASC
      )
-     SELECT participant_name, correct, total, time_seconds,
-            ROW_NUMBER() OVER (ORDER BY correct DESC, time_seconds ASC) AS position,
-            GREATEST(0, EXTRACT(DAY FROM NOW() - submitted_at))::int AS days_in_position
-     FROM best
+     SELECT CASE WHEN COALESCE(s.ranking_consent, FALSE) THEN b.participant_name ELSE 'Usuario anónimo' END AS participant_name,
+            b.correct, b.total, b.time_seconds,
+            ROW_NUMBER() OVER (ORDER BY b.correct DESC, b.time_seconds ASC) AS position,
+            GREATEST(0, EXTRACT(DAY FROM NOW() - b.submitted_at))::int AS days_in_position
+     FROM best b
+     LEFT JOIN students s ON s.id = b.participant_id
      ORDER BY position
      LIMIT 200`,
     [req.params.id],
@@ -89,11 +91,15 @@ export async function getIndividualRanking(_req: Request, res: Response): Promis
        WHERE a.submitted_at IS NOT NULL
        ORDER BY a.challenge_id, a.participant_id, a.correct DESC, a.time_seconds ASC
      )
-     SELECT MAX(b.participant_name) AS name, i.name AS institution,
+     SELECT CASE WHEN COALESCE(MAX(s.ranking_consent::int), 0) = 1
+                 THEN MAX(b.participant_name) ELSE 'Usuario anónimo' END AS name,
+            i.name AS institution,
             COUNT(*) AS challenges, SUM(b.correct) AS points,
             ROUND(100.0 * SUM(b.correct) / NULLIF(SUM(b.total), 0)) AS accuracy_pct,
             ROW_NUMBER() OVER (ORDER BY SUM(b.correct) DESC, SUM(b.time_seconds) ASC) AS position
-     FROM best b LEFT JOIN institutions i ON i.id = b.institution_id
+     FROM best b
+     LEFT JOIN institutions i ON i.id = b.institution_id
+     LEFT JOIN students s ON s.id = b.participant_id
      GROUP BY b.participant_id, i.name
      ORDER BY position
      LIMIT 100`,

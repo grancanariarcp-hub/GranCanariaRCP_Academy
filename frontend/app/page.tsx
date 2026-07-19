@@ -173,7 +173,10 @@ export default function Home() {
           </div>
         )}
 
-        <p style={{ textAlign: 'center', marginTop: 32 }}>
+        <p style={{ textAlign: 'center', marginTop: 32, fontSize: 13 }}>
+          <Link href="/privacidad">Política de privacidad</Link> · <Link href="/terminos">Condiciones de uso</Link>
+        </p>
+        <p style={{ textAlign: 'center', marginTop: 8 }}>
           <AppVersion />
         </p>
       </div>
