@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { getUser } from '@/lib/auth';
@@ -24,13 +25,14 @@ interface Stats {
 }
 interface FailedGeneral { id: string; tema: string | null; category: string | null; text: string; fallos: string; respuestas: string; pct_fallo: string }
 
-export default function PracticaPage() {
+function PracticaContenido() {
   const user = typeof window !== 'undefined' ? getUser() : null;
   const [stats, setStats] = useState<Stats | null>(null);
   const [phase, setPhase] = useState<'config' | 'taking' | 'result'>('config');
   const [error, setError] = useState<string | null>(null);
 
   const [mode, setMode] = useState<'aleatorio' | 'tema' | 'fallos'>('aleatorio');
+  const params = useSearchParams();
   const [category, setCategory] = useState('SVB');
   const [count, setCount] = useState('10');
 
@@ -50,6 +52,14 @@ export default function PracticaPage() {
   const [failedGeneral, setFailedGeneral] = useState<FailedGeneral[]>([]);
   const [showFailed, setShowFailed] = useState(false);
   const selectedBank = banks.find((b) => b.id === bankId) || null;
+
+  // Enlaces del panel de oposiciones: /practica?bankId=…&modo=simulacro|tema|fallos
+  useEffect(() => {
+    const b = params.get('bankId');
+    const m = params.get('modo');
+    if (b) setBankId(b);
+    if (m === 'tema' || m === 'fallos') setMode(m);
+  }, [params]);
 
   const [questions, setQuestions] = useState<Q[]>([]);
   const [answers, setAnswers] = useState<Record<string, number | null>>({});
@@ -425,5 +435,17 @@ export default function PracticaPage() {
       </div>
       <StickyCampusBar />
     </div>
+  );
+}
+
+/**
+ * useSearchParams obliga a un límite de Suspense: sin él, la compilación
+ * estática de la página falla.
+ */
+export default function PracticaPage() {
+  return (
+    <Suspense fallback={<div style={{ padding: 40 }}>Cargando…</div>}>
+      <PracticaContenido />
+    </Suspense>
   );
 }

@@ -64,7 +64,7 @@ export default function StudentDashboard() {
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
   return (
-    <AppShell user={user} title="Campus" nav={[{ label: 'Inicio', href: '/student', active: true }, { label: 'Práctica RCP básico', href: '/practica' }, { label: 'Desafíos RCP', href: '/desafios' }, { label: 'Perfil', href: '/student/perfil' }]}>
+    <AppShell user={user} title="Campus" nav={[{ label: 'Inicio', href: '/student', active: true }, { label: 'Oposiciones', href: '/student/ope' }, { label: 'Práctica RCP básico', href: '/practica' }, { label: 'Desafíos RCP', href: '/desafios' }, { label: 'Perfil', href: '/student/perfil' }]}>
       <WhatsAppPrompt />
       {error && <div className="alert alert-error">{error}</div>}
       {msg && <div className="alert alert-success">{msg}</div>}
