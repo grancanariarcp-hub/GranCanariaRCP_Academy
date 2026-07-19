@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
-import { badRequest, notFound } from '../utils/httpError.js';
+import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { assertEditor } from '../services/courseAuth.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
@@ -228,4 +228,51 @@ export async function listExamAttempts(req: Request, res: Response): Promise<voi
     [req.params.examId],
   );
   res.json({ attempts: rows });
+}
+
+/**
+ * Copia preguntas de un banco al examen. Sirve para reutilizar cualquier banco
+ * PÚBLICO como fuente sin poder descargarlo: las preguntas se copian dentro del
+ * examen del curso, no se entrega el banco.
+ */
+export async function addExamQuestionsFromBank(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const { bankId, tema, count } = z.object({
+    bankId: z.string().uuid(),
+    tema: z.string().max(160).optional(),
+    count: z.number().int().min(1).max(200),
+  }).parse(req.body);
+
+  const exam = await query('SELECT 1 FROM exams e JOIN modules m ON m.id = e.module_id WHERE e.id = $1 AND m.course_id = $2',
+    [req.params.examId, req.params.id]);
+  if (exam.rows.length === 0) throw notFound('Examen no encontrado');
+
+  // Solo bancos propios o públicos.
+  const bank = await query<{ visibility: string; created_by: string | null }>(
+    'SELECT visibility, created_by FROM question_banks WHERE id = $1', [bankId],
+  );
+  if (bank.rows.length === 0) throw notFound('Banco no encontrado');
+  if (req.auth!.role !== 'super_admin' && bank.rows[0].visibility !== 'publico' && bank.rows[0].created_by !== req.auth!.sub) {
+    throw forbidden('No puedes usar ese banco');
+  }
+
+  const qs = await query<{ text: string; options: string[]; correct_index: number }>(
+    `SELECT text, options, correct_index FROM questions
+      WHERE bank_id = $1 AND is_active = TRUE ${tema ? 'AND tema = $3' : ''}
+      ORDER BY RANDOM() LIMIT $2`,
+    tema ? [bankId, count, tema] : [bankId, count],
+  );
+  if (qs.rows.length === 0) throw badRequest('No hay preguntas con ese criterio', 'NO_QUESTIONS');
+
+  let added = 0;
+  for (const q of qs.rows) {
+    await query(
+      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, sort_order)
+       VALUES ($1, 'test', $2, $3::jsonb, $4,
+               COALESCE((SELECT MAX(sort_order) + 1 FROM exam_questions WHERE exam_id = $1), 0))`,
+      [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index],
+    );
+    added += 1;
+  }
+  res.status(201).json({ added });
 }

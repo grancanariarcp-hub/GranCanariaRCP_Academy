@@ -17,6 +17,9 @@ interface Bank {
   sim_questions: number | null;
   sim_minutes: number | null;
   sim_pass_pct: number | null;
+  visibility: 'privado' | 'publico';
+  mine: boolean;
+  canManage: boolean;
 }
 
 const INSTITUCIONES = ['ERC', 'AHA', 'PNRCP', 'ILCOR', 'Cruz Roja', 'Otra'];
@@ -39,7 +42,7 @@ function shapeFor(kind: string) {
 }
 
 export default function BancosPage() {
-  const user = useSession(['super_admin'], '/login');
+  const user = useSession(['super_admin', 'profesor'], '/login/admin');
   const [banks, setBanks] = useState<Bank[]>([]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -51,6 +54,7 @@ export default function BancosPage() {
   const [dim1, setDim1] = useState('');
   const [dim2, setDim2] = useState('');
   const [official, setOfficial] = useState(false);
+  const [visibility, setVisibility] = useState<'privado' | 'publico'>('privado');
   const [simQ, setSimQ] = useState('');
   const [simMin, setSimMin] = useState('');
   const [simPass, setSimPass] = useState('');
@@ -65,7 +69,7 @@ export default function BancosPage() {
 
   async function load() {
     try {
-      setBanks((await api<{ banks: Bank[] }>('/api/admin/banks', { auth: true })).banks);
+      setBanks((await api<{ banks: Bank[] }>('/api/banks', { auth: true })).banks);
     } catch { /* ignore */ }
   }
   useEffect(() => { if (user) load(); /* eslint-disable-next-line */ }, [user]);
@@ -77,7 +81,7 @@ export default function BancosPage() {
 
   function startEdit(b: Bank) {
     setEditingId(b.id);
-    setName(b.name); setKind(b.kind); setAnio(b.anio?.toString() ?? '');
+    setName(b.name); setKind(b.kind); setAnio(b.anio?.toString() ?? ''); setVisibility(b.visibility ?? 'privado');
     setDim1(b.comunidad_autonoma ?? ''); setDim2(b.categoria_profesional ?? '');
     setOfficial(b.official);
     setSimQ(b.sim_questions?.toString() ?? ''); setSimMin(b.sim_minutes?.toString() ?? ''); setSimPass(b.sim_pass_pct?.toString() ?? '');
@@ -102,10 +106,10 @@ export default function BancosPage() {
     };
     try {
       if (editingId) {
-        await api(`/api/admin/banks/${editingId}`, { method: 'PATCH', auth: true, body: JSON.stringify(body) });
+        await api(`/api/banks/${editingId}`, { method: 'PATCH', auth: true, body: JSON.stringify(body) });
         setMsg({ ok: true, text: 'Banco actualizado ✅' });
       } else {
-        await api('/api/admin/banks', { method: 'POST', auth: true, body: JSON.stringify(body) });
+        await api('/api/banks', { method: 'POST', auth: true, body: JSON.stringify(body) });
         setMsg({ ok: true, text: 'Banco creado ✅' });
       }
       resetForm();
@@ -118,7 +122,7 @@ export default function BancosPage() {
   async function removeBank(b: Bank) {
     if (!confirm(`¿Borrar el banco «${b.name}» y sus ${b.questions} preguntas? Esta acción no se puede deshacer.`)) return;
     try {
-      await api(`/api/admin/banks/${b.id}`, { method: 'DELETE', auth: true });
+      await api(`/api/banks/${b.id}`, { method: 'DELETE', auth: true });
       if (selBank === b.id) setSelBank('');
       if (editingId === b.id) resetForm();
       load();
@@ -128,7 +132,7 @@ export default function BancosPage() {
   }
 
   async function download(b: Bank) {
-    try { await downloadFile(`/api/admin/banks/${b.id}/export`, `${b.name}.json`); } catch { /* ignore */ }
+    try { await downloadFile(`/api/banks/${b.id}/export`, `${b.name}.json`); } catch { /* ignore */ }
   }
 
   async function loadTemas(id: string) {
@@ -144,7 +148,7 @@ export default function BancosPage() {
     try { parsed = JSON.parse(json); } catch { setImpMsg({ ok: false, text: 'JSON no válido' }); return; }
     if (!Array.isArray(parsed)) { setImpMsg({ ok: false, text: 'Debe ser una lista [ ... ]' }); return; }
     try {
-      const r = await api<{ created: number; duplicadas: number; total: number; errors: Array<{ fila: number }>; posibleReimport: boolean }>(`/api/admin/banks/${selBank}/import`, { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) });
+      const r = await api<{ created: number; duplicadas: number; total: number; errors: Array<{ fila: number }>; posibleReimport: boolean }>(`/api/banks/${selBank}/import`, { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) });
       const partes = [`Creadas ${r.created}/${r.total}`];
       if (r.duplicadas > 0) partes.push(`${r.duplicadas} duplicadas omitidas`);
       if (r.errors.length) partes.push(`errores en filas: ${r.errors.map((e) => e.fila).join(', ')}`);
@@ -162,12 +166,16 @@ export default function BancosPage() {
     <AppShell
       user={user}
       title="Bancos de preguntas"
-      nav={[
+      nav={user.role === 'super_admin' ? [
         { label: 'Resumen', href: '/admin' },
         { label: 'Cursos', href: '/admin/cursos' },
         { label: 'Preguntas', href: '/admin/preguntas' },
         { label: 'Bancos', href: '/admin/bancos', active: true },
         { label: 'Desafíos', href: '/admin/desafios' },
+      ] : [
+        { label: 'Mis cursos', href: '/admin/cursos' },
+        { label: 'Mis bancos', href: '/admin/bancos', active: true },
+        { label: 'Perfil', href: '/admin/perfil' },
       ]}
     >
       <div className="grid grid-2">
@@ -223,6 +231,14 @@ export default function BancosPage() {
               </div>
             </div>
 
+            <div className="form-group">
+              <label className="form-label">Visibilidad</label>
+              <select className="form-select" value={visibility} onChange={(e) => setVisibility(e.target.value as 'privado' | 'publico')}>
+                <option value="privado">Privado — solo yo</option>
+                <option value="publico">Público — otros profesores pueden usarlo como fuente (no descargarlo)</option>
+              </select>
+            </div>
+
             {shape.official && (
               <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, marginBottom: 12 }}>
                 <input type="checkbox" checked={official} onChange={(e) => setOfficial(e.target.checked)} /> Preguntas oficiales (no pool)
@@ -261,6 +277,8 @@ export default function BancosPage() {
                           b.anio || null,
                           b.comunidad_autonoma,
                           b.categoria_profesional,
+                          b.mine ? 'mío' : 'público',
+                          b.visibility === 'privado' ? 'privado' : null,
                           b.official ? 'oficial' : null,
                           b.sim_questions ? `sim ${b.sim_questions}p/${b.sim_minutes ?? '∞'}min` : null,
                         ].filter(Boolean).join(' · ')}
@@ -269,10 +287,18 @@ export default function BancosPage() {
                     <td>{b.questions}</td>
                     <td>
                       <div className="row-actions">
-                        <button className="link-action" onClick={() => loadTemas(b.id)} title="Importar preguntas y ver temas">Importar</button>
-                        <button className="link-action" onClick={() => startEdit(b)} title="Editar la ficha del banco">Editar</button>
-                        <button className="link-action" onClick={() => download(b)} title="Descargar las preguntas en JSON">Descargar</button>
-                        <button className="link-action danger" onClick={() => removeBank(b)} title="Borrar el banco y sus preguntas">Borrar</button>
+                        {b.canManage ? (
+                          <>
+                            <button className="link-action" onClick={() => loadTemas(b.id)} title="Importar preguntas y ver temas">Importar</button>
+                            <button className="link-action" onClick={() => startEdit(b)} title="Editar la ficha del banco">Editar</button>
+                            <button className="link-action" onClick={() => download(b)} title="Descargar las preguntas en JSON">Descargar</button>
+                            <button className="link-action danger" onClick={() => removeBank(b)} title="Borrar el banco y sus preguntas">Borrar</button>
+                          </>
+                        ) : (
+                          <span className="muted" style={{ fontSize: 12 }} title="Puedes usarlo como fuente de preguntas en tus exámenes">
+                            Solo como fuente
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

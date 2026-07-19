@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../config/database.js';
-import { badRequest, notFound } from '../utils/httpError.js';
+import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 
 function norm(s: unknown): string {
   return String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -19,8 +19,25 @@ function resolveCorrect(v: unknown, n: number): number | null {
   return null;
 }
 
+/**
+ * Reglas de acceso a un banco:
+ *  · super_admin: todo.
+ *  · profesor: control total sobre LOS SUYOS; los públicos solo puede verlos y
+ *    usarlos como fuente de preguntas (no editar, borrar ni descargar).
+ */
+async function assertBankOwner(req: Request, bankId: string): Promise<void> {
+  if (req.auth!.role === 'super_admin') return;
+  const { rows } = await query<{ created_by: string | null }>(
+    'SELECT created_by FROM question_banks WHERE id = $1', [bankId],
+  );
+  if (rows.length === 0) throw notFound('Banco no encontrado');
+  if (rows[0].created_by !== req.auth!.sub) {
+    throw forbidden('Este banco no es tuyo. Puedes usarlo como fuente de preguntas, pero no modificarlo ni descargarlo.');
+  }
+}
+
 // ---------------------------------------------------------------------------
-// super_admin: create / list banks
+// create / list banks
 // ---------------------------------------------------------------------------
 /**
  * Los bancos tienen dos "dimensiones" genéricas que se etiquetan distinto según
@@ -43,22 +60,26 @@ const createSchema = z.object({
   simQuestions: z.number().int().min(1).max(300).nullable().optional(),
   simMinutes: z.number().int().min(1).max(600).nullable().optional(),
   simPassPct: z.number().int().min(0).max(100).nullable().optional(),
+  visibility: z.enum(['privado', 'publico']).optional(),
 });
 
 export async function createBank(req: Request, res: Response): Promise<void> {
   const d = createSchema.parse(req.body);
+  // Un profesor crea sus bancos en privado salvo que indique lo contrario.
+  const visibility = d.visibility ?? (req.auth!.role === 'super_admin' ? 'publico' : 'privado');
   const { rows } = await query(
-    `INSERT INTO question_banks (name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, sim_questions, sim_minutes, sim_pass_pct`,
+    `INSERT INTO question_banks (name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct, created_by, visibility)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, sim_questions, sim_minutes, sim_pass_pct, visibility`,
     [d.name, d.kind, d.comunidadAutonoma ?? null, d.anio ?? null, d.categoriaProfesional ?? null, d.official, d.descripcion ?? null,
-      d.simQuestions ?? null, d.simMinutes ?? null, d.simPassPct ?? null],
+      d.simQuestions ?? null, d.simMinutes ?? null, d.simPassPct ?? null, req.auth!.sub, visibility],
   );
   res.status(201).json({ bank: rows[0] });
 }
 
 /** Editar un banco. Solo se tocan los campos enviados (null = limpiar). */
 export async function updateBank(req: Request, res: Response): Promise<void> {
+  await assertBankOwner(req, req.params.id);
   const d = createSchema.partial().parse(req.body);
   const map: Record<string, unknown> = {
     name: d.name,
@@ -90,6 +111,7 @@ export async function updateBank(req: Request, res: Response): Promise<void> {
 
 /** Borra un banco y todas sus preguntas. */
 export async function deleteBank(req: Request, res: Response): Promise<void> {
+  await assertBankOwner(req, req.params.id);
   const bank = await query('SELECT 1 FROM question_banks WHERE id = $1', [req.params.id]);
   if (bank.rows.length === 0) throw notFound('Banco no encontrado');
   await query('DELETE FROM questions WHERE bank_id = $1', [req.params.id]);
@@ -99,6 +121,8 @@ export async function deleteBank(req: Request, res: Response): Promise<void> {
 
 /** Descarga las preguntas del banco en JSON (mismo formato que la importación). */
 export async function exportBank(req: Request, res: Response): Promise<void> {
+  // Los bancos públicos NO se descargan: solo se usan como fuente de preguntas.
+  await assertBankOwner(req, req.params.id);
   const bank = await query<{ name: string }>('SELECT name FROM question_banks WHERE id = $1', [req.params.id]);
   if (bank.rows.length === 0) throw notFound('Banco no encontrado');
 
@@ -119,14 +143,21 @@ export async function exportBank(req: Request, res: Response): Promise<void> {
   res.send(JSON.stringify(data, null, 2));
 }
 
-export async function listBanks(_req: Request, res: Response): Promise<void> {
+export async function listBanks(req: Request, res: Response): Promise<void> {
+  const isSuper = !req.auth || req.auth.role === 'super_admin';
+  const uid = req.auth?.sub ?? null;
   const { rows } = await query(
     `SELECT b.id, b.name, b.kind, b.comunidad_autonoma, b.anio, b.categoria_profesional, b.official, b.descripcion,
-            b.sim_questions, b.sim_minutes, b.sim_pass_pct,
+            b.sim_questions, b.sim_minutes, b.sim_pass_pct, b.visibility, b.created_by,
+            ($2::uuid IS NOT NULL AND b.created_by = $2) AS mine,
             (SELECT COUNT(*) FROM questions q WHERE q.bank_id = b.id) AS questions
-     FROM question_banks b ORDER BY (b.kind = 'rcp') DESC, b.created_at DESC`,
+     FROM question_banks b
+     WHERE $1::boolean OR b.visibility = 'publico' OR b.created_by = $2
+     ORDER BY (b.created_by = $2) DESC NULLS LAST, (b.kind = 'rcp') DESC, b.created_at DESC`,
+    [isSuper, uid],
   );
-  res.json({ banks: rows });
+  // canManage: puede editar, borrar y descargar (solo el dueño o el super admin)
+  res.json({ banks: rows.map((b) => ({ ...b, canManage: isSuper || b.mine === true })) });
 }
 
 /** Temas de un banco con nº de preguntas (para elegir en la práctica). */
@@ -143,6 +174,7 @@ export async function getBankTemas(req: Request, res: Response): Promise<void> {
 // super_admin: import questions (JSON) into a bank, with tema
 // ---------------------------------------------------------------------------
 export async function importBankQuestions(req: Request, res: Response): Promise<void> {
+  await assertBankOwner(req, req.params.id);
   const bank = await query('SELECT 1 FROM question_banks WHERE id = $1', [req.params.id]);
   if (bank.rows.length === 0) throw notFound('Banco no encontrado');
 
