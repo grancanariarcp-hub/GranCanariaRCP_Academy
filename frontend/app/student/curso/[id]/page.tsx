@@ -11,7 +11,7 @@ import { CourseSurvey } from '@/components/CourseSurvey';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
 import { MyAttendance } from '@/components/MyAttendance';
-import { PayEnrollment } from '@/components/PayEnrollment';
+import { PaymentGate } from '@/components/PaymentGate';
 
 interface Activity {
   id: string;
@@ -47,6 +47,7 @@ export default function StudentCoursePage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [certAvailable, setCertAvailable] = useState(false);
   const [matricula, setMatricula] = useState<{ estado: string; importeCents: number } | null>(null);
+  const [bloqueadoPorPago, setBloqueadoPorPago] = useState(false);
   const [progress, setProgress] = useState<{ total: number; completed: number; pct: number } | null>(null);
   const [time, setTime] = useState<{ activeHours: number; sessionHours: number; focusPct: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +56,11 @@ export default function StudentCoursePage() {
     if (!user) return;
     api<{ course: Course; modules: Module[]; certificateAvailable: boolean; progress: { total: number; completed: number; pct: number }; matricula: { estado: string; importeCents: number } }>(`/api/student/courses/${courseId}`, { auth: true })
       .then((r) => { setCourse(r.course); setModules(r.modules); setCertAvailable(r.certificateAvailable); setProgress(r.progress); setMatricula(r.matricula); })
-      .catch((err) => setError(err instanceof ApiError ? err.message : 'Error cargando el curso'));
+      .catch((err) => {
+        // El servidor no sirve el contenido hasta que la matrícula está pagada.
+        if (err instanceof ApiError && err.code === 'PAYMENT_REQUIRED') setBloqueadoPorPago(true);
+        else setError(err instanceof ApiError ? err.message : 'Error cargando el curso');
+      });
     api<{ activeHours: number; sessionHours: number; focusPct: number | null }>(`/api/profile/time?courseId=${courseId}`, { auth: true })
       .then(setTime).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,11 +92,20 @@ export default function StudentCoursePage() {
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
+  // Matrícula sin pagar: no se muestra nada del curso, solo la vía para pagar.
+  if (bloqueadoPorPago) {
+    return (
+      <AppShell user={user} title="Matrícula pendiente" nav={[{ label: 'Inicio', href: '/student', active: true }]}>
+        <PageNav backHref="/student" backLabel="Volver a mis cursos" />
+        <PaymentGate courseId={courseId} />
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={[{ label: 'Inicio', href: '/student', active: true }]}>
       <TimeTracker courseId={courseId} />
       <MyAttendance courseId={courseId} />
-      {matricula && <PayEnrollment courseId={courseId} estado={matricula.estado} importeCents={matricula.importeCents} />}
       <PageNav backHref="/student" backLabel="Volver a mis cursos" />
       {error && <div className="alert alert-error">{error}</div>}
 

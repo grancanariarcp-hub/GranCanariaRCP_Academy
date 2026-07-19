@@ -26,7 +26,11 @@ interface Course {
   cfc: string | null;
   thumbnail_url?: string;
   enrollment_open: boolean;
+  /** Precio vigente calculado en el servidor (tramo anticipado o recargado). */
+  precio?: { cents: number; earlyCents: number; lateCents: number; esAnticipada: boolean; hasta: string | null };
 }
+
+const euros = (cents: number) => (cents / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 interface Staff {
   id: string;
   name: string;
@@ -42,6 +46,7 @@ export default function PublicCoursePage() {
   const courseId = params.id as string;
   const [course, setCourse] = useState<Course | null>(null);
   const [staff, setStaff] = useState<Staff[]>([]);
+  const [enrolando, setEnrolando] = useState(false);
   const [program, setProgram] = useState<Mod[]>([]);
   const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
   const [error, setError] = useState<string | null>(null);
@@ -59,13 +64,32 @@ export default function PublicCoursePage() {
   const puedeEditar = user?.role === 'super_admin' || user?.role === 'profesor';
   const isStudent = user?.role === 'student';
 
+  /**
+   * Matricularse. Si el curso es de pago, se va directo a la pasarela: el
+   * acceso al contenido exige haber pagado, así que no tiene sentido dejar al
+   * alumno dentro de la plataforma con una matrícula a medias.
+   */
   async function enroll() {
     setMsg(null);
+    setEnrolando(true);
     try {
       await api(`/api/student/enroll/${courseId}`, { method: 'POST', auth: true });
+      const precioCents = course?.precio?.cents ?? course?.price_cents ?? 0;
+      if (precioCents > 0) {
+        const pago = await api<{ url: string }>(`/api/student/courses/${courseId}/checkout`, { method: 'POST', auth: true });
+        window.location.href = pago.url;
+        return;
+      }
       router.push('/student');
     } catch (err) {
-      setMsg(err instanceof ApiError ? err.message : 'Error al matricular');
+      // Si falla justo el cobro, la matrícula queda pendiente y se puede
+      // reintentar desde "Mis cursos": no se pierde nada.
+      setMsg(
+        err instanceof ApiError && err.code === 'STRIPE_NOT_CONFIGURED'
+          ? 'El pago con tarjeta aún no está disponible. Ponte en contacto con la organización.'
+          : err instanceof ApiError ? err.message : 'Error al matricular',
+      );
+      setEnrolando(false);
     }
   }
 
@@ -107,7 +131,14 @@ export default function PublicCoursePage() {
               <div className="info-box">⏱️ <strong>Duración:</strong> {course.duration_hours ? `${course.duration_hours} h` : '—'}</div>
               <div className="info-box">
                 💶 <strong>Coste:</strong>{' '}
-                {course.price_cents > 0 ? `${(course.price_cents / 100).toFixed(2)} €` : 'Gratis'}
+                {(course.precio?.cents ?? course.price_cents) > 0 ? euros(course.precio?.cents ?? course.price_cents) : 'Gratis'}
+                {/* Con matrícula anticipada vigente, mostrar el precio posterior
+                    da urgencia real sin necesidad de inventar una promoción. */}
+                {course.precio?.esAnticipada && course.precio.lateCents > course.precio.cents && (
+                  <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>
+                    Después: {euros(course.precio.lateCents)}
+                  </div>
+                )}
               </div>
               {course.acreditacion && <div className="info-box">🏛️ <strong>Acredita:</strong> {course.acreditacion}</div>}
               {course.cfc && <div className="info-box">🎖️ <strong>CFC:</strong> {course.cfc}</div>}
@@ -193,9 +224,23 @@ export default function PublicCoursePage() {
                 {!isStudent && <><Link href="/registro">Regístrate</Link> para no perdértela.</>}
               </div>
             ) : isStudent ? (
-              <button className="btn btn-primary btn-full" onClick={enroll}>
-                {course.price_cents > 0 ? 'Matricularme (pago)' : 'Matricularme gratis'}
-              </button>
+              <>
+                <button className="btn btn-primary btn-full press" onClick={enroll} disabled={enrolando}>
+                  {enrolando
+                    ? 'Preparando…'
+                    : (course.precio?.cents ?? course.price_cents) > 0
+                      ? `Matricularme y pagar ${euros(course.precio?.cents ?? course.price_cents)}`
+                      : 'Matricularme gratis'}
+                </button>
+                {(course.precio?.cents ?? course.price_cents) > 0 && (
+                  <p className="muted" style={{ fontSize: 12, textAlign: 'center', marginTop: 8 }}>
+                    Pago seguro con tarjeta. El acceso al curso se activa al confirmarse el pago.
+                    {course.precio?.esAnticipada && course.precio.hasta && (
+                      <> Precio de matrícula anticipada hasta el {new Date(course.precio.hasta).toLocaleDateString('es-ES')}.</>
+                    )}
+                  </p>
+                )}
+              </>
             ) : (
               <div className="info-box" style={{ textAlign: 'center' }}>
                 Para matricularte, <Link href="/login">accede</Link> o <Link href="/registro">regístrate</Link>.

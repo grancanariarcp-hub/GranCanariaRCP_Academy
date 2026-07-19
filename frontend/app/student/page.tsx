@@ -84,9 +84,21 @@ export default function StudentDashboard() {
                 <div style={{ fontWeight: 600 }}>{c.title}</div>
                 <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>
                   {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')} ·{' '}
-                  <span className={`badge ${c.status === 'completado' ? 'badge-success' : c.status === 'pendiente_pago' ? 'badge-warning' : 'badge-primary'}`}>{c.status}</span>
+                  <span className={`badge ${c.status === 'completado' ? 'badge-success' : c.status === 'pendiente_pago' ? 'badge-warning' : 'badge-primary'}`}>
+                    {c.status === 'pendiente_pago' ? 'pendiente de pago' : c.status}
+                  </span>
                 </div>
-                <Link className="btn btn-primary btn-small" href={`/student/curso/${c.id}`}>Entrar al curso</Link>
+                {/* Sin pagar no se entra al curso: el botón lleva a completar el pago. */}
+                {c.status === 'pendiente_pago' ? (
+                  <>
+                    <Link className="btn btn-primary btn-small" href={`/student/curso/${c.id}`}>Completar el pago</Link>
+                    <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                      El contenido se abre al confirmarse el pago.
+                    </p>
+                  </>
+                ) : (
+                  <Link className="btn btn-primary btn-small" href={`/student/curso/${c.id}`}>Entrar al curso</Link>
+                )}
               </div>
             ))}
           </div>

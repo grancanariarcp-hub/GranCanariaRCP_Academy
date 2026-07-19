@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { query } from '../config/database.js';
-import { badRequest, forbidden, notFound } from '../utils/httpError.js';
+import { badRequest, forbidden, notFound, HttpError } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { withImageUrls } from '../services/r2.js';
@@ -136,6 +136,12 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
   );
   if (enr.rows.length === 0) throw forbidden('No estás matriculado en este curso');
   const matricula = enr.rows[0];
+
+  // El contenido no se sirve hasta que la matrícula está pagada: si no, bastaba
+  // con matricularse y entrar para acceder a todo el curso sin pasar por caja.
+  if (matricula.status === 'pendiente_pago') {
+    throw new HttpError(402, 'Debes completar el pago de la matrícula para acceder al curso', 'PAYMENT_REQUIRED');
+  }
 
   const course = await query('SELECT id, title, tema, subtema, modality, objetivo_general FROM courses WHERE id = $1', [courseId]);
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
