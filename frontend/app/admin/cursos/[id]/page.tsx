@@ -73,6 +73,11 @@ export default function CourseDetailPage() {
     examenes: { aprobados: string; presentados: string };
     pendientes: Array<{ activity_id: string; title: string; type: string; pendientes: string }>;
   }>(null);
+  const [cfc, setCfc] = useState<null | {
+    checks: Array<{ clave: string; titulo: string; estado: 'ok' | 'aviso' | 'falta'; detalle: string; comoMejorar?: string }>;
+    resumen: { ok: number; avisos: number; faltan: number; total: number };
+    aviso: string;
+  }>(null);
   const [dur, setDur] = useState<null | {
     parametros: { minPerPage: number; wordsPerMin: number; minPerQuestion: number };
     porTipo: Record<string, number>; totalMinutos: number; totalHoras: number;
@@ -127,6 +132,8 @@ export default function CourseDetailPage() {
         .then((r) => setDur(r)).catch(() => {});
       api<typeof cdash>(`/api/courses/${courseId}/dashboard`, { auth: true })
         .then((r) => setCdash(r)).catch(() => {});
+      api<typeof cfc>(`/api/courses/${courseId}/cfc`, { auth: true })
+        .then((r) => setCfc(r)).catch(() => {});
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
@@ -531,6 +538,34 @@ export default function CourseDetailPage() {
                 Estimación: {dur.parametros.minPerPage} min por página de documento · {dur.parametros.wordsPerMin} palabras/min de lectura ·
                 {' '}{dur.parametros.minPerQuestion} min por pregunta en tests sin límite de tiempo. Los exámenes con tiempo configurado usan ese tiempo.
               </p>
+            </div>
+          )}
+
+          {/* Asistente CFC */}
+          {cfc && (
+            <div className="card animate-in" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <div className="card-title">Asistente de acreditación (CFC)</div>
+                <div className="card-subtitle">
+                  {cfc.resumen.ok}/{cfc.resumen.total} cumplidos · {cfc.resumen.avisos} a revisar · {cfc.resumen.faltan} pendientes
+                </div>
+              </div>
+              <div style={{ height: 10, background: 'var(--gray-200)', borderRadius: 999, overflow: 'hidden', marginBottom: 14 }}>
+                <div style={{ width: `${Math.round((cfc.resumen.ok / cfc.resumen.total) * 100)}%`, height: '100%', background: 'linear-gradient(90deg,#2c5282,#22c55e)', transition: 'width .5s ease' }} />
+              </div>
+              {cfc.checks.map((ch) => (
+                <div key={ch.clave} style={{ display: 'flex', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--gray-200)' }}>
+                  <span style={{ fontSize: 16, lineHeight: 1.2 }}>{ch.estado === 'ok' ? '✅' : ch.estado === 'aviso' ? '⚠️' : '❌'}</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{ch.titulo}</div>
+                    <div className="muted" style={{ fontSize: 13 }}>{ch.detalle}</div>
+                    {ch.estado !== 'ok' && ch.comoMejorar && (
+                      <div style={{ fontSize: 12.5, marginTop: 3, color: 'var(--secondary-dark)' }}>→ {ch.comoMejorar}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>{cfc.aviso}</p>
             </div>
           )}
 
