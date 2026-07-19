@@ -111,10 +111,23 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
     [req.params.id],
   );
   if (rows.length === 0) throw notFound('Curso no encontrado');
-  const staff = await query(
-    `SELECT u.id, u.name, u.headline, cs.role FROM course_staff cs JOIN users u ON u.id = cs.user_id WHERE cs.course_id = $1`,
+  // Profesorado del curso con su ficha: el director primero, porque es quien
+  // responde de la actividad ante la comisión y ante el alumnado.
+  const staffRows = await query<{ id: string; name: string; headline: string | null; role: string; photo_key: string | null }>(
+    `SELECT u.id, u.name, u.headline, u.photo_key, cs.role
+       FROM course_staff cs JOIN users u ON u.id = cs.user_id
+      WHERE cs.course_id = $1
+      ORDER BY CASE cs.role WHEN 'director' THEN 0 ELSE 1 END, u.name`,
     [req.params.id],
   );
+  // Se devuelve una forma estable y sin la clave interna de almacenamiento.
+  const staffConFoto = await presignKeys(staffRows.rows, 'photo_key', 'photo_url');
+  const staff = {
+    rows: staffConFoto.map((u) => ({
+      id: u.id, name: u.name, headline: u.headline, role: u.role,
+      photo_url: (u as { photo_url?: string }).photo_url ?? null,
+    })),
+  };
   // Programa público: módulos con los títulos de sus actividades (temas).
   const program = await query<{ id: string; title: string }>(
     `SELECT m.id, m.title,

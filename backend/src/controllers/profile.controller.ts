@@ -264,17 +264,26 @@ export async function deleteCvItem(req: Request, res: Response): Promise<void> {
  * quienes tienen titular relleno, para no mostrar fichas a medias.
  */
 export async function listPublicProfessors(_req: Request, res: Response): Promise<void> {
-  const { rows } = await query<{ id: string; name: string; headline: string | null; photo_key: string | null }>(
-    `SELECT id, name, headline, photo_key
-       FROM users
-      WHERE role = 'profesor' AND status = 'active' AND headline IS NOT NULL AND headline <> ''
-      ORDER BY created_at
+  // Solo el profesorado con curso VIVO: publicado y aún no terminado, esté la
+  // matrícula abierta o no. Al cerrarse el curso deja de aparecer solo, sin que
+  // nadie tenga que acordarse de retirarlo.
+  const { rows } = await query<{ id: string; name: string; headline: string | null; photo_key: string | null; cursos: string }>(
+    `SELECT u.id, u.name, u.headline, u.photo_key, COUNT(DISTINCT c.id)::text AS cursos
+       FROM users u
+       JOIN course_staff cs ON cs.user_id = u.id
+       JOIN courses c ON c.id = cs.course_id
+      WHERE u.role = 'profesor' AND u.status = 'active'
+        AND c.status = 'publicado'
+        AND (c.ends_at IS NULL OR c.ends_at >= CURRENT_DATE)
+      GROUP BY u.id
+      ORDER BY MIN(c.starts_at) NULLS LAST, u.name
       LIMIT 12`,
   );
   const profesores = await Promise.all(rows.map(async (u) => ({
     id: u.id,
     name: u.name,
     headline: u.headline,
+    cursos: Number(u.cursos),
     photo_url: u.photo_key && r2Configured() ? await presignedGetUrl(u.photo_key, 3600) : null,
   })));
   res.json({ profesores });

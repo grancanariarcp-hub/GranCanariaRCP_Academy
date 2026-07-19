@@ -32,6 +32,7 @@ interface Staff {
   name: string;
   headline: string | null;
   role: string;
+  photo_url?: string | null;
 }
 interface Mod { title: string; activities: Array<{ type: string; title: string }> }
 
@@ -138,16 +139,49 @@ export default function PublicCoursePage() {
                 ))}
               </div>
             )}
+            {/* Profesorado del curso: quién lo dirige y quién lo imparte, con
+                acceso a su currículum. Es lo que más pesa al decidir una
+                formación sanitaria. */}
             {staff.length > 0 && (
-              <p style={{ marginBottom: 16 }}>
-                <strong>Docentes:</strong>{' '}
-                {staff.map((s, i) => (
-                  <span key={s.id}>
-                    {i > 0 ? ', ' : ''}
-                    <Link href={`/profesor/${s.id}`}>{s.name}</Link>{s.headline ? ` (${s.headline})` : ''}
-                  </span>
-                ))}
-              </p>
+              <div style={{ marginBottom: 20 }}>
+                <h3 style={{ fontSize: 16, marginBottom: 10 }}>Profesorado</h3>
+                <div className="grid grid-2" style={{ gap: 10 }}>
+                  {staff.map((s) => (
+                    <Link key={s.id} href={`/profesor/${s.id}`} className="press"
+                      style={{
+                        display: 'flex', gap: 11, alignItems: 'center', textDecoration: 'none',
+                        padding: 11, borderRadius: 10, border: '1px solid var(--gray-200)',
+                        background: s.role === 'director' ? 'var(--gray-100)' : '#fff',
+                      }}>
+                      <div style={{
+                        width: 46, height: 46, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
+                        background: 'linear-gradient(135deg,var(--primary-dark),var(--secondary-dark))',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontWeight: 700, fontSize: 15,
+                      }}>
+                        {s.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={s.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          s.name.split(' ').slice(0, 2).map((n) => n[0]).join('')
+                        )}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--gray-900)' }}>{s.name}</div>
+                        {s.headline && <div className="muted" style={{ fontSize: 12.5 }}>{s.headline}</div>}
+                        <div style={{ marginTop: 4 }}>
+                          <span className={`badge ${s.role === 'director' ? 'badge-primary' : ''}`} style={{ fontSize: 11 }}>
+                            {s.role === 'director' ? 'Director del curso' : 'Docente'}
+                          </span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+                <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                  Pulsa sobre cada docente para consultar su currículum.
+                </p>
+              </div>
             )}
 
             {msg && <div className="alert alert-error">{msg}</div>}

@@ -332,7 +332,8 @@ export default function CampusPage() {
               <span className="heading-underline">Quién imparte la formación</span>
             </h2>
             <p className="muted" style={{ textAlign: 'center', marginBottom: 20, fontSize: 14 }}>
-              Profesionales sanitarios en activo, con su currículum publicado y consultable.
+              Profesionales sanitarios en activo que imparten los cursos en marcha, con su currículum
+              publicado y consultable.
             </p>
             <div className="grid grid-4" style={{ marginBottom: 44 }}>
               {profes.map((p, i) => (
