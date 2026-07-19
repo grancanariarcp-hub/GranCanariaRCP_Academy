@@ -53,6 +53,9 @@ export default function PublicCoursePage() {
   }, [courseId]);
 
   const user = typeof window !== 'undefined' ? getUser() : null;
+  // El curso se puede editar en cualquier estado, también publicado: la ficha
+  // se cierra al firmar el acta, no al publicarla.
+  const puedeEditar = user?.role === 'super_admin' || user?.role === 'profesor';
   const isStudent = user?.role === 'student';
 
   async function enroll() {
@@ -69,6 +72,14 @@ export default function PublicCoursePage() {
     <div style={{ minHeight: '100vh', padding: '32px 16px' }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
         <PageNav />
+        {/* Atajo a la edición para quien gestiona el curso: la ficha pública es
+            un punto de entrada habitual y no tenía vuelta al panel. */}
+        {puedeEditar && (
+          <div className="card" style={{ marginBottom: 14, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderLeft: '4px solid var(--secondary-dark)' }}>
+            <span className="muted" style={{ fontSize: 13 }}>Estás viendo la ficha pública de este curso.</span>
+            <Link href={`/admin/cursos/${courseId}`} className="btn btn-primary btn-small press">Editar curso</Link>
+          </div>
+        )}
         {error && <div className="alert alert-error">{error}</div>}
         {!course ? (
           !error && <div className="muted">Cargando…</div>

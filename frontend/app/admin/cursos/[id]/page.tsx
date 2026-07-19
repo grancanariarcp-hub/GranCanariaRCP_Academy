@@ -10,6 +10,7 @@ import { ExamWizard } from '@/components/ExamWizard';
 import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
 import { AttendancePanel } from '@/components/AttendancePanel';
+import { adminNav } from '@/lib/nav';
 
 interface Activity {
   id: string;
@@ -114,6 +115,7 @@ export default function CourseDetailPage() {
   const [f2c, setF2c] = useState('');
   const [certMsg, setCertMsg] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null); // moduleId
+  const [subiendoDoc, setSubiendoDoc] = useState(false);
   const [actType, setActType] = useState<'documento' | 'video' | 'enlace' | 'texto' | 'imagen' | 'test' | 'examen'>('documento');
   const [actTitle, setActTitle] = useState('');
   const [actUrl, setActUrl] = useState('');
@@ -131,7 +133,7 @@ export default function CourseDetailPage() {
     try {
       const [c, d] = await Promise.all([
         api<{ course: Course; modules: Module[]; staff: Staff[]; gallery: Array<{ id: string; url: string }> }>(`/api/courses/${courseId}`, { auth: true }),
-        api<{ documents: Array<{ id: string; title: string }> }>('/api/admin/documents', { auth: true }).catch(() => ({ documents: [] })),
+        api<{ documents: Array<{ id: string; title: string }> }>('/api/documents', { auth: true }).catch(() => ({ documents: [] })),
       ]);
       setCourse(c.course);
       setGallery(c.gallery ?? []);
@@ -323,6 +325,29 @@ export default function CourseDetailPage() {
       setError(err instanceof ApiError ? err.message : 'Error al subir la imagen');
     }
   }
+  /**
+   * Sube un PDF a la biblioteca de documentos y lo deja ya elegido para la
+   * actividad. Antes solo se podía escoger de un desplegable, así que había que
+   * ir a otra pantalla a subirlo primero.
+   */
+  async function uploadDocAndSelect(file: File | undefined) {
+    if (!file) return;
+    if (file.type !== 'application/pdf') { setError('El documento debe ser un PDF'); return; }
+    setSubiendoDoc(true);
+    setError(null);
+    try {
+      const r = await uploadFile<{ document: { id: string; title: string } }>(
+        '/api/documents', file, { title: actTitle.trim() || file.name.replace(/\.pdf$/i, ''), kind: 'otro' },
+      );
+      setDocs((prev) => [{ id: r.document.id, title: r.document.title }, ...prev]);
+      setActDoc(r.document.id);
+      if (!actTitle.trim()) setActTitle(r.document.title);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al subir el documento');
+    } finally {
+      setSubiendoDoc(false);
+    }
+  }
   async function deleteActivity(activityId: string) {
     await api(`/api/courses/${courseId}/activities/${activityId}`, { method: 'DELETE', auth: true });
     load();
@@ -342,10 +367,7 @@ export default function CourseDetailPage() {
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
-  const nav =
-    user.role === 'super_admin'
-      ? [{ label: 'Cursos', href: '/admin/cursos', active: true }, { label: 'Profesores', href: '/admin/profesores' }]
-      : [{ label: 'Mis cursos', href: '/admin/cursos', active: true }];
+  const nav = adminNav(user.role, '/admin/cursos');
 
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={nav}>
@@ -727,10 +749,23 @@ export default function CourseDetailPage() {
                         <input className="form-input" placeholder="Título de la actividad" value={actTitle} onChange={(e) => setActTitle(e.target.value)} style={{ marginBottom: 8 }} />
                       )}
                       {actType === 'documento' && (
-                        <select className="form-select" value={actDoc} onChange={(e) => setActDoc(e.target.value)} style={{ marginBottom: 8 }}>
-                          <option value="">Elige un documento…</option>
-                          {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
-                        </select>
+                        <div style={{ marginBottom: 8 }}>
+                          <label className={`btn btn-primary btn-small btn-full ${subiendoDoc ? 'disabled' : ''}`} style={{ cursor: subiendoDoc ? 'wait' : 'pointer' }}>
+                            {subiendoDoc ? 'Subiendo…' : '📄 Subir un PDF desde mi equipo'}
+                            <input type="file" accept="application/pdf,.pdf" style={{ display: 'none' }} disabled={subiendoDoc}
+                              onChange={(e) => { uploadDocAndSelect(e.target.files?.[0]); e.target.value = ''; }} />
+                          </label>
+                          {docs.length > 0 && (
+                            <>
+                              <p className="muted" style={{ fontSize: 12, textAlign: 'center', margin: '8px 0 6px' }}>o elige uno ya subido</p>
+                              <select className="form-select" value={actDoc} onChange={(e) => setActDoc(e.target.value)}>
+                                <option value="">Documentos de la biblioteca…</option>
+                                {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                              </select>
+                            </>
+                          )}
+                          {actDoc && <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>✓ Documento seleccionado</p>}
+                        </div>
                       )}
                       {(actType === 'video' || actType === 'enlace') && (
                         <input className="form-input" placeholder="https://…" value={actUrl} onChange={(e) => setActUrl(e.target.value)} style={{ marginBottom: 8 }} />
@@ -748,7 +783,7 @@ export default function CourseDetailPage() {
                         <ExamWizard courseId={courseId} moduleId={m.id} onCreated={() => { setAddingTo(null); load(); }} />
                       )}
                       {actType !== 'imagen' && actType !== 'test' && actType !== 'examen' && (
-                        <button className="btn btn-primary btn-small btn-full" onClick={() => addActivity(m.id)} disabled={!actTitle.trim()}>
+                        <button className="btn btn-primary btn-small btn-full" onClick={() => addActivity(m.id)} disabled={!actTitle.trim() || (actType === 'documento' && !actDoc)}>
                           Añadir
                         </button>
                       )}

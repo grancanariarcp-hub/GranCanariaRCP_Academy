@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
+import { adminNav } from '@/lib/nav';
 
 interface Course {
   id: string;
@@ -103,20 +104,7 @@ export default function CursosPage() {
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
-  const nav =
-    user.role === 'super_admin'
-      ? [
-          { label: 'Resumen', href: '/admin' },
-          { label: 'Cursos', href: '/admin/cursos', active: true },
-          { label: 'Preguntas', href: '/admin/preguntas' },
-          { label: 'Documentos', href: '/admin/documentos' },
-          { label: 'Profesores', href: '/admin/profesores' },
-          { label: 'Perfil', href: '/admin/perfil' },
-        ]
-      : [
-          { label: 'Mis cursos', href: '/admin/cursos', active: true },
-          { label: 'Perfil', href: '/admin/perfil' },
-        ];
+  const nav = adminNav(user.role, '/admin/cursos');
 
   return (
     <AppShell user={user} title="Cursos" nav={nav}>

@@ -5,6 +5,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api } from '@/lib/api';
 import { getToken } from '@/lib/auth';
+import { adminNav } from '@/lib/nav';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
 
@@ -38,7 +39,7 @@ export default function DocumentosPage() {
 
   async function loadDocs() {
     try {
-      const r = await api<{ documents: DocRow[] }>('/api/admin/documents', { auth: true });
+      const r = await api<{ documents: DocRow[] }>('/api/documents', { auth: true });
       setDocs(r.documents);
     } catch {
       /* ignore */
@@ -62,7 +63,7 @@ export default function DocumentosPage() {
       fd.append('file', file);
       fd.append('title', title);
       fd.append('kind', kind);
-      const res = await fetch(`${API_URL}/api/admin/documents`, {
+      const res = await fetch(`${API_URL}/api/documents`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${getToken()}` },
         body: fd,
@@ -85,7 +86,7 @@ export default function DocumentosPage() {
 
   async function view(id: string) {
     try {
-      const r = await api<{ url: string }>(`/api/admin/documents/${id}/url`, { auth: true });
+      const r = await api<{ url: string }>(`/api/documents/${id}/url`, { auth: true });
       window.open(r.url, '_blank');
     } catch {
       alert('No se pudo abrir el documento');
@@ -98,11 +99,7 @@ export default function DocumentosPage() {
     <AppShell
       user={user}
       title="Documentos"
-      nav={[
-        { label: 'Resumen', href: '/admin' },
-        { label: 'Preguntas', href: '/admin/preguntas' },
-        { label: 'Documentos', href: '/admin/documentos', active: true },
-      ]}
+      nav={adminNav(user.role, '/admin/documentos')}
     >
       <div className="grid grid-2">
         <div className="card">

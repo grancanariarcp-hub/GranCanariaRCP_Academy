@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
+import { adminNav } from '@/lib/nav';
 
 interface Challenge {
   id: string;
@@ -96,14 +97,7 @@ export default function AdminDesafiosPage() {
     <AppShell
       user={user}
       title="Desafíos"
-      nav={[
-        { label: 'Resumen', href: '/admin' },
-        { label: 'Cursos', href: '/admin/cursos' },
-        { label: 'Preguntas', href: '/admin/preguntas' },
-        { label: 'Bancos', href: '/admin/bancos' },
-        { label: 'Desafíos', href: '/admin/desafios', active: true },
-        { label: 'Profesores', href: '/admin/profesores' },
-      ]}
+      nav={adminNav(user.role, '/admin/desafios')}
     >
       <div className="grid grid-2">
         <div className="card">

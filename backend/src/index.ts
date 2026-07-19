@@ -18,6 +18,7 @@ import forumRoutes from './routes/forum.routes.js';
 import bankRoutes from './routes/bank.routes.js';
 import notificationRoutes from './routes/notification.routes.js';
 import institutionRoutes from './routes/institution.routes.js';
+import documentsRoutes from './routes/documents.routes.js';
 import maestroRoutes from './routes/maestro.routes.js';
 
 const app = express();
@@ -73,6 +74,7 @@ app.use('/api/forum', forumRoutes);
 app.use('/api/banks', bankRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/institution', institutionRoutes);
+app.use('/api/documents', documentsRoutes);
 app.use('/api/maestro', maestroRoutes);
 
 // 404 + central error handler (must be last)

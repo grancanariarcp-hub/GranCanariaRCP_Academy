@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
+import { adminNav } from '@/lib/nav';
 
 interface Professor {
   id: string;
@@ -100,13 +101,7 @@ export default function ProfesoresPage() {
     <AppShell
       user={user}
       title="Profesores"
-      nav={[
-        { label: 'Resumen', href: '/admin' },
-        { label: 'Cursos', href: '/admin/cursos' },
-        { label: 'Preguntas', href: '/admin/preguntas' },
-        { label: 'Documentos', href: '/admin/documentos' },
-        { label: 'Profesores', href: '/admin/profesores', active: true },
-      ]}
+      nav={adminNav(user.role, '/admin/profesores')}
     >
       {error && <div className="alert alert-error">{error}</div>}
       {pending > 0 && (

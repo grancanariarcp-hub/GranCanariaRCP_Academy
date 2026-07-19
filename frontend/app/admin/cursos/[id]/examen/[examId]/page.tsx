@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, uploadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
+import { adminNav } from '@/lib/nav';
 
 type Format = 'test' | 'vf' | 'abierta';
 interface ExamQuestion {
@@ -185,7 +186,7 @@ export default function ExamEditorPage() {
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
-  const nav = [{ label: 'Cursos', href: '/admin/cursos', active: true }];
+  const nav = adminNav(user.role, '/admin/cursos');
 
   return (
     <AppShell user={user} title={exam?.title ?? 'Examen'} nav={nav}>

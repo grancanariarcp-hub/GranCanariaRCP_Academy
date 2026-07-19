@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
+import { adminNav } from '@/lib/nav';
 
 type Level = 'SVB' | 'SVI' | 'SVA';
 type Audience = 'ninos' | 'jovenes' | 'adultos';
@@ -73,7 +74,7 @@ export default function PreguntasPage() {
     try {
       const [q, d, b] = await Promise.all([
         api<{ questions: QuestionRow[] }>(`/api/admin/questions${media ? `?media=${media}` : ''}`, { auth: true }),
-        api<{ documents: Array<{ id: string; title: string }> }>('/api/admin/documents', { auth: true }),
+        api<{ documents: Array<{ id: string; title: string }> }>('/api/documents', { auth: true }),
         api<{ banks: Array<{ id: string; name: string; kind: string }> }>('/api/admin/banks', { auth: true }).catch(() => ({ banks: [] })),
       ]);
       setList(q.questions);
@@ -204,12 +205,7 @@ export default function PreguntasPage() {
     <AppShell
       user={user}
       title="Preguntas"
-      nav={[
-        { label: 'Resumen', href: '/admin' },
-        { label: 'Preguntas', href: '/admin/preguntas', active: true },
-        { label: 'Bancos', href: '/admin/bancos' },
-        { label: 'Documentos', href: '/admin/documentos' },
-      ]}
+      nav={adminNav(user.role, '/admin/preguntas')}
     >
       {/* ---------------- Carga masiva ---------------- */}
       <div className="card" style={{ marginBottom: 24 }}>

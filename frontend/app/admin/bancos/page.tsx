@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, downloadFile } from '@/lib/api';
+import { adminNav } from '@/lib/nav';
 
 interface Bank {
   id: string;
@@ -166,17 +167,7 @@ export default function BancosPage() {
     <AppShell
       user={user}
       title="Bancos de preguntas"
-      nav={user.role === 'super_admin' ? [
-        { label: 'Resumen', href: '/admin' },
-        { label: 'Cursos', href: '/admin/cursos' },
-        { label: 'Preguntas', href: '/admin/preguntas' },
-        { label: 'Bancos', href: '/admin/bancos', active: true },
-        { label: 'Desafíos', href: '/admin/desafios' },
-      ] : [
-        { label: 'Mis cursos', href: '/admin/cursos' },
-        { label: 'Mis bancos', href: '/admin/bancos', active: true },
-        { label: 'Perfil', href: '/admin/perfil' },
-      ]}
+      nav={adminNav(user.role, '/admin/preguntas')}
     >
       <div className="grid grid-2">
         {/* Crear / editar */}

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
+import { adminNav } from '@/lib/nav';
 
 interface Stats {
   students: number;
@@ -131,19 +132,7 @@ export default function AdminDashboard() {
     <AppShell
       user={user}
       title="Dashboard"
-      nav={[
-        { label: 'Resumen', href: '/admin', active: true },
-        { label: 'Cursos', href: '/admin/cursos' },
-        { label: 'Preguntas', href: '/admin/preguntas' },
-        { label: 'Bancos', href: '/admin/bancos' },
-        { label: 'Desafíos', href: '/admin/desafios' },
-        { label: 'Documentos', href: '/admin/documentos' },
-        { label: 'Profesores', href: '/admin/profesores' },
-        { label: 'Perfil', href: '/admin/perfil' },
-        { label: 'Instituciones', href: '/admin' },
-        { label: 'Administradores', href: '/admin' },
-        { label: 'Auditoría', href: '/admin' },
-      ]}
+      nav={adminNav(user.role, '/admin')}
     >
       {error && <div className="alert alert-error">{error}</div>}
 
