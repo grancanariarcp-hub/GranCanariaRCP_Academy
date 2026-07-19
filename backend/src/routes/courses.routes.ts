@@ -15,6 +15,10 @@ import { courseDashboard } from '../controllers/dashboard.controller.js';
 import { examQuality, setQuestionGrading } from '../controllers/questionQuality.controller.js';
 import { cfcAssistant } from '../controllers/cfc.controller.js';
 import { surveyResults, setSurveyOpen } from '../controllers/survey.controller.js';
+import {
+  createAttendanceSession, listAttendanceSessions, updateAttendanceSession, deleteAttendanceSession,
+  attendanceQrToken, listAttendanceRecords, markAttendanceManually,
+} from '../controllers/attendance.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -69,6 +73,15 @@ router.get('/:id/cfc', asyncHandler(cfcAssistant));
 router.get('/:id/survey/results', asyncHandler(surveyResults));
 router.patch('/:id/survey', asyncHandler(setSurveyOpen));
 router.post('/:id/students/:studentId/reset-password', asyncHandler(directorResetStudentPassword));
+
+// Asistencia presencial
+router.get('/:id/attendance/sessions', asyncHandler(listAttendanceSessions));
+router.post('/:id/attendance/sessions', asyncHandler(createAttendanceSession));
+router.patch('/:id/attendance/sessions/:sessionId', asyncHandler(updateAttendanceSession));
+router.delete('/:id/attendance/sessions/:sessionId', asyncHandler(deleteAttendanceSession));
+router.get('/:id/attendance/sessions/:sessionId/qr', asyncHandler(attendanceQrToken));
+router.get('/:id/attendance/sessions/:sessionId/records', asyncHandler(listAttendanceRecords));
+router.post('/:id/attendance/sessions/:sessionId/records/:studentId', asyncHandler(markAttendanceManually));
 
 // Certificado (director / super_admin)
 router.get('/:id/certificate/preview', asyncHandler(previewCertificate));

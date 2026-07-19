@@ -15,6 +15,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { getSurveyForStudent, submitSurvey } from '../controllers/survey.controller.js';
 import { reportQuestion } from '../controllers/questionQuality.controller.js';
+import { myAttendance, previewScan, scanAttendance } from '../controllers/attendance.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 const router = Router();
@@ -31,6 +32,11 @@ router.post('/courses/:courseId/activities/:activityId/complete', asyncHandler(s
 router.get('/courses/:courseId/survey', asyncHandler(getSurveyForStudent));
 router.post('/courses/:courseId/survey', asyncHandler(submitSurvey));
 router.get('/courses/:courseId/certificate', asyncHandler(studentCertificate));
+
+// Asistencia presencial: escaneo del QR que muestra el profesor
+router.get('/attendance', asyncHandler(myAttendance));
+router.get('/attendance/scan', asyncHandler(previewScan));
+router.post('/attendance/scan', asyncHandler(scanAttendance));
 
 // Exámenes (realizar / revisar)
 router.get('/exams/:examId/attempts', asyncHandler(listMyAttempts));
