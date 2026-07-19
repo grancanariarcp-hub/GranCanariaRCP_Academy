@@ -10,11 +10,10 @@ const nextConfig = {
       // La raíz pasó a ser el campus de pago: los enlaces a /campus ya
       // compartidos siguen funcionando.
       { source: '/campus', destination: '/', permanent: true },
-      // Las rutas de Next distinguen mayúsculas: recogemos las formas en que
-      // se teclea a mano la zona gratuita.
-      { source: '/desafiorcp', destination: '/desafioRCP', permanent: true },
-      { source: '/DesafioRCP', destination: '/desafioRCP', permanent: true },
-      { source: '/DESAFIORCP', destination: '/desafioRCP', permanent: true },
+      // Las variantes de mayúsculas de /desafioRCP NO se resuelven aquí: estas
+      // reglas no distinguen mayúsculas, así que capturarían también la propia
+      // URL buena y la redirigirían a sí misma en bucle. Lo hace middleware.ts,
+      // que compara la cadena exacta.
     ];
   },
 };
