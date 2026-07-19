@@ -9,6 +9,7 @@ import { qrImage } from '../controllers/qr.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { subscribeLead, unsubscribeLead } from '../controllers/lead.controller.js';
 import { verificarActa } from '../controllers/acta.controller.js';
+import { verifyRecognition, recognitionPdf } from '../controllers/recognition.controller.js';
 
 /** Public endpoints (no auth) — course discovery + challenges/rankings. */
 const router = Router();
@@ -29,6 +30,8 @@ router.get('/qr', asyncHandler(qrImage));
 router.post('/leads', asyncHandler(subscribeLead));
 router.delete('/leads/:email', asyncHandler(unsubscribeLead));
 router.get('/actas/:code', asyncHandler(verificarActa));
+router.get('/recognitions/:code', asyncHandler(verifyRecognition));
+router.get('/recognitions/:code/pdf', asyncHandler(recognitionPdf));
 router.get('/certificates/:code', asyncHandler(getPublicCertificate));
 router.get('/certificates/:code/pdf', asyncHandler(publicCertificatePdf));
 

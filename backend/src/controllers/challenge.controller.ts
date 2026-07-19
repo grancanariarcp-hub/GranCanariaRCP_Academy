@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { query } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl, presignKeys } from '../services/r2.js';
+import { reconocerDesafio, reconocerHoras } from '../services/recognitions.js';
 
 function areaCategories(area: string): string[] {
   if (area === 'mixto') return ['SVB', 'PA'];
@@ -196,7 +197,27 @@ export async function submitChallenge(req: Request, res: Response): Promise<void
             (SELECT COUNT(*) FROM ranked) AS totalp`,
     [att.rows[0].challenge_id, req.auth!.sub],
   );
-  res.json({ correct, total, timeSeconds, position: Number(pos.rows[0]?.position ?? 0), totalParticipants: Number(pos.rows[0]?.totalp ?? 0) });
+  const position = Number(pos.rows[0]?.position ?? 0);
+
+  // Reconocimientos: por el desafío y, de paso, por las horas acumuladas. No
+  // deben poder tumbar la respuesta del intento, así que se ignoran sus fallos.
+  const ch = await query<{ title: string }>('SELECT title FROM challenges WHERE id = $1', [att.rows[0].challenge_id]);
+  const quien = {
+    subjectId: req.auth!.sub,
+    subjectType: req.auth!.role === 'student' ? 'student' : 'user',
+    subjectName: req.auth!.name || 'Participante',
+  };
+  if (position > 0) {
+    await reconocerDesafio({
+      ...quien,
+      challengeId: att.rows[0].challenge_id,
+      challengeTitle: ch.rows[0]?.title ?? 'Desafío',
+      position,
+    }).catch(() => { /* no bloquear el resultado del desafío */ });
+  }
+  await reconocerHoras(quien).catch(() => { /* idem */ });
+
+  res.json({ correct, total, timeSeconds, position, totalParticipants: Number(pos.rows[0]?.totalp ?? 0) });
 }
 
 // ---------------------------------------------------------------------------

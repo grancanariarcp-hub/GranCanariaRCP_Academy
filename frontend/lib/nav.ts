@@ -19,6 +19,7 @@ export function adminNav(role: Role, activeHref?: string) {
           { label: 'Bancos', href: '/admin/bancos' },
           { label: 'Documentos', href: '/admin/documentos' },
           { label: 'Desafíos', href: '/admin/desafios' },
+          { label: 'Reconocimientos', href: '/admin/reconocimientos' },
           { label: 'Profesores', href: '/admin/profesores' },
           { label: 'Perfil', href: '/admin/perfil' },
         ]

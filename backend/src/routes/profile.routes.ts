@@ -5,6 +5,7 @@ import { myPendingGroups, markJoined } from '../controllers/whatsapp.controller.
 import { heartbeat, myLearningTime } from '../controllers/learningTime.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { myRecognitions, checkRecognitions } from '../controllers/recognition.controller.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
@@ -28,5 +29,8 @@ router.get('/legajo', asyncHandler(generateLegajo));
 router.get('/cv', asyncHandler(getCv));
 router.post('/cv', asyncHandler(addCvItem));
 router.delete('/cv/:itemId', asyncHandler(deleteCvItem));
+
+router.get('/recognitions', asyncHandler(myRecognitions));
+router.post('/recognitions/check', asyncHandler(checkRecognitions));
 
 export default router;

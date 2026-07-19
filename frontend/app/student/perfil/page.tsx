@@ -3,6 +3,7 @@
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { ProfilePanel } from '@/components/ProfilePanel';
+import { MyRecognitions } from '@/components/MyRecognitions';
 
 export default function StudentProfilePage() {
   const user = useSession(['student'], '/login/menor');
@@ -18,6 +19,7 @@ export default function StudentProfilePage() {
       ]}
     >
       <ProfilePanel user={user} />
+      <MyRecognitions />
     </AppShell>
   );
 }

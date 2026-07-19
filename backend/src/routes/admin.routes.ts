@@ -27,6 +27,7 @@ import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { stripeStatus } from '../controllers/payment.controller.js';
 import { listLeads } from '../controllers/lead.controller.js';
+import { listTemplates, createTemplate, updateTemplate, deleteTemplate, uploadTemplateBackground, previewTemplate } from '../controllers/recognition.controller.js';
 
 const router = Router();
 
@@ -39,6 +40,14 @@ router.use(requireAuth, requireRole('super_admin'));
 router.get('/stats', asyncHandler(getStats));
 router.get('/stripe-status', asyncHandler(stripeStatus));
 router.get('/leads', asyncHandler(listLeads));
+
+// Certificados de reconocimiento (plantillas)
+router.get('/recognition-templates', asyncHandler(listTemplates));
+router.post('/recognition-templates', asyncHandler(createTemplate));
+router.patch('/recognition-templates/:id', asyncHandler(updateTemplate));
+router.delete('/recognition-templates/:id', asyncHandler(deleteTemplate));
+router.post('/recognition-templates/:id/background', upload.single('file'), asyncHandler(uploadTemplateBackground));
+router.get('/recognition-templates/:id/preview.pdf', asyncHandler(previewTemplate));
 router.get('/dashboard', asyncHandler(adminDashboard));
 
 router.get('/institutions', asyncHandler(listInstitutions));
