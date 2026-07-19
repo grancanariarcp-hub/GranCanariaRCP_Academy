@@ -149,6 +149,8 @@ export async function importBankQuestions(req: Request, res: Response): Promise<
   const { questions } = z.object({ questions: z.array(z.record(z.unknown())).min(1, 'Lista vacía') }).parse(req.body);
   const errors: Array<{ fila: number; errores: string[] }> = [];
   let created = 0;
+  let duplicadas = 0;
+  const seenInFile = new Set<string>();
 
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
@@ -162,14 +164,31 @@ export async function importBankQuestions(req: Request, res: Response): Promise<
     if (ci === null) errs.push('correcta inválida (A/B/C/D o número)');
 
     if (errs.length > 0) { errors.push({ fila: i + 1, errores: errs }); continue; }
+
+    // Duplicada dentro del propio fichero.
+    const key = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    if (seenInFile.has(key)) { duplicadas += 1; continue; }
+    seenInFile.add(key);
+
+    // Duplicada respecto a lo que ya hay en el banco (misma pregunta ya subida).
+    const dup = await query(
+      `SELECT 1 FROM questions
+        WHERE bank_id = $1 AND text_norm = md5(lower(regexp_replace($2, '[^[:alnum:]]+', '', 'g')))`,
+      [req.params.id, text],
+    );
+    if (dup.rows.length > 0) { duplicadas += 1; continue; }
+
     await query(
-      `INSERT INTO questions (bank_id, tema, category, text, options, correct_index, explanation, created_by)
-       VALUES ($1,$2,NULL,$3,$4::jsonb,$5,$6,$7)`,
+      `INSERT INTO questions (bank_id, tema, category, text, options, correct_index, explanation, created_by, text_norm)
+       VALUES ($1,$2,NULL,$3,$4::jsonb,$5,$6,$7, md5(lower(regexp_replace($3, '[^[:alnum:]]+', '', 'g'))))`,
       [req.params.id, tema, text, JSON.stringify(options), ci, String(q.explicacion ?? q.explanation ?? '').trim() || null, req.auth!.sub],
     );
     created += 1;
   }
-  res.json({ created, total: questions.length, errors });
+
+  // Aviso claro si parece que se ha reimportado el mismo banco.
+  const posibleReimport = duplicadas > 0 && created === 0;
+  res.json({ created, duplicadas, total: questions.length, errors, posibleReimport });
 }
 
 // ---------------------------------------------------------------------------

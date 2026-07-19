@@ -144,8 +144,12 @@ export default function BancosPage() {
     try { parsed = JSON.parse(json); } catch { setImpMsg({ ok: false, text: 'JSON no válido' }); return; }
     if (!Array.isArray(parsed)) { setImpMsg({ ok: false, text: 'Debe ser una lista [ ... ]' }); return; }
     try {
-      const r = await api<{ created: number; total: number; errors: Array<{ fila: number }> }>(`/api/admin/banks/${selBank}/import`, { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) });
-      setImpMsg({ ok: r.errors.length === 0, text: `Creadas ${r.created}/${r.total}.` + (r.errors.length ? ` Errores en filas: ${r.errors.map((e) => e.fila).join(', ')}` : '') });
+      const r = await api<{ created: number; duplicadas: number; total: number; errors: Array<{ fila: number }>; posibleReimport: boolean }>(`/api/admin/banks/${selBank}/import`, { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) });
+      const partes = [`Creadas ${r.created}/${r.total}`];
+      if (r.duplicadas > 0) partes.push(`${r.duplicadas} duplicadas omitidas`);
+      if (r.errors.length) partes.push(`errores en filas: ${r.errors.map((e) => e.fila).join(', ')}`);
+      if (r.posibleReimport) partes.push('⚠️ Ninguna pregunta nueva: parece que este banco ya estaba importado');
+      setImpMsg({ ok: r.errors.length === 0 && !r.posibleReimport, text: partes.join(' · ') });
       setJson(''); loadTemas(selBank); load();
     } catch (err) {
       setImpMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
