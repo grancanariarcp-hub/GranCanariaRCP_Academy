@@ -139,6 +139,85 @@ export async function listCourses(req: Request, res: Response): Promise<void> {
   res.json({ courses: rows });
 }
 
+/**
+ * Duración lectiva estimada del curso, desglosada por tipo de contenido.
+ * Es el dato que se necesita para justificar las horas ante la comisión de
+ * formación continuada (CFC). Cada actividad puede llevar duración manual
+ * (duration_min), que siempre prevalece sobre la estimación.
+ */
+export async function courseDuration(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  await assertCanAccess(id, req);
+
+  const c = await query<{ min_per_page: string; words_per_min: number; min_per_question: string; duration_hours: string | null }>(
+    'SELECT min_per_page, words_per_min, min_per_question, duration_hours FROM courses WHERE id = $1',
+    [id],
+  );
+  if (c.rows.length === 0) throw notFound('Curso no encontrado');
+  const minPerPage = Number(c.rows[0].min_per_page);
+  const wordsPerMin = Number(c.rows[0].words_per_min);
+  const minPerQuestion = Number(c.rows[0].min_per_question);
+
+  const acts = await query<{
+    id: string; type: string; title: string; body: string | null; duration_min: number | null;
+    pages: number | null; time_limit_min: number | null; n_questions: string | null;
+  }>(
+    `SELECT a.id, a.type, a.title, a.body, a.duration_min,
+            d.pages,
+            e.time_limit_min,
+            (SELECT COUNT(*) FROM exam_questions eq WHERE eq.exam_id = e.id) AS n_questions
+     FROM activities a
+     LEFT JOIN documents d ON d.id = a.document_id
+     LEFT JOIN exams e ON e.id = a.exam_id
+     WHERE a.module_id IN (SELECT id FROM modules WHERE course_id = $1)
+     ORDER BY a.sort_order`,
+    [id],
+  );
+
+  const buckets: Record<string, number> = { documentos: 0, textos: 0, videos: 0, evaluacion: 0, otros: 0 };
+  const sinEstimar: Array<{ id: string; title: string; type: string }> = [];
+  const detalle = acts.rows.map((a) => {
+    let min = 0;
+    let bucket = 'otros';
+    let estimado = true;
+
+    if (a.duration_min != null) {
+      min = a.duration_min; estimado = false;
+      bucket = a.type === 'video' ? 'videos' : a.type === 'documento' ? 'documentos' : a.type === 'texto' ? 'textos' : 'otros';
+    } else if (a.type === 'documento') {
+      bucket = 'documentos';
+      min = a.pages ? Math.round(a.pages * minPerPage) : 0;
+      if (!a.pages) sinEstimar.push({ id: a.id, title: a.title, type: a.type });
+    } else if (a.type === 'texto') {
+      bucket = 'textos';
+      const words = (a.body ?? '').trim().split(/\s+/).filter(Boolean).length;
+      min = Math.round(words / Math.max(1, wordsPerMin));
+    } else if (a.type === 'test' || a.type === 'examen') {
+      bucket = 'evaluacion';
+      min = a.time_limit_min ?? Math.round(Number(a.n_questions ?? 0) * minPerQuestion);
+    } else if (a.type === 'video') {
+      bucket = 'videos';
+      sinEstimar.push({ id: a.id, title: a.title, type: a.type }); // hay que indicar su duración
+    } else {
+      sinEstimar.push({ id: a.id, title: a.title, type: a.type });
+    }
+
+    buckets[bucket] += min;
+    return { id: a.id, title: a.title, type: a.type, minutos: min, estimado };
+  });
+
+  const totalMin = Object.values(buckets).reduce((s, v) => s + v, 0);
+  res.json({
+    parametros: { minPerPage, wordsPerMin, minPerQuestion },
+    porTipo: buckets,
+    totalMinutos: totalMin,
+    totalHoras: Math.round((totalMin / 60) * 10) / 10,
+    horasDeclaradas: c.rows[0].duration_hours != null ? Number(c.rows[0].duration_hours) : null,
+    sinEstimar,
+    detalle,
+  });
+}
+
 /** Alumnos matriculados en el curso (para el profesorado / director). */
 export async function listCourseStudents(req: Request, res: Response): Promise<void> {
   const { id } = req.params;

@@ -31,6 +31,9 @@ const updateCourseSchema = z.object({
   firmante2Nombre: z.string().max(160).optional(),
   firmante2Cargo: z.string().max(160).optional(),
   whatsappUrl: z.string().url('Enlace no válido').or(z.literal('')).optional(),
+  minPerPage: z.number().min(0.5).max(30).optional(),
+  wordsPerMin: z.number().int().min(50).max(600).optional(),
+  minPerQuestion: z.number().min(0.1).max(30).optional(),
 });
 
 export async function updateCourse(req: Request, res: Response): Promise<void> {
@@ -43,6 +46,7 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     certifica: d.certifica, firmante1_nombre: d.firmante1Nombre, firmante1_cargo: d.firmante1Cargo,
     firmante2_nombre: d.firmante2Nombre, firmante2_cargo: d.firmante2Cargo,
     whatsapp_url: d.whatsappUrl,
+    min_per_page: d.minPerPage, words_per_min: d.wordsPerMin, min_per_question: d.minPerQuestion,
   };
   const fields: string[] = [];
   const params: unknown[] = [];
@@ -128,6 +132,20 @@ export async function addActivity(req: Request, res: Response): Promise<void> {
     [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.body ?? null, d.isMandatory],
   );
   res.status(201).json({ activity: rows[0] });
+}
+
+/** Duración manual de una actividad (minutos). Útil sobre todo para vídeos. */
+export async function setActivityDuration(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const { minutes } = z.object({ minutes: z.number().int().min(0).max(1000).nullable() }).parse(req.body);
+  const { rows } = await query(
+    `UPDATE activities SET duration_min = $1
+      WHERE id = $2 AND module_id IN (SELECT id FROM modules WHERE course_id = $3)
+      RETURNING id, duration_min`,
+    [minutes, req.params.activityId, req.params.id],
+  );
+  if (rows.length === 0) throw notFound('Actividad no encontrada');
+  res.json({ activity: rows[0] });
 }
 
 /** Upload the course thumbnail (multipart image) to R2. */

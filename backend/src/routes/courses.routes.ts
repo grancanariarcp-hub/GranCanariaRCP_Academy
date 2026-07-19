@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { createCourse, listCourses, getCourse, listCourseStudents } from '../controllers/course.controller.js';
+import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration } from '../controllers/course.controller.js';
 import multer from 'multer';
 import {
   updateCourse, uploadCourseThumbnail, addModule, updateModule, deleteModule,
   addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
-  addCourseImage, deleteCourseImage,
+  addCourseImage, deleteCourseImage, setActivityDuration,
 } from '../controllers/courseContent.controller.js';
 import {
   createExam, getExam, updateExam, addExamQuestion, importExamQuestions, deleteExamQuestion, listExamAttempts,
@@ -38,6 +38,7 @@ router.delete('/:id/modules/:moduleId', asyncHandler(deleteModule));
 router.post('/:id/modules/:moduleId/activities', asyncHandler(addActivity));
 router.post('/:id/modules/:moduleId/activities/image', upload.single('file'), asyncHandler(addImageActivity));
 router.delete('/:id/activities/:activityId', asyncHandler(deleteActivity));
+router.patch('/:id/activities/:activityId/duration', asyncHandler(setActivityDuration));
 
 // Staff (directores / instructores)
 router.post('/:id/staff', asyncHandler(inviteStaff));
@@ -53,6 +54,7 @@ router.delete('/:id/exams/:examId/questions/:questionId', asyncHandler(deleteExa
 router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
 
 router.get('/:id/students', asyncHandler(listCourseStudents));
+router.get('/:id/duration', asyncHandler(courseDuration));
 router.post('/:id/students/:studentId/reset-password', asyncHandler(directorResetStudentPassword));
 
 // Certificado (director / super_admin)

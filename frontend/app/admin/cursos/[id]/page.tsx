@@ -66,6 +66,12 @@ export default function CourseDetailPage() {
   const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
   const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean; completadas: string }>>([]);
   const [totalActivities, setTotalActivities] = useState(0);
+  const [dur, setDur] = useState<null | {
+    parametros: { minPerPage: number; wordsPerMin: number; minPerQuestion: number };
+    porTipo: Record<string, number>; totalMinutos: number; totalHoras: number;
+    horasDeclaradas: number | null;
+    sinEstimar: Array<{ id: string; title: string; type: string }>;
+  }>(null);
   const [tempPw, setTempPw] = useState<{ name: string; pw: string } | null>(null);
   const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +116,8 @@ export default function CourseDetailPage() {
       setGallery(c.gallery ?? []);
       api<{ students: typeof students; totalActivities: number }>(`/api/courses/${courseId}/students`, { auth: true })
         .then((r) => { setStudents(r.students); setTotalActivities(r.totalActivities); }).catch(() => {});
+      api<typeof dur>(`/api/courses/${courseId}/duration`, { auth: true })
+        .then((r) => setDur(r)).catch(() => {});
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
@@ -159,6 +167,22 @@ export default function CourseDetailPage() {
       setError(err instanceof ApiError ? err.message : 'Error al subir la miniatura');
     }
   }
+  async function setActivityMinutes(activityId: string, minutes: number | null) {
+    try {
+      await api(`/api/courses/${courseId}/activities/${activityId}/duration`, {
+        method: 'PATCH', auth: true, body: JSON.stringify({ minutes }),
+      });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
+
+  async function applyDeclaredHours() {
+    if (!dur) return;
+    await patchCourse({ durationHours: dur.totalHoras });
+  }
+
   async function resetStudentPassword(s: { id: string; name: string }) {
     if (!confirm(`¿Restablecer la contraseña de ${s.name}? Se generará una clave temporal de un solo uso.`)) return;
     try {
@@ -410,6 +434,53 @@ export default function CourseDetailPage() {
             </div>
             {gallery.length === 0 && <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>Sin imágenes. Si no añades ninguna, la ficha usa la miniatura.</p>}
           </div>
+
+          {/* Duración lectiva (CFC) */}
+          {dur && (
+            <div className="card animate-in" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <div className="card-title">Duración lectiva estimada</div>
+                <div className="card-subtitle">Es el dato que se justifica ante la comisión de formación continuada (CFC)</div>
+              </div>
+              <div className="grid grid-4" style={{ marginBottom: 12 }}>
+                <div className="info-box">📄 Documentos: <strong>{dur.porTipo.documentos} min</strong></div>
+                <div className="info-box">📝 Textos: <strong>{dur.porTipo.textos} min</strong></div>
+                <div className="info-box">🎬 Vídeos: <strong>{dur.porTipo.videos} min</strong></div>
+                <div className="info-box">🎓 Evaluación: <strong>{dur.porTipo.evaluacion} min</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--primary-dark)' }}>{dur.totalHoras} h</div>
+                <span className="muted">({dur.totalMinutos} minutos en total)</span>
+                {dur.horasDeclaradas != null && (
+                  <span className={`badge ${Math.abs(dur.horasDeclaradas - dur.totalHoras) < 0.6 ? 'badge-success' : 'badge-warning'}`}>
+                    declaradas en la ficha: {dur.horasDeclaradas} h
+                  </span>
+                )}
+                <button className="btn btn-outline btn-small" onClick={applyDeclaredHours}>Usar {dur.totalHoras} h como duración del curso</button>
+              </div>
+              {dur.sinEstimar.length > 0 && (
+                <div className="alert alert-warning">
+                  <strong>Faltan datos para {dur.sinEstimar.length} actividad(es)</strong>, así que la duración real es mayor:
+                  <ul style={{ margin: '6px 0 0 18px' }}>
+                    {dur.sinEstimar.map((a) => (
+                      <li key={a.id} style={{ fontSize: 13 }}>
+                        {a.title} ({a.type}) —{' '}
+                        <button className="link-action" onClick={() => {
+                          const m = prompt(`Duración en minutos de «${a.title}»`);
+                          if (m && !Number.isNaN(Number(m))) setActivityMinutes(a.id, Number(m));
+                        }}>indicar minutos</button>
+                        {a.type === 'documento' && <span className="muted"> · o indica sus páginas en Documentos</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="muted" style={{ fontSize: 12 }}>
+                Estimación: {dur.parametros.minPerPage} min por página de documento · {dur.parametros.wordsPerMin} palabras/min de lectura ·
+                {' '}{dur.parametros.minPerQuestion} min por pregunta en tests sin límite de tiempo. Los exámenes con tiempo configurado usan ese tiempo.
+              </p>
+            </div>
+          )}
 
           {/* Certificado */}
           <div className="card" style={{ marginBottom: 24 }}>
