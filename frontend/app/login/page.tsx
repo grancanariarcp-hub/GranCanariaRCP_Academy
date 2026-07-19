@@ -19,11 +19,17 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await api<{ token: string; user: SessionUser }>('/api/auth/login', {
+      const res = await api<{ token: string; user: SessionUser; mustChangePassword?: boolean }>('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
       saveSession(res.token, res.user);
+      // Si entró con una clave temporal, debe definir la suya antes de nada.
+      if (res.mustChangePassword) {
+        const perfil = res.user.role === 'student' ? '/student/perfil' : '/admin/perfil';
+        router.push(`${perfil}?cambiar=1`);
+        return;
+      }
       router.push(homeForRole(res.user.role));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error de conexión con el servidor');

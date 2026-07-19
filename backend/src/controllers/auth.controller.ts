@@ -361,7 +361,8 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
     id: string; password_hash: string; name: string;
     role: 'super_admin' | 'institution_admin' | 'profesor';
     institution_id: string | null; is_active: boolean; status: string;
-  }>('SELECT id, password_hash, name, role, institution_id, is_active, status FROM users WHERE email = $1', [lower]);
+    must_change_password: boolean;
+  }>('SELECT id, password_hash, name, role, institution_id, is_active, status, must_change_password FROM users WHERE email = $1', [lower]);
 
   if (u.rows.length > 0) {
     const user = u.rows[0];
@@ -377,7 +378,11 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       await query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
       const token = signToken({ sub: user.id, role: user.role, institutionId: user.institution_id, name: user.name });
       await audit({ actorId: user.id, actorType: user.role, action: 'AUTH_LOGIN_SUCCESS', entity: 'user', entityId: user.id, ip });
-      res.json({ token, user: { id: user.id, name: user.name, role: user.role, institutionId: user.institution_id } });
+      res.json({
+        token,
+        mustChangePassword: user.must_change_password,
+        user: { id: user.id, name: user.name, role: user.role, institutionId: user.institution_id },
+      });
       return;
     }
   }
@@ -385,7 +390,8 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
   // 2) Students (adults with email + password)
   const s = await query<{
     id: string; display_name: string; password_hash: string | null; institution_id: string | null; is_active: boolean;
-  }>('SELECT id, display_name, password_hash, institution_id, is_active FROM students WHERE email = $1', [lower]);
+    must_change_password: boolean;
+  }>('SELECT id, display_name, password_hash, institution_id, is_active, must_change_password FROM students WHERE email = $1', [lower]);
 
   if (s.rows.length > 0 && s.rows[0].password_hash) {
     const st = s.rows[0];
@@ -398,7 +404,11 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
       await query('UPDATE students SET last_login_at = NOW() WHERE id = $1', [st.id]);
       const token = signToken({ sub: st.id, role: 'student', institutionId: st.institution_id, name: st.display_name });
       await audit({ actorId: st.id, actorType: 'student', action: 'STUDENT_LOGIN_SUCCESS', entity: 'student', entityId: st.id, ip });
-      res.json({ token, user: { id: st.id, name: st.display_name, role: 'student', institutionId: st.institution_id } });
+      res.json({
+        token,
+        mustChangePassword: st.must_change_password,
+        user: { id: st.id, name: st.display_name, role: 'student', institutionId: st.institution_id },
+      });
       return;
     }
   }

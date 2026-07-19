@@ -32,6 +32,11 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
   const [cur, setCur] = useState('');
   const [nw, setNw] = useState('');
   const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // change email
+  const [emCur, setEmCur] = useState('');
+  const [emNew, setEmNew] = useState('');
+  const [emMsg, setEmMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [downloading, setDownloading] = useState(false);
 
   // CV (staff)
@@ -84,6 +89,18 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
       setCur(''); setNw('');
     } catch (err) {
       setPwMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
+    }
+  }
+
+  async function changeEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setEmMsg(null);
+    try {
+      const r = await api<{ email: string }>('/api/profile/email', { method: 'POST', auth: true, body: JSON.stringify({ currentPassword: emCur, newEmail: emNew }) });
+      setEmMsg({ ok: true, text: `Correo de acceso actualizado a ${r.email} ✅` });
+      setEmCur(''); setEmNew('');
+    } catch (err) {
+      setEmMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
     }
   }
 
@@ -162,6 +179,21 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
               <input className="form-input" type="password" value={nw} onChange={(e) => setNw(e.target.value)} required />
             </div>
             <button className="btn btn-primary btn-full">Actualizar contraseña</button>
+          </form>
+
+          <div style={{ borderTop: '1px solid var(--gray-200)', margin: '18px 0 14px' }} />
+          <div className="card-title" style={{ marginBottom: 10 }}>Cambiar correo de acceso</div>
+          {emMsg && <div className={`alert ${emMsg.ok ? 'alert-success' : 'alert-error'}`}>{emMsg.text}</div>}
+          <form onSubmit={changeEmail}>
+            <div className="form-group">
+              <label className="form-label">Nuevo correo</label>
+              <input className="form-input" type="email" value={emNew} onChange={(e) => setEmNew(e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Tu contraseña (para confirmar)</label>
+              <input className="form-input" type="password" value={emCur} onChange={(e) => setEmCur(e.target.value)} required />
+            </div>
+            <button className="btn btn-outline btn-full">Actualizar correo</button>
           </form>
         </div>
       </div>

@@ -10,6 +10,7 @@ import {
   createExam, getExam, updateExam, addExamQuestion, importExamQuestions, deleteExamQuestion, listExamAttempts,
 } from '../controllers/exam.controller.js';
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
+import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -50,6 +51,8 @@ router.post('/:id/exams/:examId/questions', asyncHandler(addExamQuestion));
 router.post('/:id/exams/:examId/questions/import', asyncHandler(importExamQuestions));
 router.delete('/:id/exams/:examId/questions/:questionId', asyncHandler(deleteExamQuestion));
 router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
+
+router.post('/:id/students/:studentId/reset-password', asyncHandler(directorResetStudentPassword));
 
 // Certificado (director / super_admin)
 router.get('/:id/certificate/preview', asyncHandler(previewCertificate));

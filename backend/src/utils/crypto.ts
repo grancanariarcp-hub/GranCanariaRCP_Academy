@@ -17,6 +17,18 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
   return bcrypt.compare(plain, hash);
 }
 
+/**
+ * Contraseña temporal de un solo uso (legible, sin caracteres ambiguos como
+ * O/0 o l/1) para que un administrador se la pueda dictar al usuario.
+ */
+export function generateTempPassword(length = 10): string {
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const bytes = crypto.randomBytes(length);
+  let out = '';
+  for (let i = 0; i < length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
 /** ¿El hash guardado usa un coste mayor del actual? (para re-hashear al entrar) */
 export function needsRehash(hash: string): boolean {
   const cost = Number(hash.split('$')[2]);

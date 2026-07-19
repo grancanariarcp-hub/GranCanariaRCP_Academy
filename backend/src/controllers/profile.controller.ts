@@ -61,9 +61,42 @@ export async function changePassword(req: Request, res: Response): Promise<void>
   if (!hash || !(await verifyPassword(currentPassword, hash))) {
     throw badRequest('La contraseña actual no es correcta', 'BAD_CURRENT');
   }
-  await query(`UPDATE ${table} SET password_hash = $1 WHERE id = $2`, [await hashPassword(newPassword), sub]);
+  // Al definir contraseña propia se levanta la obligación de cambiarla.
+  await query(`UPDATE ${table} SET password_hash = $1, must_change_password = FALSE WHERE id = $2`,
+    [await hashPassword(newPassword), sub]);
   await audit({ actorId: sub, actorType: role, action: 'PASSWORD_CHANGE', ip: clientIp(req) });
   res.json({ ok: true });
+}
+
+// ---------------------------------------------------------------------------
+// POST /api/profile/email — cambiar el correo de acceso (pide la contraseña)
+// ---------------------------------------------------------------------------
+const changeEmailSchema = z.object({
+  currentPassword: z.string().min(1, 'Confirma tu contraseña'),
+  newEmail: z.string().email('Email no válido'),
+});
+
+export async function changeEmail(req: Request, res: Response): Promise<void> {
+  const { currentPassword, newEmail } = changeEmailSchema.parse(req.body);
+  const { sub, role } = req.auth!;
+  const table = role === 'student' ? 'students' : 'users';
+  const email = newEmail.toLowerCase();
+
+  const cur = await query<{ password_hash: string | null }>(`SELECT password_hash FROM ${table} WHERE id = $1`, [sub]);
+  const hash = cur.rows[0]?.password_hash;
+  if (!hash || !(await verifyPassword(currentPassword, hash))) {
+    throw badRequest('La contraseña no es correcta', 'BAD_CURRENT');
+  }
+
+  const taken = await query(
+    'SELECT 1 FROM users WHERE email = $1 AND id <> $2 UNION SELECT 1 FROM students WHERE email = $1 AND id <> $2',
+    [email, sub],
+  );
+  if (taken.rows.length > 0) throw badRequest('Ese email ya está en uso', 'EMAIL_TAKEN');
+
+  await query(`UPDATE ${table} SET email = $1 WHERE id = $2`, [email, sub]);
+  await audit({ actorId: sub, actorType: role, action: 'EMAIL_CHANGE', ip: clientIp(req), metadata: { email } });
+  res.json({ ok: true, email });
 }
 
 // ---------------------------------------------------------------------------

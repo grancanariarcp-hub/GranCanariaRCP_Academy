@@ -18,6 +18,7 @@ import { getTemplate, importQuestions } from '../controllers/questionImport.cont
 import { createChallenge, listAllChallenges } from '../controllers/challenge.controller.js';
 import { createBank, updateBank, deleteBank, exportBank, listBanks, getBankTemas, importBankQuestions, globalFailedStats } from '../controllers/bank.controller.js';
 import { setInstitutionStatus } from '../controllers/institution.controller.js';
+import { adminResetPassword } from '../controllers/credentials.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -63,6 +64,8 @@ router.get('/banks/:id/export', asyncHandler(exportBank));
 router.get('/banks/:id/temas', asyncHandler(getBankTemas));
 router.post('/banks/:id/import', asyncHandler(importBankQuestions));
 router.get('/failed-general', asyncHandler(globalFailedStats));
+
+router.post('/reset-password/:type/:id', asyncHandler(adminResetPassword));
 
 router.get('/audit-logs', asyncHandler(listAuditLogs));
 
