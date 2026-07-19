@@ -27,7 +27,7 @@ const AUDIENCE_LABEL: Record<Audience, string> = {
 };
 
 export default function PreguntasPage() {
-  const user = useSession(['super_admin'], '/login/admin');
+  const user = useSession(['super_admin', 'profesor'], '/login/admin');
 
   // form state
   const [banks, setBanks] = useState<Array<{ id: string; name: string; kind: string }>>([]);
@@ -73,9 +73,9 @@ export default function PreguntasPage() {
   async function loadList(media?: string) {
     try {
       const [q, d, b] = await Promise.all([
-        api<{ questions: QuestionRow[] }>(`/api/admin/questions${media ? `?media=${media}` : ''}`, { auth: true }),
+        api<{ questions: QuestionRow[] }>(`/api/questions${media ? `?media=${media}` : ''}`, { auth: true }),
         api<{ documents: Array<{ id: string; title: string }> }>('/api/documents', { auth: true }),
-        api<{ banks: Array<{ id: string; name: string; kind: string }> }>('/api/admin/banks', { auth: true }).catch(() => ({ banks: [] })),
+        api<{ banks: Array<{ id: string; name: string; kind: string }> }>('/api/banks', { auth: true }).catch(() => ({ banks: [] })),
       ]);
       setList(q.questions);
       setDocs(d.documents);
@@ -128,7 +128,7 @@ export default function PreguntasPage() {
     setImporting(true);
     try {
       const res = await uploadFile<{ created: number; duplicadas: number; total: number; errors: Array<{ fila: number; errores: string[] }>; posibleReimport: boolean }>(
-        '/api/admin/questions/import',
+        '/api/questions/import',
         file,
         { bankId },
       );
@@ -172,7 +172,7 @@ export default function PreguntasPage() {
       };
       if (qImage) {
         // Con imagen: va como multipart, pero conserva TODAS las etiquetas.
-        await uploadFile('/api/admin/questions/image', qImage, {
+        await uploadFile('/api/questions/image', qImage, {
           bankId, tema: tema || '', category, audiences: JSON.stringify(audiences),
           qtype, difficulty: String(difficulty), text,
           clinicalContext: qtype === 'caso_clinico' ? clinicalContext : '',
@@ -182,7 +182,7 @@ export default function PreguntasPage() {
           isCritical: String(isCritical),
         });
       } else {
-        await api('/api/admin/questions', { method: 'POST', auth: true, body: JSON.stringify(payload) });
+        await api('/api/questions', { method: 'POST', auth: true, body: JSON.stringify(payload) });
       }
       setMsg({ ok: true, text: `Pregunta creada${qImage ? ' con imagen' : videoUrl ? ' con vídeo' : ''} ✅` });
       setQImage(null);
@@ -225,14 +225,14 @@ export default function PreguntasPage() {
           <button
             type="button"
             className="btn btn-outline btn-small"
-            onClick={() => downloadFile('/api/admin/questions/template', 'plantilla-preguntas-rcp.xlsx')}
+            onClick={() => downloadFile('/api/questions/template', 'plantilla-preguntas-rcp.xlsx')}
           >
             ⬇ Plantilla Excel
           </button>
           <button
             type="button"
             className="btn btn-outline btn-small"
-            onClick={() => downloadFile('/api/admin/questions/template?format=json', 'ejemplo-preguntas-rcp.json')}
+            onClick={() => downloadFile('/api/questions/template?format=json', 'ejemplo-preguntas-rcp.json')}
           >
             ⬇ Ejemplo JSON
           </button>

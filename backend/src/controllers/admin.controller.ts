@@ -237,8 +237,13 @@ export async function createQuestion(req: Request, res: Response): Promise<void>
   const data = createQuestionSchema.parse(req.body);
 
   // El banco debe existir y la pregunta no puede estar ya en él.
-  const bank = await query('SELECT 1 FROM question_banks WHERE id = $1', [data.bankId]);
+  const bank = await query<{ created_by: string | null }>(
+    'SELECT created_by FROM question_banks WHERE id = $1', [data.bankId],
+  );
   if (bank.rows.length === 0) throw badRequest('Banco no encontrado', 'BAD_BANK');
+  if (req.auth!.role !== 'super_admin' && bank.rows[0].created_by !== req.auth!.sub) {
+    throw badRequest('Solo puedes añadir preguntas a tus propios bancos', 'NOT_BANK_OWNER');
+  }
   const dup = await query(
     `SELECT 1 FROM questions
       WHERE bank_id = $1 AND text_norm = md5(lower(regexp_replace($2, '[^[:alnum:]]+', '', 'g')))`,
@@ -296,6 +301,13 @@ export async function listQuestions(req: Request, res: Response): Promise<void> 
   const { level, audience, type, bankId, media } = req.query as Record<string, string | undefined>;
   const conditions: string[] = [];
   const params: unknown[] = [];
+
+  // El profesorado solo ve las preguntas de los bancos que ha creado: los
+  // bancos ajenos puede usarlos como fuente de exámenes, pero no inspeccionarlos.
+  if (req.auth!.role !== 'super_admin') {
+    params.push(req.auth!.sub);
+    conditions.push(`bank_id IN (SELECT id FROM question_banks WHERE created_by = $${params.length})`);
+  }
 
   if (level && ['SVB', 'SVI', 'SVA'].includes(level)) {
     params.push(level);

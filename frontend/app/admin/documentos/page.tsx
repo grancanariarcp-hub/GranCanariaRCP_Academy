@@ -17,6 +17,8 @@ interface DocRow {
   pages: number | null;
   has_file: boolean;
   created_at: string;
+  /** Subido por mí: solo entonces se puede borrar. */
+  mio?: boolean;
 }
 
 const KIND_LABEL = { erc: 'ERC 2025', pnrcp: 'PNRCP', otro: 'Otro' } as const;
@@ -28,7 +30,7 @@ function humanSize(bytes: number | null): string {
 }
 
 export default function DocumentosPage() {
-  const user = useSession(['super_admin'], '/login/admin');
+  const user = useSession(['super_admin', 'profesor'], '/login/admin');
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<'erc' | 'pnrcp' | 'otro'>('erc');
@@ -36,11 +38,22 @@ export default function DocumentosPage() {
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [cuota, setCuota] = useState<{ usadoBytes: number; limiteMb: number; ilimitada: boolean; pct: number } | null>(null);
 
+  async function borrar(d: DocRow) {
+    if (!confirm(`¿Borrar «${d.title}»? Se liberará el espacio que ocupa.`)) return;
+    try {
+      await api(`/api/documents/${d.id}`, { method: 'DELETE', auth: true });
+      loadDocs();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : 'No se pudo borrar' });
+    }
+  }
   async function loadDocs() {
     try {
-      const r = await api<{ documents: DocRow[] }>('/api/documents', { auth: true });
+      const r = await api<{ documents: DocRow[]; cuota: { usadoBytes: number; limiteMb: number; ilimitada: boolean; pct: number } }>('/api/documents', { auth: true });
       setDocs(r.documents);
+      setCuota(r.cuota);
     } catch {
       /* ignore */
     }
@@ -136,6 +149,30 @@ export default function DocumentosPage() {
             <div className="card-title">Documentos subidos</div>
             <div className="card-subtitle">{docs.length} documentos</div>
           </div>
+
+          {/* Espacio consumido: el almacenamiento tiene coste real, así que
+              conviene que se vea antes de agotarlo, no al fallar una subida. */}
+          {cuota && !cuota.ilimitada && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
+                <span className="muted">Espacio usado</span>
+                <span className={cuota.pct >= 90 ? 'badge badge-warning' : 'muted'}>
+                  {humanSize(cuota.usadoBytes)} de {cuota.limiteMb} MB
+                </span>
+              </div>
+              <div style={{ height: 7, background: 'var(--gray-200)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%', width: `${cuota.pct}%`, transition: 'width .3s ease',
+                  background: cuota.pct >= 90 ? 'var(--danger)' : cuota.pct >= 70 ? 'var(--warning)' : 'var(--success)',
+                }} />
+              </div>
+              {cuota.pct >= 80 && (
+                <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                  Te queda poco espacio. Borra documentos que ya no uses o solicita una ampliación.
+                </p>
+              )}
+            </div>
+          )}
           <div className="table-responsive">
             <table>
               <thead>
@@ -155,18 +192,25 @@ export default function DocumentosPage() {
                     </td>
                     <td className="muted" style={{ fontSize: 12 }}>{humanSize(d.size_bytes)}</td>
                     <td>
-                      {d.has_file && (
-                        <button className="btn btn-outline btn-small" onClick={() => view(d.id)}>
-                          Ver
-                        </button>
-                      )}
+                      <span className="row-actions" style={{ whiteSpace: 'nowrap' }}>
+                        {d.has_file && <button className="link-action" onClick={() => view(d.id)}>Ver</button>}
+                        {d.mio && <>{d.has_file && ' · '}<button className="link-action danger" onClick={() => borrar(d)}>Borrar</button></>}
+                      </span>
                     </td>
                   </tr>
                 ))}
                 {docs.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="muted">
-                      Aún no has subido documentos
+                    <td colSpan={4}>
+                      <div style={{ padding: '14px 4px' }}>
+                        <strong>Todavía no hay documentos disponibles.</strong>
+                        <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                          Aún no se ha publicado material común de la plataforma. Puedes subir aquí tus propias
+                          guías en PDF con el formulario de la izquierda: quedarán disponibles para enlazarlas
+                          como actividades en tus cursos.
+                          {cuota && !cuota.ilimitada && ` Dispones de ${cuota.limiteMb} MB gratuitos.`}
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 )}
