@@ -44,8 +44,6 @@ export default function CampusPage() {
 
   const temas = useMemo(() => [...new Set(courses.map((c) => c.tema).filter(Boolean) as string[])].sort(), [courses]);
   const publicos = useMemo(() => [...new Set(courses.flatMap((c) => c.publico_objetivo || []))].sort(), [courses]);
-  const abiertos = courses.filter((c) => c.enrollment_open).length;
-  const conCfc = courses.filter((c) => c.cfc).length;
 
   const filtered = courses.filter((c) => {
     if (fMatricula === 'abierta' && !c.enrollment_open) return false;
@@ -66,12 +64,14 @@ export default function CampusPage() {
         background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--secondary-dark) 55%,#0d9488 100%)',
         color: '#fff', padding: '38px 16px 46px',
       }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', textAlign: 'center' }}>
+        <div style={{ maxWidth: 760, margin: '0 auto', textAlign: 'center' }}>
           <div style={{ textAlign: 'left' }}>
             <PageNav backHref="/" backLabel="Zona gratuita" light />
           </div>
           <div className="animate-fade">
-            <img src="/logo-horizontal.png" alt="Gran Canaria RCP" style={{ maxWidth: 280, width: '100%', filter: 'brightness(0) invert(1)' }} />
+            {/* Versión en negativo del logo: isla y rótulo en blanco, manos en
+                el azul del encabezado (el filtro CSS las aplanaba en blanco). */}
+            <img src="/logo-horizontal-negativo.png" alt="Gran Canaria RCP" style={{ maxWidth: 280, width: '100%' }} />
             <h1 style={{ fontSize: 34, marginTop: 14, lineHeight: 1.15 }}>Campus de formación</h1>
             <p style={{ fontSize: 17, opacity: 0.95, maxWidth: 640, margin: '12px auto 0' }}>
               Fórmate con <strong>cursos acreditados</strong>, evaluación real y
@@ -93,13 +93,6 @@ export default function CampusPage() {
             </Link>
           </div>
 
-          {courses.length > 0 && (
-            <div style={{ display: 'flex', gap: 26, justifyContent: 'center', marginTop: 26, flexWrap: 'wrap', fontSize: 14 }}>
-              <span><strong style={{ fontSize: 22 }}>{courses.length}</strong> cursos</span>
-              <span><strong style={{ fontSize: 22 }}>{abiertos}</strong> con matrícula abierta</span>
-              {conCfc > 0 && <span><strong style={{ fontSize: 22 }}>{conCfc}</strong> con créditos CFC</span>}
-            </div>
-          )}
         </div>
       </div>
 
