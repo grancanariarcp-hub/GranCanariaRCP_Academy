@@ -29,6 +29,7 @@ const STATUS_LABEL: Record<Professor['status'], string> = {
 export default function ProfesoresPage() {
   const user = useSession(['super_admin'], '/login/admin');
   const [list, setList] = useState<Professor[]>([]);
+  const [tempPw, setTempPw] = useState<{ name: string; pw: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // create form
@@ -58,6 +59,16 @@ export default function ProfesoresPage() {
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al actualizar');
+    }
+  }
+
+  async function resetPassword(id: string, name: string) {
+    if (!confirm(`¿Restablecer la contraseña de ${name}? Se generará una clave temporal de un solo uso.`)) return;
+    try {
+      const r = await api<{ tempPassword: string }>(`/api/admin/reset-password/user/${id}`, { method: 'POST', auth: true });
+      setTempPw({ name, pw: r.tempPassword });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al restablecer');
     }
   }
 
@@ -110,6 +121,12 @@ export default function ProfesoresPage() {
             <div className="card-title">Profesores</div>
             <div className="card-subtitle">{list.length} en total</div>
           </div>
+          {tempPw && (
+            <div className="alert alert-success">
+              Clave temporal para <strong>{tempPw.name}</strong>: <code style={{ fontSize: 16, fontWeight: 700 }}>{tempPw.pw}</code>
+              <div style={{ fontSize: 12, marginTop: 4 }}>Comunícasela; al entrar deberá definir su propia contraseña. No volverá a mostrarse.</div>
+            </div>
+          )}
           <div className="table-responsive">
             <table>
               <thead>
@@ -126,16 +143,15 @@ export default function ProfesoresPage() {
                     </td>
                     <td><span className={`badge ${STATUS_BADGE[p.status]}`}>{STATUS_LABEL[p.status]}</span></td>
                     <td>
-                      {p.status !== 'active' && (
-                        <button className="btn btn-primary btn-small" onClick={() => setStatus(p.id, 'approve')}>
-                          Aprobar
-                        </button>
-                      )}{' '}
-                      {p.status !== 'rejected' && (
-                        <button className="btn btn-outline btn-small" onClick={() => setStatus(p.id, 'reject')}>
-                          Rechazar
-                        </button>
-                      )}
+                      <div className="row-actions">
+                        {p.status !== 'active' && (
+                          <button className="link-action" onClick={() => setStatus(p.id, 'approve')}>Aprobar</button>
+                        )}
+                        {p.status !== 'rejected' && (
+                          <button className="link-action" onClick={() => setStatus(p.id, 'reject')}>Rechazar</button>
+                        )}
+                        <button className="link-action" onClick={() => resetPassword(p.id, p.name)} title="Genera una clave temporal de un solo uso">Restablecer</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

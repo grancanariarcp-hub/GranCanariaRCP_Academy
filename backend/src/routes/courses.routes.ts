@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createCourse, listCourses, getCourse } from '../controllers/course.controller.js';
+import { createCourse, listCourses, getCourse, listCourseStudents } from '../controllers/course.controller.js';
 import multer from 'multer';
 import {
   updateCourse, uploadCourseThumbnail, addModule, updateModule, deleteModule,
@@ -52,6 +52,7 @@ router.post('/:id/exams/:examId/questions/import', asyncHandler(importExamQuesti
 router.delete('/:id/exams/:examId/questions/:questionId', asyncHandler(deleteExamQuestion));
 router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
 
+router.get('/:id/students', asyncHandler(listCourseStudents));
 router.post('/:id/students/:studentId/reset-password', asyncHandler(directorResetStudentPassword));
 
 // Certificado (director / super_admin)

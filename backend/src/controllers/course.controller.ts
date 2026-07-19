@@ -139,6 +139,30 @@ export async function listCourses(req: Request, res: Response): Promise<void> {
   res.json({ courses: rows });
 }
 
+/** Alumnos matriculados en el curso (para el profesorado / director). */
+export async function listCourseStudents(req: Request, res: Response): Promise<void> {
+  const { id } = req.params;
+  await assertCanAccess(id, req);
+  const { rows } = await query(
+    `SELECT s.id, s.display_name AS name, s.email, s.is_minor,
+            e.status, e.enrolled_at,
+            (SELECT COUNT(*) FROM exam_attempts a
+               JOIN exams ex ON ex.id = a.exam_id
+               JOIN modules m ON m.id = ex.module_id
+              WHERE m.course_id = $1 AND a.student_id = s.id) AS intentos,
+            EXISTS (SELECT 1 FROM exam_attempts a
+               JOIN exams ex ON ex.id = a.exam_id
+               JOIN modules m ON m.id = ex.module_id
+              WHERE m.course_id = $1 AND a.student_id = s.id AND a.passed) AS aprobado
+     FROM enrollments e
+     JOIN students s ON s.id = e.student_id
+     WHERE e.course_id = $1
+     ORDER BY s.display_name`,
+    [id],
+  );
+  res.json({ students: rows });
+}
+
 async function assertCanAccess(courseId: string, req: Request): Promise<void> {
   if (req.auth!.role === 'super_admin') return;
   const { rows } = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [

@@ -63,6 +63,8 @@ export default function CourseDetailPage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
+  const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean }>>([]);
+  const [tempPw, setTempPw] = useState<{ name: string; pw: string } | null>(null);
   const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +105,8 @@ export default function CourseDetailPage() {
       ]);
       setCourse(c.course);
       setGallery(c.gallery ?? []);
+      api<{ students: typeof students }>(`/api/courses/${courseId}/students`, { auth: true })
+        .then((r) => setStudents(r.students)).catch(() => {});
       setFResumen(c.course.resumen ?? '');
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
@@ -151,6 +155,16 @@ export default function CourseDetailPage() {
       setError(err instanceof ApiError ? err.message : 'Error al subir la miniatura');
     }
   }
+  async function resetStudentPassword(s: { id: string; name: string }) {
+    if (!confirm(`¿Restablecer la contraseña de ${s.name}? Se generará una clave temporal de un solo uso.`)) return;
+    try {
+      const r = await api<{ tempPassword: string }>(`/api/courses/${courseId}/students/${s.id}/reset-password`, { method: 'POST', auth: true });
+      setTempPw({ name: s.name, pw: r.tempPassword });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Error al restablecer');
+    }
+  }
+
   async function uploadGallery(file: File | undefined) {
     if (!file) return;
     try {
@@ -528,6 +542,43 @@ export default function CourseDetailPage() {
                 <input className="form-input" placeholder="Nombre del nuevo módulo" value={newModule} onChange={(e) => setNewModule(e.target.value)} />
                 <button className="btn btn-primary btn-small" onClick={addModule}>+ Módulo</button>
               </div>
+            </div>
+
+            {/* Alumnos matriculados */}
+            <div className="card animate-in">
+              <div className="card-header">
+                <div className="card-title">Alumnos matriculados</div>
+                <div className="card-subtitle">{students.length}</div>
+              </div>
+              {tempPw && (
+                <div className="alert alert-success">
+                  Clave temporal para <strong>{tempPw.name}</strong>: <code style={{ fontSize: 16, fontWeight: 700 }}>{tempPw.pw}</code>
+                  <div style={{ fontSize: 12, marginTop: 4 }}>Comunícasela; al entrar deberá definir su propia contraseña. No volverá a mostrarse.</div>
+                </div>
+              )}
+              {students.length === 0 ? (
+                <div className="muted">Aún no hay alumnos matriculados.</div>
+              ) : (
+                <div className="table-responsive">
+                  <table>
+                    <thead><tr><th>Alumno</th><th>Estado</th><th>Examen</th><th></th></tr></thead>
+                    <tbody>
+                      {students.map((s) => (
+                        <tr key={s.id}>
+                          <td><strong>{s.name}</strong>{s.email && <div className="muted" style={{ fontSize: 12 }}>{s.email}</div>}</td>
+                          <td><span className={`badge ${s.status === 'completado' ? 'badge-success' : s.status === 'pendiente_pago' ? 'badge-warning' : 'badge-primary'}`}>{s.status}</span></td>
+                          <td>{s.aprobado ? <span className="badge badge-success">aprobado</span> : <span className="muted" style={{ fontSize: 12 }}>{Number(s.intentos) > 0 ? `${s.intentos} intento(s)` : 'sin intentos'}</span>}</td>
+                          <td>
+                            <div className="row-actions">
+                              {s.email && <button className="link-action" onClick={() => resetStudentPassword(s)} title="Genera una clave temporal de un solo uso">Restablecer</button>}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Staff */}
