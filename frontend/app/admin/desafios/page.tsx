@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
-import { api, ApiError, downloadFile } from '@/lib/api';
+import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 
 interface Challenge {
   id: string;
@@ -15,6 +15,7 @@ interface Challenge {
   kind: string;
   audience?: string;
   seconds_per_question?: number;
+  thumbnail_url?: string;
   starts_at: string | null;
   ends_at: string | null;
   participants: string;
@@ -56,6 +57,11 @@ export default function AdminDesafiosPage() {
     if (!confirm(`¿Borrar el desafío «${c.title}» y todos sus intentos?`)) return;
     try { await api(`/api/admin/challenges/${c.id}`, { method: 'DELETE', auth: true }); load(); }
     catch (err) { setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' }); }
+  }
+  async function uploadThumb(c: Challenge, file: File | undefined) {
+    if (!file) return;
+    try { await uploadFile(`/api/admin/challenges/${c.id}/thumbnail`, file); load(); }
+    catch (err) { setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error al subir' }); }
   }
   async function exportRanking(c: Challenge) {
     try { await downloadFile(`/api/admin/challenges/${c.id}/export`, `ranking-${c.title}.json`); } catch { /* ignore */ }
@@ -188,7 +194,15 @@ export default function AdminDesafiosPage() {
               <tbody>
                 {list.map((c) => (
                   <tr key={c.id}>
-                    <td>{c.title}<div className="muted" style={{ fontSize: 12 }}>
+                    <td>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        {c.thumbnail_url
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={c.thumbnail_url} alt="" style={{ width: 48, height: 32, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />
+                          : <div style={{ width: 48, height: 32, borderRadius: 4, background: 'var(--gray-200)', flexShrink: 0 }} />}
+                        <span>{c.title}</span>
+                      </div>
+                      <div className="muted" style={{ fontSize: 12 }}>
                       {c.area} · {c.num_questions}p × {c.seconds_per_question ?? '—'}s · {c.audience ?? 'todos'}
                     </div></td>
                     <td><span className={`badge ${c.kind === 'permanente' ? 'badge-primary' : 'badge-warning'}`}>{c.kind}</span></td>
@@ -196,6 +210,10 @@ export default function AdminDesafiosPage() {
                     <td>
                       <div className="row-actions">
                         <Link className="link-action" href={`/desafios/${c.id}`}>Ver</Link>
+                        <label className="link-action" style={{ cursor: 'pointer' }} title="Subir o cambiar la miniatura">
+                          Miniatura
+                          <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadThumb(c, e.target.files?.[0]); e.target.value = ''; }} />
+                        </label>
                         <button className="link-action" onClick={() => exportRanking(c)} title="Descargar el ranking en JSON">Exportar</button>
                         <button className="link-action danger" onClick={() => removeChallenge(c)}>Borrar</button>
                       </div>

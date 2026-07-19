@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
+import { r2Configured, buildKey, uploadObject, presignedGetUrl, presignKeys } from '../services/r2.js';
 
 function areaCategories(area: string): string[] {
   if (area === 'mixto') return ['SVB', 'PA'];
@@ -20,7 +21,7 @@ export async function listChallenges(_req: Request, res: Response): Promise<void
        AND (c.kind = 'permanente' OR (COALESCE(c.starts_at, NOW()) <= NOW() AND COALESCE(c.ends_at, NOW()) >= NOW()))
      ORDER BY (c.kind = 'permanente') DESC, c.created_at DESC`,
   );
-  res.json({ challenges: rows });
+  res.json({ challenges: await presignKeys(rows, 'thumbnail_key', 'thumbnail_url') });
 }
 
 // ---------------------------------------------------------------------------
@@ -281,9 +282,22 @@ export async function exportChallenge(req: Request, res: Response): Promise<void
 
 export async function listAllChallenges(_req: Request, res: Response): Promise<void> {
   const { rows } = await query(
-    `SELECT id, title, area, audience, num_questions, seconds_per_question, time_limit_seconds, kind, one_attempt_only, bank_ids, starts_at, ends_at, is_active,
+    `SELECT id, title, area, audience, num_questions, seconds_per_question, time_limit_seconds, kind, one_attempt_only, bank_ids, thumbnail_key, starts_at, ends_at, is_active,
             (SELECT COUNT(DISTINCT participant_id) FROM challenge_attempts a WHERE a.challenge_id = challenges.id AND a.submitted_at IS NOT NULL) AS participants
      FROM challenges ORDER BY (kind='permanente') DESC, created_at DESC`,
   );
-  res.json({ challenges: rows });
+  res.json({ challenges: await presignKeys(rows, 'thumbnail_key', 'thumbnail_url') });
+}
+
+/** Miniatura del desafío (multipart). Se ve en la portada y en el listado. */
+export async function uploadChallengeThumbnail(req: Request, res: Response): Promise<void> {
+  if (!r2Configured()) throw badRequest('El almacén de imágenes no está configurado', 'R2_NOT_CONFIGURED');
+  const file = req.file;
+  if (!file || !file.mimetype.startsWith('image/')) throw badRequest('Sube una imagen', 'NOT_IMAGE');
+
+  const key = buildKey(file.originalname, 'challenges');
+  await uploadObject(key, file.buffer, file.mimetype);
+  const { rows } = await query('UPDATE challenges SET thumbnail_key = $1 WHERE id = $2 RETURNING id', [key, req.params.id]);
+  if (rows.length === 0) throw notFound('Desafío no encontrado');
+  res.json({ ok: true, thumbnail_url: await presignedGetUrl(key, 3600) });
 }

@@ -16,7 +16,7 @@ import {
 } from '../controllers/admin.controller.js';
 import { uploadDocument, listDocuments, getDocumentUrl } from '../controllers/document.controller.js';
 import { getTemplate, importQuestions } from '../controllers/questionImport.controller.js';
-import { createChallenge, listAllChallenges, updateChallenge, deleteChallenge, exportChallenge } from '../controllers/challenge.controller.js';
+import { createChallenge, listAllChallenges, updateChallenge, deleteChallenge, exportChallenge, uploadChallengeThumbnail } from '../controllers/challenge.controller.js';
 import { createBank, updateBank, deleteBank, exportBank, listBanks, getBankTemas, importBankQuestions, globalFailedStats } from '../controllers/bank.controller.js';
 import { setInstitutionStatus } from '../controllers/institution.controller.js';
 import { adminResetPassword } from '../controllers/credentials.controller.js';
@@ -63,6 +63,7 @@ router.post('/challenges', asyncHandler(createChallenge));
 router.patch('/challenges/:id', asyncHandler(updateChallenge));
 router.delete('/challenges/:id', asyncHandler(deleteChallenge));
 router.get('/challenges/:id/export', asyncHandler(exportChallenge));
+router.post('/challenges/:id/thumbnail', upload.single('file'), asyncHandler(uploadChallengeThumbnail));
 
 router.get('/banks', asyncHandler(listBanks));
 router.post('/banks', asyncHandler(createBank));

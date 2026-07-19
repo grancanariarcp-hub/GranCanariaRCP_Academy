@@ -25,6 +25,7 @@ interface Challenge {
   participants: string;
   audience?: string;
   seconds_per_question?: number;
+  thumbnail_url?: string;
 }
 
 const PUBLICOS: Array<{ key: string; label: string; desc: string; color: string }> = [
@@ -82,19 +83,23 @@ export default function DesafiosPage() {
                 <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{p.desc}</p>
                 <div className="grid grid-2">
                   {delGrupo.map((c, i) => (
-              <Link key={c.id} href={`/desafios/${c.id}`} className="card press animate-in" style={{ display: 'flex', flexDirection: 'column', minHeight: 168, textDecoration: 'none', borderTop: `4px solid ${c.kind === 'permanente' ? '#c41e3a' : '#f59e0b'}`, animationDelay: `${Math.min(i, 8) * 60}ms` }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Link key={c.id} href={`/desafios/${c.id}`} className="card press animate-in" style={{ display: 'flex', flexDirection: 'column', minHeight: 168, textDecoration: 'none', padding: c.thumbnail_url ? 0 : undefined, overflow: 'hidden', borderTop: `4px solid ${c.kind === 'permanente' ? '#c41e3a' : '#f59e0b'}`, animationDelay: `${Math.min(i, 8) * 60}ms` }}>
+                {c.thumbnail_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: 92, objectFit: 'cover' }} />
+                )}
+                <div style={{ padding: c.thumbnail_url ? '12px 14px 0' : undefined, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div className="card-title">{c.title}</div>
                   {c.kind === 'permanente'
                     ? <span className="badge badge-primary">Permanente</span>
                     : <span className="badge badge-warning">Temporal</span>}
                 </div>
-                <div className="muted" style={{ fontSize: 13, margin: '8px 0' }}>
+                <div className="muted" style={{ fontSize: 13, margin: '8px 0', paddingInline: c.thumbnail_url ? 14 : undefined }}>
                   {c.area} · {c.num_questions} preguntas · {c.seconds_per_question ? `${c.seconds_per_question}s por pregunta` : `${Math.round(c.time_limit_seconds / 60)} min`}
                 </div>
-                <div style={{ fontSize: 13 }}>👥 {c.participants} participantes</div>
+                <div style={{ fontSize: 13, paddingInline: c.thumbnail_url ? 14 : undefined }}>👥 {c.participants} participantes</div>
                 {c.ends_at && <div className="muted" style={{ fontSize: 12 }}>Termina: {new Date(c.ends_at).toLocaleDateString('es-ES')}</div>}
-                <div className="btn btn-primary btn-small" style={{ marginTop: 'auto' }}>Ver ranking / participar</div>
+                <div className="btn btn-primary btn-small" style={{ marginTop: 'auto', marginInline: c.thumbnail_url ? 14 : undefined, marginBottom: c.thumbnail_url ? 14 : undefined }}>Ver ranking / participar</div>
                     </Link>
                   ))}
                 </div>
