@@ -23,7 +23,16 @@ interface Challenge {
   kind: 'permanente' | 'temporal';
   ends_at: string | null;
   participants: string;
+  audience?: string;
+  seconds_per_question?: number;
 }
+
+const PUBLICOS: Array<{ key: string; label: string; desc: string; color: string }> = [
+  { key: 'ninos', label: 'Niños', desc: '6 a 12 años', color: '#ec4899' },
+  { key: 'jovenes', label: 'Jóvenes', desc: '13 a 17 años', color: '#8b5cf6' },
+  { key: 'adultos', label: 'Adultos', desc: '18 años en adelante', color: '#2c5282' },
+  { key: 'todos', label: 'Para todos', desc: 'Cualquier edad', color: '#0d9488' },
+];
 
 export default function DesafiosPage() {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
@@ -64,8 +73,15 @@ export default function DesafiosPage() {
         {challenges.length === 0 ? (
           <p className="muted" style={{ textAlign: 'center' }}>Pronto habrá desafíos disponibles.</p>
         ) : (
-          <div className="grid grid-2">
-            {challenges.map((c, i) => (
+          PUBLICOS.map((p) => {
+            const delGrupo = challenges.filter((c) => (c.audience ?? 'todos') === p.key);
+            if (delGrupo.length === 0) return null;
+            return (
+              <div key={p.key} style={{ marginBottom: 26 }}>
+                <h2 style={{ fontSize: 18, marginBottom: 4, color: p.color }}>{p.label}</h2>
+                <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{p.desc}</p>
+                <div className="grid grid-2">
+                  {delGrupo.map((c, i) => (
               <Link key={c.id} href={`/desafios/${c.id}`} className="card press animate-in" style={{ display: 'flex', flexDirection: 'column', minHeight: 168, textDecoration: 'none', borderTop: `4px solid ${c.kind === 'permanente' ? '#c41e3a' : '#f59e0b'}`, animationDelay: `${Math.min(i, 8) * 60}ms` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div className="card-title">{c.title}</div>
@@ -74,14 +90,17 @@ export default function DesafiosPage() {
                     : <span className="badge badge-warning">Temporal</span>}
                 </div>
                 <div className="muted" style={{ fontSize: 13, margin: '8px 0' }}>
-                  {c.area} · {c.num_questions} preguntas · {Math.round(c.time_limit_seconds / 60)} min
+                  {c.area} · {c.num_questions} preguntas · {c.seconds_per_question ? `${c.seconds_per_question}s por pregunta` : `${Math.round(c.time_limit_seconds / 60)} min`}
                 </div>
                 <div style={{ fontSize: 13 }}>👥 {c.participants} participantes</div>
                 {c.ends_at && <div className="muted" style={{ fontSize: 12 }}>Termina: {new Date(c.ends_at).toLocaleDateString('es-ES')}</div>}
                 <div className="btn btn-primary btn-small" style={{ marginTop: 'auto' }}>Ver ranking / participar</div>
-              </Link>
-            ))}
-          </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })
         )}
         <p style={{ textAlign: 'center', marginTop: 32 }}><AppVersion /></p>
       </div>
