@@ -35,3 +35,8 @@ npm-debug.log*
 # Temp
 .tmp/
 temp/
+
+# Copias de seguridad: contienen datos personales, nunca al repositorio
+backups/
+*.sql.gz
+
