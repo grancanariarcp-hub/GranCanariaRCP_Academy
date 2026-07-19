@@ -6,13 +6,13 @@ import { InstallButton } from '@/components/InstallButton';
 export const metadata: Metadata = {
   // Base para resolver las imágenes de vista previa al compartir el enlace.
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://grancanariarcp.vercel.app'),
-  title: 'Gran Canaria RCP · Aprende a salvar vidas',
-  description: 'Aprende soporte vital básico y primeros auxilios gratis, ponte a prueba en los desafíos y fórmate con certificado.',
+  title: 'Campus de formación · Gran Canaria RCP',
+  description: 'Fórmate con cursos acreditados, evaluación real y certificados verificables.',
   appleWebApp: { capable: true, statusBarStyle: 'default', title: 'RCP Academy' },
   // Vista previa al compartir el enlace en redes y mensajería.
   openGraph: {
-    title: 'Gran Canaria RCP · Aprende a salvar vidas',
-    description: 'Formación gratuita en soporte vital básico y primeros auxilios, desafíos con ranking y cursos acreditados con certificado.',
+    title: 'Campus de formación · Gran Canaria RCP',
+    description: 'Cursos acreditados de RCP y emergencias, con evaluación y certificado verificable.',
     type: 'website',
     locale: 'es_ES',
     siteName: 'Gran Canaria RCP',
@@ -20,8 +20,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Gran Canaria RCP · Aprende a salvar vidas',
-    description: 'Formación gratuita en RCP y primeros auxilios, desafíos con ranking y cursos con certificado.',
+    title: 'Campus de formación · Gran Canaria RCP',
+    description: 'Cursos acreditados de RCP y emergencias, con certificado verificable.',
     images: ['/logo-horizontal.png'],
   },
 };

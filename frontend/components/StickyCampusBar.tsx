@@ -49,7 +49,7 @@ export function StickyCampusBar({ anchorId }: { anchorId?: string }) {
         <span style={{ fontSize: 14.5, fontWeight: 600 }}>
           ¿Quieres formarte oficialmente? <span style={{ opacity: 0.9, fontWeight: 400 }}>Cursos acreditados con certificado verificable.</span>
         </span>
-        <Link href="/campus" className="btn press" style={{ background: '#fff', color: 'var(--primary-dark)', fontWeight: 700, padding: '8px 18px' }}>
+        <Link href="/" className="btn press" style={{ background: '#fff', color: 'var(--primary-dark)', fontWeight: 700, padding: '8px 18px' }}>
           Ver el campus
         </Link>
         <button
