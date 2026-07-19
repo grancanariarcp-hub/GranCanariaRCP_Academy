@@ -167,7 +167,7 @@ export default function BancosPage() {
     <AppShell
       user={user}
       title="Bancos de preguntas"
-      nav={adminNav(user.role, '/admin/preguntas')}
+      nav={adminNav(user.role, '/admin/bancos')}
     >
       <div className="grid grid-2">
         {/* Crear / editar */}

@@ -7,6 +7,8 @@ import { AppVersion } from '@/components/AppVersion';
 import { Reveal } from '@/components/Reveal';
 import { temaPalette } from '@/lib/temaColors';
 import { PageNav } from '@/components/PageNav';
+import { LeadCapture } from '@/components/LeadCapture';
+import { Faq, type ItemFaq } from '@/components/Faq';
 
 interface OpenCourse {
   id: string;
@@ -30,9 +32,93 @@ const VENTAJAS = [
   { titulo: 'A tu ritmo', texto: 'Estudias cuando puedes; la plataforma registra tu avance y tu dedicación.', color: '#7c3aed' },
 ];
 
+/**
+ * Dudas que más frenan una matrícula. Además de reducir consultas, es texto
+ * real indexable: es lo que busca la gente en Google antes de decidirse.
+ */
+const FAQ: ItemFaq[] = [
+  {
+    pregunta: '¿Los certificados tienen validez oficial?',
+    respuesta: (
+      <>
+        <p>
+          Cada curso indica en su ficha si está acreditado y con cuántos créditos por la Comisión de
+          Formación Continuada. Los cursos acreditados llevan el logotipo y el número de expediente
+          en el propio certificado.
+        </p>
+        <p>
+          Los créditos de formación continuada del Sistema Nacional de Salud tienen validez en todo el
+          territorio nacional. Los cursos no acreditados emiten certificado de aprovechamiento, igualmente
+          verificable, pero sin créditos.
+        </p>
+      </>
+    ),
+  },
+  {
+    pregunta: '¿Cómo se comprueba que un certificado es auténtico?',
+    respuesta: (
+      <p>
+        Cada certificado lleva un código único y un código QR. Al escanearlo se abre una página pública
+        con los datos del curso, el programa completo y la versión digital del certificado. Cualquier
+        empleador o comisión puede comprobarlo al instante, sin cuenta ni permisos.
+      </p>
+    ),
+  },
+  {
+    pregunta: '¿Cuánto tiempo tengo para completar el curso?',
+    respuesta: (
+      <p>
+        Cada curso tiene sus fechas de inicio y fin, indicadas en su ficha antes de matricularte. Dentro
+        de ese plazo estudias a tu ritmo y desde donde quieras: la plataforma guarda tu avance y puedes
+        retomarlo en cualquier momento.
+      </p>
+    ),
+  },
+  {
+    pregunta: '¿Cómo descargo mi certificado?',
+    respuesta: (
+      <p>
+        Se genera automáticamente al superar el curso. Lo encontrarás en la página del curso, dentro de
+        tu área de alumno, con un botón de descarga en PDF. Si el curso tiene encuesta de satisfacción,
+        hay que responderla antes.
+      </p>
+    ),
+  },
+  {
+    pregunta: '¿Los cursos son presenciales u online?',
+    respuesta: (
+      <p>
+        Depende del curso: los hay online, presenciales y mixtos, y siempre se indica en su ficha. En los
+        presenciales la asistencia se registra en el aula, y hay un mínimo de asistencia exigido para
+        obtener el certificado.
+      </p>
+    ),
+  },
+  {
+    pregunta: '¿Quién imparte la formación?',
+    respuesta: (
+      <p>
+        Profesionales sanitarios en activo. El currículum de cada docente está publicado y es consultable
+        desde la ficha de su curso: puedes ver su formación y su experiencia antes de matricularte.
+      </p>
+    ),
+  },
+  {
+    pregunta: '¿Cómo se paga la matrícula?',
+    respuesta: (
+      <p>
+        Con tarjeta, a través de una pasarela de pago segura; la plataforma no almacena los datos de tu
+        tarjeta. Recibirás un justificante de pago descargable. Algunos cursos tienen precio reducido de
+        matrícula anticipada: la fecha límite aparece en la ficha.
+      </p>
+    ),
+  },
+];
+
 /** Campus de formación: página de captación de la oferta acreditada. */
 export default function CampusPage() {
   const [courses, setCourses] = useState<OpenCourse[]>([]);
+  const [profes, setProfes] = useState<Array<{ id: string; name: string; headline: string | null; photo_url: string | null }>>([]);
   const [fMatricula, setFMatricula] = useState<'todas' | 'abierta' | 'proximamente'>('todas');
   const [fTema, setFTema] = useState('');
   const [fPublico, setFPublico] = useState('');
@@ -40,6 +126,7 @@ export default function CampusPage() {
 
   useEffect(() => {
     api<{ courses: OpenCourse[] }>('/api/public/courses').then((r) => setCourses(r.courses)).catch(() => {});
+    api<{ profesores: typeof profes }>('/api/public/professors').then((r) => setProfes(r.profesores)).catch(() => {});
   }, []);
 
   const temas = useMemo(() => [...new Set(courses.map((c) => c.tema).filter(Boolean) as string[])].sort(), [courses]);
@@ -86,9 +173,10 @@ export default function CampusPage() {
                 padding: '16px 30px', fontWeight: 800, fontSize: 17, boxShadow: '0 6px 20px rgba(0,0,0,.25)' }}>
               Crear mi cuenta y matricularme
             </Link>
+            {/* Secundario a propósito: el ojo debe ir primero al registro. */}
             <Link href="/login" className="press"
-              style={{ textDecoration: 'none', background: 'rgba(255,255,255,0.14)', color: '#fff',
-                border: '1px solid rgba(255,255,255,0.5)', borderRadius: 12, padding: '16px 30px', fontWeight: 700, fontSize: 17 }}>
+              style={{ textDecoration: 'none', background: 'transparent', color: 'rgba(255,255,255,0.92)',
+                border: '1px solid rgba(255,255,255,0.35)', borderRadius: 12, padding: '16px 26px', fontWeight: 600, fontSize: 15 }}>
               Ya tengo cuenta
             </Link>
           </div>
@@ -115,9 +203,11 @@ export default function CampusPage() {
           <h2 style={{ textAlign: 'center', marginBottom: 8 }}>
             <span className="heading-underline"><span className="shine-text">Oferta formativa</span></span>
           </h2>
-          <p className="muted" style={{ textAlign: 'center', marginBottom: 20, fontSize: 14 }}>
-            Filtra por tema, público o acreditación para encontrar tu curso.
-          </p>
+          {courses.length > 0 && (
+            <p className="muted" style={{ textAlign: 'center', marginBottom: 20, fontSize: 14 }}>
+              Filtra por tema, público o acreditación para encontrar tu curso.
+            </p>
+          )}
 
           {courses.length > 0 && (
             <div className="filter-bar">
@@ -177,7 +267,7 @@ export default function CampusPage() {
         </Reveal>
 
         {courses.length === 0 ? (
-          <p className="muted" style={{ textAlign: 'center', marginBottom: 44 }}>Pronto habrá cursos disponibles.</p>
+          <LeadCapture origen="campus" />
         ) : filtered.length === 0 ? (
           <p className="muted" style={{ textAlign: 'center', marginBottom: 44 }}>Ningún curso coincide con los filtros.</p>
         ) : (
@@ -233,6 +323,45 @@ export default function CampusPage() {
             </div>
           </Link>
         </Reveal>
+
+        {/* Quién enseña: en formación sanitaria, ver caras y credenciales
+            convierte más que cualquier argumento de venta. */}
+        {profes.length > 0 && (
+          <Reveal>
+            <h2 style={{ textAlign: 'center', marginBottom: 6 }}>
+              <span className="heading-underline">Quién imparte la formación</span>
+            </h2>
+            <p className="muted" style={{ textAlign: 'center', marginBottom: 20, fontSize: 14 }}>
+              Profesionales sanitarios en activo, con su currículum publicado y consultable.
+            </p>
+            <div className="grid grid-4" style={{ marginBottom: 44 }}>
+              {profes.map((p, i) => (
+                <Reveal key={p.id} delay={i * 70}>
+                  <Link href={`/profesor/${p.id}`} className="card press" style={{ display: 'block', textDecoration: 'none', textAlign: 'center', height: '100%' }}>
+                    <div style={{
+                      width: 84, height: 84, borderRadius: '50%', margin: '0 auto 10px', overflow: 'hidden',
+                      background: 'linear-gradient(135deg,var(--primary-dark),var(--secondary-dark))',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', fontSize: 28, fontWeight: 700,
+                    }}>
+                      {p.photo_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        p.name.split(' ').slice(0, 2).map((n) => n[0]).join('')
+                      )}
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
+                    <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{p.headline}</div>
+                    <div style={{ fontSize: 12.5, marginTop: 8, color: 'var(--secondary-dark)', fontWeight: 600 }}>Ver currículum →</div>
+                  </Link>
+                </Reveal>
+              ))}
+            </div>
+          </Reveal>
+        )}
+
+        <Reveal><Faq items={FAQ} /></Reveal>
 
         {/* ---------- Cierre ---------- */}
         <Reveal>

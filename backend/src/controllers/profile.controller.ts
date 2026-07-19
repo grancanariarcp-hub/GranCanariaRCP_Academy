@@ -256,6 +256,30 @@ export async function deleteCvItem(req: Request, res: Response): Promise<void> {
 }
 
 /** Public: a professor's CV (for students). */
+/**
+ * GET /api/public/professors — profesorado con perfil publicado.
+ *
+ * La formación sanitaria se vende con confianza: ver quién enseña, con nombre,
+ * cargo y currículum consultable, pesa más que cualquier argumento. Solo salen
+ * quienes tienen titular relleno, para no mostrar fichas a medias.
+ */
+export async function listPublicProfessors(_req: Request, res: Response): Promise<void> {
+  const { rows } = await query<{ id: string; name: string; headline: string | null; photo_key: string | null }>(
+    `SELECT id, name, headline, photo_key
+       FROM users
+      WHERE role = 'profesor' AND status = 'active' AND headline IS NOT NULL AND headline <> ''
+      ORDER BY created_at
+      LIMIT 12`,
+  );
+  const profesores = await Promise.all(rows.map(async (u) => ({
+    id: u.id,
+    name: u.name,
+    headline: u.headline,
+    photo_url: u.photo_key && r2Configured() ? await presignedGetUrl(u.photo_key, 3600) : null,
+  })));
+  res.json({ profesores });
+}
+
 export async function getProfessorCv(req: Request, res: Response): Promise<void> {
   const u = await query<{ name: string; headline: string | null; photo_key: string | null }>(
     "SELECT name, headline, photo_key FROM users WHERE id = $1 AND role = 'profesor'",

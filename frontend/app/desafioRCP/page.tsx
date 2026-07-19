@@ -62,10 +62,16 @@ export default function Home() {
             style={{ display: 'block', textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 14, padding: 30,
               background: 'linear-gradient(135deg,#c41e3a,#f59e0b)', boxShadow: 'var(--shadow-md)' }}>
             <div style={{ fontWeight: 800, fontSize: 24 }}>¿Qué tanto sabes de RCP?</div>
-            <div style={{ fontSize: 13, opacity: 0.95, marginTop: 6 }}>
+            {/* Explicar el formato en una línea: "competir representando a tu
+                institución" no dice nada a quien llega por primera vez. */}
+            <div style={{ fontSize: 14.5, opacity: 0.97, marginTop: 8, maxWidth: 470, marginInline: 'auto', lineHeight: 1.45 }}>
+              Responde <strong>10 preguntas rápidas</strong> sobre reanimación y primeros auxilios,
+              con pocos segundos por pregunta. Al terminar ves tu resultado y tu puesto en el ranking.
+            </div>
+            <div style={{ fontSize: 12.5, opacity: 0.9, marginTop: 8 }}>
               {challenges.length > 0
-                ? `${challenges.length} desafío(s) activos · ranking · acceso para menores`
-                : 'Desafíos, reto permanente, ranking y acceso para menores'}
+                ? `${challenges.length} desafío(s) activos · gratis · también para menores`
+                : 'Gratis · sin instalar nada · también para menores'}
             </div>
           </Link>
         </div>

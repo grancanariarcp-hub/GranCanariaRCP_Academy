@@ -749,3 +749,57 @@ tbody tr:hover {
 .table-plain tbody tr:hover {
   background: var(--gray-100);
 }
+
+/* ---------- Preguntas frecuentes ---------- */
+.faq details {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.faq details[open] {
+  border-color: var(--secondary-dark);
+  box-shadow: var(--shadow-sm);
+}
+.faq summary {
+  padding: 15px 44px 15px 18px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  position: relative;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: '+';
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--secondary-dark);
+  transition: transform 0.2s ease;
+}
+.faq details[open] summary::after {
+  content: '−';
+}
+.faq summary:hover {
+  background: var(--gray-100);
+}
+.faq-cuerpo {
+  padding: 0 18px 16px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--gray-700);
+}
+.faq-cuerpo p {
+  margin-bottom: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .faq summary::after { transition: none; }
+}

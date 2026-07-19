@@ -16,6 +16,7 @@ export function adminNav(role: Role, activeHref?: string) {
           { label: 'Resumen', href: '/admin' },
           { label: 'Cursos', href: '/admin/cursos' },
           { label: 'Preguntas', href: '/admin/preguntas' },
+          { label: 'Bancos', href: '/admin/bancos' },
           { label: 'Documentos', href: '/admin/documentos' },
           { label: 'Desafíos', href: '/admin/desafios' },
           { label: 'Profesores', href: '/admin/profesores' },
@@ -24,6 +25,7 @@ export function adminNav(role: Role, activeHref?: string) {
       : [
           { label: 'Mis cursos', href: '/admin/cursos' },
           { label: 'Mis preguntas', href: '/admin/preguntas' },
+          { label: 'Mis bancos', href: '/admin/bancos' },
           { label: 'Documentos', href: '/admin/documentos' },
           { label: 'Perfil', href: '/admin/perfil' },
         ];

@@ -26,6 +26,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { stripeStatus } from '../controllers/payment.controller.js';
+import { listLeads } from '../controllers/lead.controller.js';
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.use(requireAuth, requireRole('super_admin'));
 
 router.get('/stats', asyncHandler(getStats));
 router.get('/stripe-status', asyncHandler(stripeStatus));
+router.get('/leads', asyncHandler(listLeads));
 router.get('/dashboard', asyncHandler(adminDashboard));
 
 router.get('/institutions', asyncHandler(listInstitutions));
