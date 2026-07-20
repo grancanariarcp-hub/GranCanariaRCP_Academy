@@ -194,6 +194,47 @@ export const GENERAL: Articulo[] = [
   },
 
   {
+    id: 'mis-datos',
+    titulo: 'Mis datos y darme de baja',
+    resumen: 'Qué guardamos de ti, cómo llevártelo y cómo cerrar tu cuenta.',
+    seccion: 'Primeros pasos',
+    para: ['student', 'profesor', 'super_admin', 'institution_admin', 'institution_teacher'],
+    cuerpo: [
+      { tipo: 'titulo', texto: 'Llevarte tus datos' },
+      {
+        tipo: 'texto',
+        texto:
+          'Desde tu perfil puedes descargar un documento con todo lo que consta a tu nombre: tus datos, tus cursos y tus resultados. Se genera en el momento y no se guarda en ninguna parte.',
+      },
+      { tipo: 'titulo', texto: 'Permisos que has dado' },
+      {
+        tipo: 'lista',
+        items: [
+          '**Aparecer en los rankings públicos.** Si lo desactivas sigues participando y conservas tus diplomas: solo dejas de salir en la clasificación.',
+          '**Recibir avisos de nuevos cursos.** Nunca hace falta para usar la plataforma y se puede quitar cuando quieras.',
+        ],
+      },
+      { tipo: 'titulo', texto: 'Darte de baja' },
+      {
+        tipo: 'texto',
+        texto:
+          'Cierra tu cuenta y borra tus datos personales. Se te pedirá la contraseña para confirmar, porque no es una acción que se pueda deshacer.',
+      },
+      {
+        tipo: 'aviso',
+        texto:
+          'Tus **certificados y las actas de los cursos se conservan**. Acreditan formación, otras personas pueden tener que verificarlos años después y la ley obliga a mantenerlos. Lo que desaparece es quién eras: dejan de estar asociados a tu nombre en la plataforma.',
+      },
+      {
+        tipo: 'duda',
+        pregunta: 'Me he dado de baja por error, ¿puedo recuperar la cuenta?',
+        respuesta:
+          'No desde la plataforma. Escríbenos: el expediente académico sigue existiendo, pero recuperar el acceso requiere intervención manual.',
+      },
+    ],
+    relacionados: ['alumno-perfil', 'dispositivos'],
+  },
+  {
     id: 'desafios-publico',
     titulo: 'Los desafíos de RCP',
     resumen: 'Qué son, cómo se participa y cómo funciona el ranking.',

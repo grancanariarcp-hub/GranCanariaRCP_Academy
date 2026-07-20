@@ -5,6 +5,7 @@ import { AppShell } from '@/components/AppShell';
 import { ProfilePanel } from '@/components/ProfilePanel';
 import { MyRecognitions } from '@/components/MyRecognitions';
 import { MySessions } from '@/components/MySessions';
+import { MisDatos } from '@/components/MisDatos';
 
 export default function StudentProfilePage() {
   const user = useSession(['student'], '/login/menor');
@@ -20,6 +21,7 @@ export default function StudentProfilePage() {
       ]}
     >
       <ProfilePanel user={user} />
+      <MisDatos esAlumno={true} />
       <MyRecognitions />
       <MySessions />
     </AppShell>

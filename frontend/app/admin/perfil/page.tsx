@@ -6,6 +6,7 @@ import { ProfilePanel } from '@/components/ProfilePanel';
 import { adminNav } from '@/lib/nav';
 import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 import { PerfilDocenteEditor } from '@/components/PerfilDocenteEditor';
+import { MisDatos } from '@/components/MisDatos';
 
 export default function AdminProfilePage() {
   // El auditor tiene «Perfil» en su menú lateral: si no se le admite aquí, el
@@ -20,6 +21,7 @@ export default function AdminProfilePage() {
       {user.role === 'profesor' && <PerfilDocenteAviso />}
       {user.role === 'profesor' && <PerfilDocenteEditor />}
       <ProfilePanel user={user} />
+      {user.role !== 'auditor' && <MisDatos esAlumno={false} />}
     </AppShell>
   );
 }
