@@ -170,7 +170,10 @@ export default function BancosPage() {
   async function loadTemas(id: string) {
     setSelBank(id); setImpMsg(null);
     try {
-      setTemas((await api<{ temas: Array<{ tema: string; questions: string }> }>(`/api/public/banks/${id}/temas`)).temas);
+      // Con sesión, no por la ruta pública: esta pantalla también abre bancos de
+      // oposición, y la pública no los sirve por ser contenido de pago.
+      setTemas((await api<{ temas: Array<{ tema: string; questions: string }> }>(
+        `/api/banks/${id}/temas`, { auth: true })).temas);
     } catch { setTemas([]); }
   }
 

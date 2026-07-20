@@ -168,6 +168,12 @@ export async function listBanks(req: Request, res: Response): Promise<void> {
   const conds = [visibles];
   const params: unknown[] = [isSuper, uid];
 
+  // Esta misma función sirve el catálogo público, que es de donde la práctica
+  // libre saca los bancos con los que entrenar. Los bancos de oposición son
+  // «públicos» en el sentido de no ser privados de un profesor, pero se
+  // venden: no pintan nada en una lista que se ofrece a quien no ha entrado.
+  if (!req.auth) conds.push("b.kind NOT IN ('ope', 'mir')");
+
   if (f.kind) { params.push(f.kind); conds.push(`b.kind = $${params.length}`); }
   if (f.dim1) { params.push(f.dim1); conds.push(`b.comunidad_autonoma = $${params.length}`); }
   if (f.dim2) { params.push(f.dim2); conds.push(`b.categoria_profesional = $${params.length}`); }
