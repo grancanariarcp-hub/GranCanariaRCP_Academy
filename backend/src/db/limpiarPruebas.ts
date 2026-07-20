@@ -19,6 +19,24 @@ import { pool, query, withTransaction } from '../config/database.js';
 
 const APLICAR = process.argv.includes('--aplicar');
 
+/**
+ * Correos cuya matrícula se respeta.
+ *
+ * Entre los cobros de prueba puede haber personas de verdad a las que se dio de
+ * alta durante las pruebas, o que pagaron por otra vía (transferencia, en
+ * mano). Su cobro en Stripe es igualmente ficticio y hay que retirarlo, pero
+ * quitarles el acceso al curso sería un daño real causado por una limpieza
+ * contable.
+ *
+ *   npm run db:limpiar-pruebas -- --aplicar --conservar alguien@correo.es
+ */
+const CONSERVAR = (() => {
+  const i = process.argv.indexOf('--conservar');
+  return i > -1 && process.argv[i + 1]
+    ? process.argv[i + 1].split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+    : [];
+})();
+
 const euros = (c: number) => (c / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
 async function main(): Promise<void> {
@@ -52,9 +70,19 @@ async function main(): Promise<void> {
   }
 
   for (const p of pruebas.rows) {
+    const respetado = CONSERVAR.includes((p.email ?? '').toLowerCase());
     console.log(`  ${p.receipt_number ?? '(sin justificante)'}  ${euros(p.amount_cents).padStart(10)}  ${p.status.padEnd(11)}` +
       `  ${p.alumno} <${p.email ?? 'sin correo'}>`);
-    console.log(`      curso: ${p.curso}  ·  matrícula quedará como "pendiente_pago" (ahora: ${p.enrollment_status})`);
+    console.log(`      curso: ${p.curso}  ·  ` + (respetado
+      ? `CONSERVA su acceso (matrícula intacta: ${p.enrollment_status})`
+      : `matrícula quedará como "pendiente_pago" (ahora: ${p.enrollment_status})`));
+  }
+  if (CONSERVAR.length > 0) {
+    const sinCoincidir = CONSERVAR.filter((e) => !pruebas.rows.some((p) => (p.email ?? '').toLowerCase() === e));
+    if (sinCoincidir.length > 0) {
+      console.log(`\n  AVISO: estos correos de --conservar no aparecen entre los cobros de prueba: ${sinCoincidir.join(', ')}`);
+      console.log('  Revisa que estén bien escritos: un correo mal tecleado no protege a nadie.');
+    }
   }
 
   // Los justificantes se numeran por año natural: hay que devolver cada
@@ -90,7 +118,12 @@ async function main(): Promise<void> {
     // tiene que abonarla.
     const m = await c.query(
       `UPDATE enrollments SET status = 'pendiente_pago', access_until = NULL
-        WHERE id IN (SELECT enrollment_id FROM payments WHERE livemode = FALSE)`,
+        WHERE id IN (
+          SELECT p.enrollment_id FROM payments p
+            JOIN students s ON s.id = p.student_id
+           WHERE p.livemode = FALSE AND LOWER(COALESCE(s.email, '')) <> ALL($1::text[])
+        )`,
+      [CONSERVAR],
     );
     const p = await c.query('DELETE FROM payments WHERE livemode = FALSE');
     await c.query(
