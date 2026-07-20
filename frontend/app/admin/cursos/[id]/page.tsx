@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
@@ -43,6 +43,7 @@ interface Staff {
 }
 interface Course {
   id: string;
+  created_by: string | null;
   title: string;
   tema: string | null;
   subtema: string | null;
@@ -78,6 +79,7 @@ export default function CourseDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
   const user = useSession(['super_admin', 'profesor', 'auditor'], '/login/admin');
+  const router = useRouter();
 
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);
@@ -189,6 +191,27 @@ export default function CourseDetailPage() {
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
+
+  // Ocultar retira el curso de la portada sin destruir nada: los matriculados
+  // conservan su acceso y el histórico queda intacto.
+  async function ocultar() {
+    if (!confirm('¿Ocultar el curso? Dejará de verse en la portada y nadie podrá matricularse. '
+      + 'Los alumnos que ya están dentro conservan su acceso, y podrás recuperarlo cuando quieras.')) return;
+    await patchCourse({ status: 'archivado', enrollmentOpen: false });
+  }
+
+  // Borrar solo es posible mientras el curso no haya dejado rastro en nadie; si
+  // lo tiene, el servidor lo impide y explica por qué.
+  async function borrar() {
+    if (!confirm('¿Borrar el curso definitivamente? Esta acción no se puede deshacer. '
+      + 'Si ya tiene alumnos, cobros, certificados o actas, el borrado se rechazará: en ese caso usa «Ocultar».')) return;
+    try {
+      await api(`/api/courses/${courseId}`, { method: 'DELETE', auth: true });
+      router.push('/admin/cursos');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se ha podido borrar el curso');
     }
   }
 
@@ -383,6 +406,9 @@ export default function CourseDetailPage() {
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
   const nav = adminNav(user.role, '/admin/cursos');
+  // Sobre un curso ajeno el super admin modera pero no edita: el contenido
+  // docente es de quien lo firma.
+  const esMio = !course?.created_by || course.created_by === user.id;
 
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={nav}>
@@ -407,16 +433,30 @@ export default function CourseDetailPage() {
                 {course.status === 'publicado' && (
                   <span className="badge badge-primary">{course.enrollment_open ? 'matrícula abierta' : 'próximamente'}</span>
                 )}
-                {course.status === 'publicado' ? (
+                {esMio && (course.status === 'publicado' ? (
                   <button className="btn btn-outline btn-small" onClick={() => patchCourse({ status: 'borrador' })}>Pasar a borrador</button>
                 ) : (
                   <button className="btn btn-primary btn-small" onClick={() => patchCourse({ status: 'publicado' })}>Publicar</button>
-                )}
+                ))}
                 <button className="btn btn-outline btn-small" onClick={() => patchCourse({ enrollmentOpen: !course.enrollment_open })}>
                   {course.enrollment_open ? 'Cerrar matrícula' : 'Abrir matrícula'}
                 </button>
+                {course.status === 'archivado' ? (
+                  <button className="btn btn-outline btn-small" onClick={() => patchCourse({ status: 'publicado' })}>
+                    Recuperar
+                  </button>
+                ) : (
+                  <button className="btn btn-outline btn-small" onClick={ocultar}>Ocultar</button>
+                )}
+                {esMio && <button className="btn btn-danger btn-small" onClick={borrar}>Borrar</button>}
               </div>
             </div>
+            {!esMio && (
+              <div className="info-box" style={{ marginTop: 12, fontSize: 13 }}>
+                Este curso lo creó otra persona. Puedes <strong>ocultarlo</strong> o cerrar su matrícula si hace
+                falta retirarlo, pero no editar su contenido: quien lo firma responde de lo que enseña.
+              </div>
+            )}
             {course.status === 'publicado' && (
               <div className="info-box" style={{ marginTop: 12, fontSize: 13 }}>
                 {course.enrollment_open

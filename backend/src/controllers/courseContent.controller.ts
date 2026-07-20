@@ -1,10 +1,10 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../config/database.js';
-import { badRequest, notFound } from '../utils/httpError.js';
+import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
-import { assertEditor, assertDirector } from '../services/courseAuth.js';
+import { assertEditor, assertDirector, relacionConCurso } from '../services/courseAuth.js';
 import { notify } from '../services/notify.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl, deleteObject } from '../services/r2.js';
 import { estadoPerfilDocente } from '../services/perfilDocente.js';
@@ -48,9 +48,39 @@ const updateCourseSchema = z.object({
   priceAnualCents: z.number().int().min(0).max(10_000_00).nullish(),
 });
 
+/** Lo único que se puede tocar de un curso ajeno: retirarlo de circulación. */
+const CAMPOS_DE_MODERACION = new Set(['status', 'enrollmentOpen']);
+
 export async function updateCourse(req: Request, res: Response): Promise<void> {
   await assertDirector(req);
   const d = updateCourseSchema.parse(req.body);
+
+  // Sobre un curso que no es suyo, el super admin modera pero no edita: puede
+  // ocultarlo o cerrarle la matrícula, no reescribir su contenido. Quien firma
+  // un curso acreditado responde de lo que enseña, y no puede responder de algo
+  // que otro cambió por debajo.
+  if (req.auth!.role === 'super_admin') {
+    const rel = await relacionConCurso(req.params.id, req.auth!.sub);
+    const ajeno = rel.existe && !rel.esCreador && rel.rolStaff === null;
+    if (ajeno) {
+      const tocados = Object.keys(d).filter((k) => d[k as keyof typeof d] !== undefined);
+      const prohibidos = tocados.filter((k) => !CAMPOS_DE_MODERACION.has(k));
+      if (prohibidos.length > 0) {
+        throw forbidden(
+          'Este curso lo creó otra persona: puedes ocultarlo o cerrar su matrícula, pero no editar su contenido. '
+          + `Campos no permitidos: ${prohibidos.join(', ')}.`,
+        );
+      }
+      if (d.status && d.status === 'borrador') {
+        throw forbidden('Sobre un curso ajeno solo puedes ocultarlo (archivado) o volver a publicarlo.');
+      }
+      await audit({
+        actorId: req.auth!.sub, actorType: req.auth!.role, action: 'COURSE_MODERATED',
+        entity: 'course', entityId: req.params.id, ip: clientIp(req),
+        metadata: { status: d.status, enrollmentOpen: d.enrollmentOpen },
+      }).catch(() => { /* moderar no debe fallar por el registro */ });
+    }
+  }
 
   // Publicar exige tener el currículum al día: es lo que el alumno lee para
   // decidir, y lo prometemos en la página pública. No se pide al registrarse
@@ -292,5 +322,56 @@ export async function removeStaff(req: Request, res: Response): Promise<void> {
   await assertDirector(req);
   if (req.params.userId === req.auth!.sub) throw badRequest('No puedes quitarte a ti mismo', 'SELF_REMOVE');
   await query('DELETE FROM course_staff WHERE course_id = $1 AND user_id = $2', [req.params.id, req.params.userId]);
+  res.json({ ok: true });
+}
+
+/**
+ * DELETE /api/courses/:id — borrar un curso.
+ *
+ * Solo lo borra quien lo creó, y solo mientras no haya dejado rastro en la vida
+ * de nadie. En cuanto hay una matrícula, un cobro, un certificado emitido o un
+ * acta cerrada, el curso deja de ser un borrador propio para ser el respaldo
+ * documental de la formación de otra persona: un certificado remite a su curso
+ * y un acta es el registro que pide la comisión. Borrarlo dejaría huérfano un
+ * documento que alguien puede tener que acreditar años después.
+ *
+ * Para esos casos está archivar, que lo retira de circulación sin destruir nada.
+ */
+export async function deleteCourse(req: Request, res: Response): Promise<void> {
+  const rel = await relacionConCurso(req.params.id, req.auth!.sub);
+  if (!rel.existe) throw notFound('Curso no encontrado');
+  if (!rel.esCreador) {
+    throw forbidden(
+      'Solo quien creó el curso puede borrarlo. Si necesitas retirarlo de circulación, ocúltalo (archivar).',
+    );
+  }
+
+  const { rows } = await query<{ matriculas: string; pagos: string; certificados: string; actas: string }>(
+    `SELECT (SELECT COUNT(*) FROM enrollments        WHERE course_id = $1)::text AS matriculas,
+            (SELECT COUNT(*) FROM payments           WHERE course_id = $1)::text AS pagos,
+            (SELECT COUNT(*) FROM issued_certificates WHERE course_id = $1)::text AS certificados,
+            (SELECT COUNT(*) FROM course_actas       WHERE course_id = $1)::text AS actas`,
+    [req.params.id],
+  );
+  const r = rows[0];
+  const impedimentos: string[] = [];
+  if (Number(r.matriculas) > 0) impedimentos.push(`${r.matriculas} matrícula(s)`);
+  if (Number(r.pagos) > 0) impedimentos.push(`${r.pagos} cobro(s)`);
+  if (Number(r.certificados) > 0) impedimentos.push(`${r.certificados} certificado(s) emitido(s)`);
+  if (Number(r.actas) > 0) impedimentos.push(`${r.actas} acta(s)`);
+
+  if (impedimentos.length > 0) {
+    throw badRequest(
+      `Este curso ya tiene ${impedimentos.join(', ')}, así que no puede borrarse: hay documentos y registros `
+      + 'que dependen de él. Ocúltalo (archivar) para retirarlo de circulación conservando el histórico.',
+      'CURSO_CON_HISTORIAL',
+    );
+  }
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role, action: 'COURSE_DELETED',
+    entity: 'course', entityId: req.params.id, ip: clientIp(req),
+  }).catch(() => { /* el borrado no debe fallar por el registro */ });
+  await query('DELETE FROM courses WHERE id = $1', [req.params.id]);
   res.json({ ok: true });
 }

@@ -24,6 +24,30 @@ export async function assertEditor(req: Request): Promise<void> {
   if (!role) throw forbidden('No formas parte de este curso');
 }
 
+/**
+ * Qué es esta persona respecto a este curso.
+ *
+ * Ser super admin no es lo mismo que ser el autor. Sobre un curso ajeno el
+ * super admin puede intervenir —ocultarlo, cerrar su matrícula— porque responde
+ * de la plataforma, pero no reescribirlo: el contenido docente y la
+ * responsabilidad de lo que en él se enseña son de quien lo firma.
+ */
+export async function relacionConCurso(
+  courseId: string,
+  userId: string,
+): Promise<{ esCreador: boolean; rolStaff: string | null; existe: boolean }> {
+  const { rows } = await query<{ created_by: string | null }>(
+    'SELECT created_by FROM courses WHERE id = $1',
+    [courseId],
+  );
+  if (rows.length === 0) return { esCreador: false, rolStaff: null, existe: false };
+  return {
+    esCreador: rows[0].created_by === userId,
+    rolStaff: await roleInCourse(courseId, userId),
+    existe: true,
+  };
+}
+
 export async function assertDirector(req: Request): Promise<void> {
   if (req.auth!.role === 'super_admin') return;
   if (req.auth!.role === 'auditor') return;
