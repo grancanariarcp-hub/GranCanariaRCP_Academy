@@ -29,6 +29,7 @@ import { stripeStatus } from '../controllers/payment.controller.js';
 import { listLeads } from '../controllers/lead.controller.js';
 import { listTemplates, createTemplate, updateTemplate, deleteTemplate, uploadTemplateBackground, previewTemplate } from '../controllers/recognition.controller.js';
 import { anonStats } from '../controllers/anonPractice.controller.js';
+import { listConvocatorias, createConvocatoria, updateConvocatoria, deleteConvocatoria, setConvocatoriaBanks } from '../controllers/convocatoria.controller.js';
 
 const router = Router();
 
@@ -42,6 +43,13 @@ router.get('/stats', asyncHandler(getStats));
 router.get('/stripe-status', asyncHandler(stripeStatus));
 router.get('/leads', asyncHandler(listLeads));
 router.get('/anon-practice', asyncHandler(anonStats));
+
+// Convocatorias de oposición
+router.get('/convocatorias', asyncHandler(listConvocatorias));
+router.post('/convocatorias', asyncHandler(createConvocatoria));
+router.patch('/convocatorias/:id', asyncHandler(updateConvocatoria));
+router.delete('/convocatorias/:id', asyncHandler(deleteConvocatoria));
+router.put('/convocatorias/:id/banks', asyncHandler(setConvocatoriaBanks));
 
 // Certificados de reconocimiento (plantillas)
 router.get('/recognition-templates', asyncHandler(listTemplates));

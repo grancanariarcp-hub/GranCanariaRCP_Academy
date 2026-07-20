@@ -80,6 +80,7 @@ export default function OpePage() {
       nav={[
         { label: 'Inicio', href: '/student' },
         { label: 'Oposiciones', href: '/student/ope', active: true },
+        { label: 'Generar test', href: '/student/ope/test' },
         { label: 'Práctica RCP básico', href: '/practica' },
         { label: 'Perfil', href: '/student/perfil' },
       ]}
@@ -160,8 +161,8 @@ export default function OpePage() {
                     style={b.simulacroListo ? undefined : { pointerEvents: 'none', opacity: 0.5 }}>
                     Hacer el simulacro
                   </Link>
-                  <Link href={`/practica?bankId=${b.id}&modo=tema`} className="btn btn-outline press">
-                    Examen a mi medida
+                  <Link href="/student/ope/test" className="btn btn-outline press">
+                    Configurar un test a mi medida
                   </Link>
                   <Link href={`/practica?bankId=${b.id}&modo=fallos`} className="btn btn-outline press"
                     style={detalle?.fallosPendientes ? undefined : { pointerEvents: 'none', opacity: 0.5 }}>

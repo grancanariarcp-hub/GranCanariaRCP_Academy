@@ -17,6 +17,7 @@ export function adminNav(role: Role, activeHref?: string) {
           { label: 'Cursos', href: '/admin/cursos' },
           { label: 'Preguntas', href: '/admin/preguntas' },
           { label: 'Bancos', href: '/admin/bancos' },
+          { label: 'Convocatorias', href: '/admin/convocatorias' },
           { label: 'Documentos', href: '/admin/documentos' },
           { label: 'Desafíos', href: '/admin/desafios' },
           { label: 'Diplomas', href: '/admin/reconocimientos' },
