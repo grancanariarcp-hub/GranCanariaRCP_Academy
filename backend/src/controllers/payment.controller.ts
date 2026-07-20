@@ -100,7 +100,12 @@ export async function createCheckoutSession(req: Request, res: Response): Promis
     `INSERT INTO payments (enrollment_id, student_id, course_id, amount_cents, status, stripe_session_id, livemode, tax_note)
      VALUES ($1,$2,$3,$4,'pendiente',$5,$6,$7)
      ON CONFLICT (stripe_session_id) DO NOTHING`,
-    [m.enrollment_id, studentId, courseId, cents, sesion.id, stripeEnProduccion(), NOTA_EXENCION],
+    // Si el cobro es real lo dice la PROPIA SESIÓN de Stripe, no el aspecto de
+    // nuestra clave. Deducirlo del prefijo fallaba con las claves restringidas
+    // (rk_live_): un cobro real quedaba marcado como de prueba, la dirección
+    // veía «esto no es dinero real» sobre dinero real, y la limpieza de pagos
+    // de prueba lo habría borrado junto con su justificante.
+    [m.enrollment_id, studentId, courseId, cents, sesion.id, sesion.livemode, NOTA_EXENCION],
   );
 
   res.json({ url: sesion.url });
@@ -276,13 +281,17 @@ export async function coursePayments(req: Request, res: Response): Promise<void>
 export async function stripeStatus(_req: Request, res: Response): Promise<void> {
   const configurado = stripeConfigurado();
   let cuenta: { id: string; chargesEnabled: boolean; pais: string | null } | null = null;
+  // Una clave restringida puede no tener permiso para leer la cuenta. Eso no
+  // impide cobrar, pero si se calla el error queda un panel mudo imposible de
+  // diagnosticar: se guarda el motivo tal como lo cuenta Stripe.
+  let errorCuenta: string | null = null;
   if (configurado) {
     try {
       // Sin argumentos apunta a la cuenta de la propia clave.
       const a = await stripe().accounts.retrieve('');
       cuenta = { id: a.id, chargesEnabled: !!a.charges_enabled, pais: a.country ?? null };
-    } catch {
-      cuenta = null;
+    } catch (e) {
+      errorCuenta = e instanceof Error ? e.message : 'no se ha podido consultar la cuenta';
     }
   }
   const secretoWebhook = (process.env.STRIPE_WEBHOOK_SECRET || '').trim();
@@ -291,6 +300,7 @@ export async function stripeStatus(_req: Request, res: Response): Promise<void> 
     webhookConfigurado: !!secretoWebhook,
     modo: !configurado ? 'sin configurar' : stripeEnProduccion() ? 'produccion' : 'pruebas',
     cuenta,
+    errorCuenta,
     // Diagnóstico: cuando el modo no es el esperado, dice POR QUÉ sin llegar a
     // exponer la clave. Sin esto, un modo «pruebas» inesperado obliga a probar
     // a ciegas entre cuatro causas distintas.

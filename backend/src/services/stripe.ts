@@ -29,9 +29,16 @@ export function stripeConfigurado(): boolean {
   return !!claveStripe();
 }
 
-/** True si la clave es de producción y, por tanto, mueve dinero real. */
+/**
+ * True si la clave es de producción y, por tanto, mueve dinero real.
+ *
+ * Vale tanto la clave secreta completa (sk_live_) como una restringida
+ * (rk_live_). Las restringidas son mejor práctica —conceden solo los permisos
+ * necesarios—, y una restringida de producción cobra dinero igual de real:
+ * tratarla como de pruebas era decir que un ingreso real no lo era.
+ */
 export function stripeEnProduccion(): boolean {
-  return claveStripe().startsWith('sk_live_');
+  return /^(sk|rk)_live_/.test(claveStripe());
 }
 
 /**
@@ -47,12 +54,12 @@ export function diagnosticoClave(): { prefijo: string; tipo: string; teniaEspaci
     ? 'sin clave'
     : clave.startsWith('sk_live_')
       ? 'secreta de producción (correcta)'
-      : clave.startsWith('sk_test_')
-        ? 'secreta de pruebas'
-        : clave.startsWith('pk_')
-          ? 'PUBLICABLE: es la clave que se muestra sin ocultar, no sirve para cobrar'
-          : clave.startsWith('rk_')
-            ? 'restringida: puede no tener permiso para cobrar'
+      : clave.startsWith('rk_live_')
+        ? 'restringida de producción (válida, si tiene permiso de escritura sobre Checkout Sessions)'
+        : clave.startsWith('sk_test_') || clave.startsWith('rk_test_')
+          ? 'de pruebas'
+          : clave.startsWith('pk_')
+            ? 'PUBLICABLE: es la clave que se muestra sin ocultar, no sirve para cobrar'
             : 'no reconocida';
   return { prefijo, tipo, teniaEspacios: bruta !== clave };
 }

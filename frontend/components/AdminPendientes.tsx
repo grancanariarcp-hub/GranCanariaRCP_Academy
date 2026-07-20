@@ -18,6 +18,7 @@ interface Cuenta { subject_id: string; nombre: string | null; email: string | nu
 interface Stripe {
   configurado: boolean; webhookConfigurado: boolean; modo: string; webhookValido: boolean;
   cuenta: { id: string; chargesEnabled: boolean; pais: string | null } | null;
+  errorCuenta: string | null;
   clave: { prefijo: string; tipo: string; teniaEspacios: boolean };
 }
 
@@ -156,6 +157,15 @@ export function AdminPendientes() {
                   falta está debajo, oculta tras <em>Revelar</em>, y empieza por <code>sk_live_</code>.
                 </div>
               )}
+            </div>
+          )}
+          {stripe.errorCuenta && (
+            <div className="alert alert-error" style={{ fontSize: 13, marginTop: 8 }}>
+              No se ha podido leer la cuenta de Stripe: {stripe.errorCuenta}
+              <div style={{ marginTop: 6 }}>
+                Con una clave restringida esto suele significar que le falta permiso de lectura sobre
+                <strong> Account</strong>. No impide cobrar, pero deja el panel a ciegas.
+              </div>
             </div>
           )}
           {stripe.webhookConfigurado && !stripe.webhookValido && (
