@@ -40,3 +40,6 @@ temp/
 backups/
 *.sql.gz
 
+
+# Caché de compilación de TypeScript: se regenera en cada build
+*.tsbuildinfo

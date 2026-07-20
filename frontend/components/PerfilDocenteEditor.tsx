@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Titular y profesión del docente.
@@ -43,7 +44,7 @@ export function PerfilDocenteEditor({ onGuardado }: { onGuardado?: () => void })
   return (
     <div className="card" style={{ marginBottom: 20 }}>
       <div className="card-header">
-        <div className="card-title">Cómo te ven tus alumnos</div>
+        <div className="card-title">Cómo te ven tus alumnos <Ayuda tema="profesor-perfil" /></div>
         <div className="card-subtitle">Aparece junto a tus cursos y en tu ficha pública</div>
       </div>
 

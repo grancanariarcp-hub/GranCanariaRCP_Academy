@@ -30,12 +30,17 @@ const ORDEN = [
   'activities', 'course_images',
   'enrollments', 'activity_completions', 'exam_attempts',
   'challenges', 'challenge_attempts',
-  'practice_sessions', 'learning_time',
+  'practice_sessions', 'practice_tests', 'learning_time',
   'course_surveys', 'survey_responses', 'survey_item_scores',
   'issued_certificates', 'notifications', 'forum_threads', 'forum_posts',
   'question_reports', 'consent_log', 'platform_settings',
   'answer_log', 'test_responses', 'audit_logs',
   'attendance_sessions', 'attendance_records',
+  'acta_counters', 'course_actas',
+  'recognition_templates', 'issued_recognitions',
+  'receipt_counters', 'payments',
+  'ope_convocatorias', 'ope_convocatoria_banks',
+  'leads', 'anon_practice', 'sessions',
   '_migrations',
 ];
 

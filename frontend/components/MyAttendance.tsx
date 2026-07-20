@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Jornadas presenciales del alumno, con su botón para fichar.
@@ -47,7 +48,7 @@ export function MyAttendance({ courseId }: { courseId?: string }) {
     <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid #0d9488' }}>
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div className="card-title">Asistencia presencial</div>
+          <div className="card-title">Asistencia presencial <Ayuda tema="alumno-asistencia" /></div>
           <div className="card-subtitle">Escanea el QR que muestra tu profesor al entrar y al salir.</div>
         </div>
         <button className="btn btn-primary btn-small press" onClick={() => setLector(true)}>Escanear QR</button>

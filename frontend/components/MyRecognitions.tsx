@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Diplomas del participante.
@@ -45,7 +46,7 @@ export function MyRecognitions() {
   return (
     <div className="card" style={{ marginBottom: 20, borderLeft: '4px solid #c41e3a' }}>
       <div className="card-header">
-        <div className="card-title">Mis diplomas</div>
+        <div className="card-title">Mis diplomas <Ayuda tema="alumno-certificados" /></div>
         <div className="card-subtitle">Por participar en los desafíos y por tus horas de práctica</div>
       </div>
 

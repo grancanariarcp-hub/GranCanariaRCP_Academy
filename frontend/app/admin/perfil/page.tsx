@@ -8,7 +8,9 @@ import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 import { PerfilDocenteEditor } from '@/components/PerfilDocenteEditor';
 
 export default function AdminProfilePage() {
-  const user = useSession(['super_admin', 'institution_admin', 'profesor'], '/login');
+  // El auditor tiene «Perfil» en su menú lateral: si no se le admite aquí, el
+  // propio menú le expulsa al login al pulsarlo.
+  const user = useSession(['super_admin', 'institution_admin', 'profesor', 'auditor'], '/login');
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
   const nav = adminNav(user.role, '/admin/perfil');

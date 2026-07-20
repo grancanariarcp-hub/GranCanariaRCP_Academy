@@ -6,6 +6,7 @@ import { clearSession, type SessionUser } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
 import { NotificationBell } from '@/components/NotificationBell';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 interface NavItem {
   label: string;
@@ -51,6 +52,11 @@ export function AppShell({
               {item.label}
             </a>
           ))}
+          {/* El manual se añade aquí y no en cada menú: así lo tienen todos los
+              roles sin que haya que acordarse de incluirlo al crear una página. */}
+          <a href="/ayuda" onClick={() => setMenuOpen(false)} style={{ marginTop: 10, opacity: 0.85 }}>
+            Manual de uso
+          </a>
         </nav>
         <div style={{ marginTop: 24, paddingLeft: 12 }}>
           <AppVersion style={{ color: 'rgba(255,255,255,0.6)' }} />
@@ -64,6 +70,8 @@ export function AppShell({
             <h2>{title}</h2>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Ayuda de la pantalla actual: se resuelve sola por la ruta. */}
+            <Ayuda variante="boton" />
             <NotificationBell />
             <span className="muted" style={{ fontSize: 13 }}>
               {user.name} · <span className="badge badge-primary">{roleLabel(user.role)}</span>

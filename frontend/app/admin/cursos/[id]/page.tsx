@@ -16,6 +16,7 @@ import { ActaPanel } from '@/components/ActaPanel';
 import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 import { CourseSubscription } from '@/components/CourseSubscription';
 import { CoursePayments } from '@/components/CoursePayments';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 interface Activity {
   id: string;
@@ -505,7 +506,7 @@ export default function CourseDetailPage() {
         {/* Ficha del curso */}
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
-              <div className="card-title">Ficha del curso</div>
+              <div className="card-title">Ficha del curso <Ayuda tema="profesor-curso-crear" /></div>
               <div className="card-subtitle">Se muestra a los alumnos antes de matricularse</div>
             </div>
             {fichaMsg && <div className={`alert ${fichaMsg.includes('✅') ? 'alert-success' : 'alert-error'}`}>{fichaMsg}</div>}
@@ -703,7 +704,7 @@ export default function CourseDetailPage() {
           {!course.es_ope && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
-              <div className="card-title">Certificado</div>
+              <div className="card-title">Certificado <Ayuda tema="profesor-certificados" /></div>
               <div className="card-subtitle">Se genera al aprobar el curso. Si no subes fondo, será blanco.</div>
             </div>
             {certMsg && <div className={`alert ${certMsg.includes('✅') ? 'alert-success' : 'alert-error'}`}>{certMsg}</div>}
@@ -747,7 +748,7 @@ export default function CourseDetailPage() {
             {/* Módulos + actividades */}
             <div className="card">
               <div className="card-header">
-                <div className="card-title">Contenido del curso</div>
+                <div className="card-title">Contenido del curso <Ayuda tema="profesor-curso-modulos" /></div>
                 <div className="card-subtitle">{modules.length} módulos</div>
               </div>
 
@@ -848,7 +849,7 @@ export default function CourseDetailPage() {
             {/* Alumnos matriculados */}
             <div className="card animate-in">
               <div className="card-header">
-                <div className="card-title">Alumnos matriculados</div>
+                <div className="card-title">Alumnos matriculados <Ayuda tema="profesor-alumnos" /></div>
                 <div className="card-subtitle">{students.length}</div>
               </div>
               {tempPw && (

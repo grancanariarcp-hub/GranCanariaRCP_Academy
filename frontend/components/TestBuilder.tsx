@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Asistente de configuración de tests y exámenes para oposiciones.
@@ -112,7 +113,7 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
   return (
     <div className="card">
       <div className="card-header">
-        <div className="card-title">Configura tu test</div>
+        <div className="card-title">Configura tu test <Ayuda tema="ope-test" /></div>
         <div className="card-subtitle">Cada paso ajusta de dónde salen las preguntas y cómo lo harás</div>
       </div>
 

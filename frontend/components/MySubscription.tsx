@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Estado de mi suscripción, con la cancelación a un clic.
@@ -73,7 +74,7 @@ export function MySubscription({ courseId }: { courseId: string }) {
       borderLeft: `4px solid ${s.renovacionAutomatica || s.renovacionPendienteDeActivar ? 'var(--success)' : 'var(--warning)'}`,
     }}>
       <div className="card-header">
-        <div className="card-title">Tu suscripción</div>
+        <div className="card-title">Tu suscripción <Ayuda tema="ope-suscripcion" /></div>
         <div className="card-subtitle">
           Plan {NOMBRE[s.periodo ?? ''] ?? s.periodo} · {euros(s.importeCents ?? 0)} por periodo
         </div>

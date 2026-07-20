@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Dispositivos conectados a la cuenta.
@@ -37,7 +38,7 @@ export function MySessions() {
   return (
     <div className="card" style={{ marginBottom: 20 }}>
       <div className="card-header">
-        <div className="card-title">Dispositivos conectados</div>
+        <div className="card-title">Dispositivos conectados <Ayuda tema="dispositivos" /></div>
         <div className="card-subtitle">
           Puedes usar tu cuenta en {maximo} dispositivos a la vez; al entrar en uno más se cierra el menos
           activo

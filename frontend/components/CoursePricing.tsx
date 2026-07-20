@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Precio de matrícula del curso, con matrícula anticipada.
@@ -57,7 +58,7 @@ export function CoursePricing({ courseId, course, onSaved }: { courseId: string;
   return (
     <div className="card" style={{ marginBottom: 24 }}>
       <div className="card-header">
-        <div className="card-title">Precio de matrícula</div>
+        <div className="card-title">Precio de matrícula <Ayuda tema="profesor-precio" /></div>
         <div className="card-subtitle">Deja el precio en 0 para que el curso sea gratuito</div>
       </div>
 

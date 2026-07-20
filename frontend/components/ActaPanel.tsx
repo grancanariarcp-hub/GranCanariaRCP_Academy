@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, downloadFile } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Acta del curso en el panel de dirección.
@@ -77,7 +78,7 @@ export function ActaPanel({ courseId }: { courseId: string }) {
     <div className="card" style={{ marginBottom: 24 }}>
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div className="card-title">Acta del curso</div>
+          <div className="card-title">Acta del curso <Ayuda tema="profesor-acta" /></div>
           <div className="card-subtitle">Documento que cierra la actividad formativa</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

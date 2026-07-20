@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, downloadFile } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Asistencia presencial en el panel del director.
@@ -105,7 +106,7 @@ export function AttendancePanel({ courseId }: { courseId: string }) {
     <div className="card" style={{ marginBottom: 24 }}>
       <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <div className="card-title">Asistencia presencial</div>
+          <div className="card-title">Asistencia presencial <Ayuda tema="profesor-asistencia" /></div>
           <div className="card-subtitle">Una jornada por día o actividad. El alumnado ficha con el QR desde su perfil.</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

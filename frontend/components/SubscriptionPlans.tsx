@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Contratación por suscripción.
@@ -64,7 +65,7 @@ export function SubscriptionPlans({ courseId, onContratado }: { courseId: string
   return (
     <div className="card" style={{ marginBottom: 20 }}>
       <div className="card-header">
-        <div className="card-title">Elige tu suscripción</div>
+        <div className="card-title">Elige tu suscripción <Ayuda tema="ope-suscripcion" /></div>
         <div className="card-subtitle">Cuanto más largo el periodo, menos pagas al mes</div>
       </div>
 

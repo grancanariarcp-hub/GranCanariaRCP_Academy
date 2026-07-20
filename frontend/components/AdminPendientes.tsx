@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Tres cosas que la plataforma recoge y que hasta ahora no se veían en ninguna
@@ -71,7 +72,7 @@ export function AdminPendientes() {
       {/* Indicios de credenciales compartidas */}
       <div className="card">
         <div className="card-header">
-          <div className="card-title">Posible uso compartido</div>
+          <div className="card-title">Posible uso compartido <Ayuda tema="admin-pendientes" /></div>
           <div className="card-subtitle">Cuentas con muchos dispositivos o conexiones en 14 días</div>
         </div>
         {compartido.length === 0 ? (

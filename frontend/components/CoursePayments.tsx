@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { Ayuda } from '@/components/ayuda/Ayuda';
 
 /**
  * Cobros del curso.
@@ -39,7 +40,7 @@ export function CoursePayments({ courseId }: { courseId: string }) {
   return (
     <div className="card" style={{ marginBottom: 24 }}>
       <div className="card-header">
-        <div className="card-title">Cobros del curso</div>
+        <div className="card-title">Cobros del curso <Ayuda tema="profesor-pagos" /></div>
         <div className="card-subtitle">{datos.payments.length} movimientos</div>
       </div>
 
