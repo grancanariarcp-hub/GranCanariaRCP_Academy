@@ -15,6 +15,7 @@ import { Ayuda } from '@/components/ayuda/Ayuda';
 interface Pago {
   id: string; amount_cents: number; status: string; receipt_number: string | null;
   paid_at: string | null; livemode: boolean; display_name: string; email: string | null;
+  refunded_cents: number; refunded_at: string | null;
 }
 
 const euros = (c: number) => (c / 100).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
@@ -26,7 +27,7 @@ const ETIQUETA: Record<string, string> = {
 export function CoursePayments({ courseId }: { courseId: string }) {
   const [datos, setDatos] = useState<{
     payments: Pago[];
-    totales: { cobradoCents: number; pendienteCents: number };
+    totales: { cobradoCents: number; pendienteCents: number; devueltoCents: number };
     modoPruebas: boolean;
   } | null>(null);
 
@@ -56,6 +57,11 @@ export function CoursePayments({ courseId }: { courseId: string }) {
           <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--success)' }}>
             {euros(datos.totales.cobradoCents)}
           </div>
+          {datos.totales.devueltoCents > 0 && (
+            <div className="muted" style={{ fontSize: 11.5 }}>
+              ya descontados {euros(datos.totales.devueltoCents)} devueltos
+            </div>
+          )}
         </div>
         <div className="info-box">
           <div className="muted" style={{ fontSize: 12 }}>Pendiente de pago</div>
@@ -77,7 +83,14 @@ export function CoursePayments({ courseId }: { courseId: string }) {
                   {p.display_name}
                   {p.email && <div className="muted" style={{ fontSize: 11.5 }}>{p.email}</div>}
                 </td>
-                <td><strong>{euros(p.amount_cents)}</strong></td>
+                <td>
+                  <strong>{euros(p.amount_cents)}</strong>
+                  {p.refunded_cents > 0 && (
+                    <div className="muted" style={{ fontSize: 11.5 }}>
+                      −{euros(p.refunded_cents)} devuelto
+                    </div>
+                  )}
+                </td>
                 <td>
                   <span className={`badge ${p.status === 'pagado' ? 'badge-success' : p.status === 'pendiente' ? 'badge-warning' : ''}`}>
                     {ETIQUETA[p.status] ?? p.status}

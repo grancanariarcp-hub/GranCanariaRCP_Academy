@@ -153,13 +153,7 @@ export async function stripeWebhook(req: Request, res: Response): Promise<void> 
       [(evento.data.object as Stripe.Checkout.Session).id],
     );
   } else if (evento.type === 'charge.refunded') {
-    const cargo = evento.data.object as Stripe.Charge;
-    if (cargo.payment_intent) {
-      await query(
-        `UPDATE payments SET status = 'reembolsado' WHERE stripe_payment_intent_id = $1`,
-        [String(cargo.payment_intent)],
-      );
-    }
+    await confirmarDevolucion(evento.data.object as Stripe.Charge);
   }
 
   // Siempre 200: si respondemos error, Stripe reintenta en bucle.
@@ -241,6 +235,65 @@ async function confirmarPago(sesion: Stripe.Checkout.Session): Promise<void> {
   }).catch(() => { /* idem */ });
 }
 
+/**
+ * Aplica una devolución.
+ *
+ * Devolver el dinero retira el acceso: si no, se podría pagar, hacer el curso
+ * entero, descargar el certificado y pedir el reembolso quedándoselo todo.
+ *
+ * Solo cuando la devolución es TOTAL. Una parcial —un descuento aplicado a
+ * posteriori, una compensación— no anula la matrícula: se anota el importe
+ * devuelto para que las cuentas cuadren y el alumno sigue dentro.
+ */
+async function confirmarDevolucion(cargo: Stripe.Charge): Promise<void> {
+  if (!cargo.payment_intent) return;
+  const intent = String(cargo.payment_intent);
+  const devuelto = cargo.amount_refunded ?? 0;
+  const total = devuelto >= (cargo.amount ?? 0);
+
+  const { rows } = await query<{
+    id: string; enrollment_id: string; student_id: string; course_id: string;
+    amount_cents: number; title: string;
+  }>(
+    `UPDATE payments p
+        SET refunded_cents = $2,
+            refunded_at    = NOW(),
+            status         = CASE WHEN $3::boolean THEN 'reembolsado' ELSE p.status END
+       FROM courses c
+      WHERE c.id = p.course_id AND p.stripe_payment_intent_id = $1
+    RETURNING p.id, p.enrollment_id, p.student_id, p.course_id, p.amount_cents, c.title`,
+    [intent, devuelto, total],
+  );
+  const p = rows[0];
+  if (!p || !total) return;
+
+  await query(
+    `UPDATE enrollments SET status = 'pendiente_pago', access_until = NULL WHERE id = $1`,
+    [p.enrollment_id],
+  );
+
+  await notify(
+    { id: p.student_id, type: 'student' },
+    'Matrícula reembolsada',
+    `Se te ha devuelto ${euros(devuelto)} de «${p.title}». El acceso al curso queda cerrado; ` +
+      'si crees que se trata de un error, contacta con la organización.',
+    `/curso/${p.course_id}`,
+  ).catch(() => { /* no bloquear la devolución por un aviso */ });
+
+  const staff = await query<{ user_id: string }>('SELECT user_id FROM course_staff WHERE course_id = $1', [p.course_id]);
+  for (const s of staff.rows) {
+    await notify({ id: s.user_id, type: 'user' }, 'Matrícula reembolsada',
+      `Se han devuelto ${euros(devuelto)} de «${p.title}». El alumno ha perdido el acceso.`,
+      `/admin/cursos/${p.course_id}`).catch(() => { /* idem */ });
+  }
+
+  await audit({
+    actorId: p.student_id, actorType: 'student', action: 'PAYMENT_REFUNDED',
+    entity: 'payment', entityId: p.id, ip: null,
+    metadata: { refundedCents: devuelto, amountCents: p.amount_cents },
+  }).catch(() => { /* idem */ });
+}
+
 /** GET /api/student/payments — mis pagos, para el perfil del alumno. */
 export async function myPayments(req: Request, res: Response): Promise<void> {
   const { rows } = await query(
@@ -258,21 +311,29 @@ export async function myPayments(req: Request, res: Response): Promise<void> {
 export async function coursePayments(req: Request, res: Response): Promise<void> {
   const { rows } = await query(
     `SELECT p.id, p.amount_cents, p.status, p.receipt_number, p.paid_at, p.livemode,
-            s.display_name, s.email
+            p.refunded_cents, p.refunded_at, s.display_name, s.email
        FROM payments p JOIN students s ON s.id = p.student_id
       WHERE p.course_id = $1
       ORDER BY p.created_at DESC`,
     [req.params.id],
   );
-  const totales = await query<{ cobrado: string; pendiente: string }>(
-    `SELECT COALESCE(SUM(amount_cents) FILTER (WHERE status = 'pagado'), 0)     AS cobrado,
-            COALESCE(SUM(amount_cents) FILTER (WHERE status = 'pendiente'), 0) AS pendiente
+  // «Cobrado» es lo realmente ingresado: lo devuelto se resta, incluso cuando la
+  // devolución fue parcial y el cobro sigue figurando como pagado.
+  const totales = await query<{ cobrado: string; pendiente: string; devuelto: string }>(
+    `SELECT COALESCE(SUM(amount_cents) FILTER (WHERE status = 'pagado'), 0)
+              - COALESCE(SUM(refunded_cents) FILTER (WHERE status = 'pagado'), 0) AS cobrado,
+            COALESCE(SUM(amount_cents) FILTER (WHERE status = 'pendiente'), 0)    AS pendiente,
+            COALESCE(SUM(refunded_cents), 0)                                      AS devuelto
        FROM payments WHERE course_id = $1`,
     [req.params.id],
   );
   res.json({
     payments: rows,
-    totales: { cobradoCents: Number(totales.rows[0].cobrado), pendienteCents: Number(totales.rows[0].pendiente) },
+    totales: {
+      cobradoCents: Number(totales.rows[0].cobrado),
+      pendienteCents: Number(totales.rows[0].pendiente),
+      devueltoCents: Number(totales.rows[0].devuelto),
+    },
     modoPruebas: stripeConfigurado() && !stripeEnProduccion(),
   });
 }
