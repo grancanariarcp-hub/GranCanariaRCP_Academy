@@ -298,6 +298,10 @@ export async function stripeStatus(_req: Request, res: Response): Promise<void> 
       errorCuenta = e instanceof Error ? e.message : 'no se ha podido consultar la cuenta';
     }
   }
+  // Que una clave restringida no pueda leer la cuenta es lo ESPERABLE: cobrar
+  // no necesita ese permiso. Se distingue de un fallo real para no teñir de
+  // rojo una clave que está bien apretada, que es justo lo que se busca.
+  const soloFaltaPermisoCuenta = !!errorCuenta && /permission|required permissions/i.test(errorCuenta);
   const secretoWebhook = (process.env.STRIPE_WEBHOOK_SECRET || '').trim();
   res.json({
     configurado,
@@ -305,6 +309,7 @@ export async function stripeStatus(_req: Request, res: Response): Promise<void> 
     modo: !configurado ? 'sin configurar' : stripeEnProduccion() ? 'produccion' : 'pruebas',
     cuenta,
     errorCuenta,
+    soloFaltaPermisoCuenta,
     // Diagnóstico: cuando el modo no es el esperado, dice POR QUÉ sin llegar a
     // exponer la clave. Sin esto, un modo «pruebas» inesperado obliga a probar
     // a ciegas entre cuatro causas distintas.

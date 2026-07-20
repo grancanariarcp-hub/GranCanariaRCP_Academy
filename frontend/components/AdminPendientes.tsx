@@ -19,6 +19,7 @@ interface Stripe {
   configurado: boolean; webhookConfigurado: boolean; modo: string; webhookValido: boolean;
   cuenta: { id: string; chargesEnabled: boolean; pais: string | null } | null;
   errorCuenta: string | null;
+  soloFaltaPermisoCuenta: boolean;
   clave: { prefijo: string; tipo: string; teniaEspacios: boolean };
 }
 
@@ -159,13 +160,18 @@ export function AdminPendientes() {
               )}
             </div>
           )}
-          {stripe.errorCuenta && (
+          {/* Una clave restringida a la que le falta leer la cuenta está bien
+              apretada, no rota: se cuenta como nota, no como alarma. */}
+          {stripe.errorCuenta && stripe.soloFaltaPermisoCuenta && (
+            <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
+              Tu clave restringida no puede leer los datos de la cuenta, así que aquí no se muestra si
+              Stripe tiene los cobros habilitados. No afecta al cobro. Si quieres verlo, añade el permiso
+              de lectura <strong>Basic Business Contact Information</strong> a la clave.
+            </p>
+          )}
+          {stripe.errorCuenta && !stripe.soloFaltaPermisoCuenta && (
             <div className="alert alert-error" style={{ fontSize: 13, marginTop: 8 }}>
               No se ha podido leer la cuenta de Stripe: {stripe.errorCuenta}
-              <div style={{ marginTop: 6 }}>
-                No impide cobrar. Con una clave restringida suele faltarle el permiso de lectura sobre
-                <strong> Account</strong>.
-              </div>
             </div>
           )}
           {stripe.webhookConfigurado && !stripe.webhookValido && (
