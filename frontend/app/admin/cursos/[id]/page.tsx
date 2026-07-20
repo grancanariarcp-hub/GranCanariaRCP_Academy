@@ -15,6 +15,7 @@ import { CoursePricing } from '@/components/CoursePricing';
 import { ActaPanel } from '@/components/ActaPanel';
 import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 import { CourseSubscription } from '@/components/CourseSubscription';
+import { CoursePayments } from '@/components/CoursePayments';
 
 interface Activity {
   id: string;
@@ -491,6 +492,9 @@ export default function CourseDetailPage() {
 
         {/* Precio de matrícula, con matrícula anticipada */}
         <CoursePricing courseId={courseId} course={course} onSaved={load} />
+
+        {/* Quién ha pagado y cuánto se lleva cobrado */}
+        <CoursePayments courseId={courseId} />
 
         {/* Cobro recurrente por periodos */}
         <CourseSubscription courseId={courseId} course={course} onSaved={load} />

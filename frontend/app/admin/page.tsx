@@ -6,6 +6,7 @@ import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
 import { AnonPracticeStats } from '@/components/AnonPracticeStats';
+import { AdminPendientes } from '@/components/AdminPendientes';
 
 interface Stats {
   students: number;
@@ -139,6 +140,10 @@ export default function AdminDashboard() {
 
       {/* Captación por la zona gratuita: cuánta gente prueba y cuánta se queda */}
       <AnonPracticeStats />
+
+      {/* Lo que la plataforma recoge y hay que mirar: interesados, indicios de
+          uso compartido y estado de la pasarela. */}
+      <AdminPendientes />
 
       {/* KPIs */}
       <div className="grid grid-4" style={{ marginBottom: 16 }}>
