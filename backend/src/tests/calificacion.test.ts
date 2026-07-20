@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { opcionesDepuradas } from '../controllers/exam.controller.js';
+import { opcionesDepuradas } from '../services/importacionPreguntas.js';
 
 /**
  * Primeros tests del proyecto.

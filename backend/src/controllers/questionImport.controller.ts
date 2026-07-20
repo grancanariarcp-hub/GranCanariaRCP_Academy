@@ -4,6 +4,7 @@ import { query } from '../config/database.js';
 import { badRequest } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { norm, separarOpciones, separarEtiquetas, resolverCorrecta, opcionesDepuradas } from '../services/importacionPreguntas.js';
 
 /**
  * Bulk question import — from Excel (.xlsx) or JSON (.json).
@@ -19,14 +20,6 @@ const COLUMNS = [
   'documento', 'pagina', 'flashcard', 'etiquetas', 'critica',
 ];
 
-/** lowercase + strip accents, for tolerant matching. */
-function norm(s: unknown): string {
-  return String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-}
-function splitList(s: unknown): string[] {
-  if (Array.isArray(s)) return s.map((x) => String(x).trim()).filter(Boolean);
-  return String(s ?? '').split(/[,;]/).map((x) => x.trim()).filter(Boolean);
-}
 
 // A format-agnostic parsed row (both Excel and JSON produce this shape).
 interface ParsedRow {
@@ -131,18 +124,19 @@ function parseExcel(buffer: Buffer): ParsedRow[] {
     return {
       fila: i + 2,
       nivel: String(r['nivel'] ?? ''),
-      publicos: splitList(r['publicos']),
+      publicos: separarEtiquetas(r['publicos']),
       tipo: r['tipo'],
       dificultad: r['dificultad'],
       contexto_clinico: String(r['contexto_clinico'] ?? ''),
       enunciado: String(r['enunciado'] ?? ''),
-      opciones: ['opcion_a', 'opcion_b', 'opcion_c', 'opcion_d'].map((k) => String(r[k] ?? '').trim()).filter(Boolean),
+      // Sin filter: una casilla vacía en medio desplazaría la letra correcta.
+      opciones: ['opcion_a', 'opcion_b', 'opcion_c', 'opcion_d'].map((k) => String(r[k] ?? '').trim()),
       correcta: r['correcta'],
       explicacion: String(r['explicacion'] ?? ''),
       documento: String(r['documento'] ?? ''),
       pagina: r['pagina'],
       flashcard: String(r['flashcard'] ?? ''),
-      etiquetas: splitList(r['etiquetas']),
+      etiquetas: separarEtiquetas(r['etiquetas']),
       critica: r['critica'],
     };
   });
@@ -161,18 +155,18 @@ function parseJson(buffer: Buffer): ParsedRow[] {
     return {
       fila: i + 1,
       nivel: String(o.nivel ?? ''),
-      publicos: splitList(o.publicos),
+      publicos: separarEtiquetas(o.publicos),
       tipo: o.tipo,
       dificultad: o.dificultad,
       contexto_clinico: String(o.contexto_clinico ?? ''),
       enunciado: String(o.enunciado ?? ''),
-      opciones: splitList(o.opciones),
+      opciones: separarOpciones(o.opciones),
       correcta: o.correcta,
       explicacion: String(o.explicacion ?? ''),
       documento: String(o.documento ?? ''),
       pagina: o.pagina,
       flashcard: String(o.flashcard ?? ''),
-      etiquetas: splitList(o.etiquetas),
+      etiquetas: separarEtiquetas(o.etiquetas),
       critica: o.critica,
     };
   });
@@ -232,11 +226,23 @@ export async function importQuestions(req: Request, res: Response): Promise<void
     const difficulty = DIFFICULTY_MAP[norm(row.dificultad)] ?? 1;
     if (qtype === 'caso_clinico' && !row.contexto_clinico.trim()) rowErrors.push('caso_clinico sin contexto_clinico');
     if (row.enunciado.trim().length < 5) rowErrors.push('enunciado vacío o muy corto');
-    if (row.opciones.length < 2) rowErrors.push('faltan opciones (mínimo 2)');
+    if (row.opciones.filter(Boolean).length < 2) rowErrors.push('faltan opciones (mínimo 2)');
 
-    const correctIndex = resolveCorrectIndex(row.correcta, row.opciones.length);
-    if (correctIndex === null) rowErrors.push('correcta debe ser A, B, C, D (o un número de opción)');
-    else if (correctIndex >= row.opciones.length) rowErrors.push('la opción correcta señalada está vacía');
+    // La letra del fichero se refiere a la lista CON sus huecos; solo después
+    // se descartan las vacías reajustando el índice. Al revés, una casilla en
+    // blanco corría las siguientes y la correcta acababa siendo otra.
+    const marcada = resolveCorrectIndex(row.correcta, row.opciones.length);
+    let correctIndex: number | null = null;
+    if (marcada === null) rowErrors.push('correcta debe ser A, B, C, D (o un número de opción)');
+    else {
+      try {
+        const dep = opcionesDepuradas(row.opciones, marcada);
+        row.opciones = dep.options;
+        correctIndex = dep.correctIndex;
+      } catch {
+        rowErrors.push('la opción correcta señalada está vacía');
+      }
+    }
 
     let refDocumentId: string | null = null;
     let refPage: number | null = null;

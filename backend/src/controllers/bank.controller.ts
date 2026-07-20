@@ -2,22 +2,8 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
+import { norm, separarOpciones, resolverCorrecta } from '../services/importacionPreguntas.js';
 
-function norm(s: unknown): string {
-  return String(s ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-}
-function toList(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
-  return String(v ?? '').split(/[|;]/).map((x) => x.trim()).filter(Boolean);
-}
-function resolveCorrect(v: unknown, n: number): number | null {
-  const s = String(v ?? '').trim().toUpperCase();
-  const letter = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 }[s as 'A'];
-  if (letter !== undefined && letter < n) return letter;
-  const num = parseInt(s, 10);
-  if (Number.isInteger(num) && num >= 1 && num <= n) return num - 1;
-  return null;
-}
 
 /**
  * Reglas de acceso a un banco:
@@ -330,11 +316,11 @@ export async function importBankQuestions(req: Request, res: Response): Promise<
     const q = questions[i];
     const errs: string[] = [];
     const text = String(q.text ?? q.enunciado ?? '').trim();
-    const options = toList(q.options ?? q.opciones);
+    const options = separarOpciones(q.options ?? q.opciones);
     const tema = String(q.tema ?? '').trim() || null;
     if (text.length < 3) errs.push('enunciado vacío');
     if (options.length < 2) errs.push('faltan opciones (mínimo 2)');
-    const ci = resolveCorrect(q.correcta ?? q.correct, options.length);
+    const ci = resolverCorrecta(q.correcta ?? q.correct, options.length);
     if (ci === null) errs.push('correcta inválida (A/B/C/D o número)');
 
     if (errs.length > 0) { errors.push({ fila: i + 1, errores: errs }); continue; }

@@ -6,6 +6,7 @@ import { assertEditor } from '../services/courseAuth.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { r2Configured, buildKey, uploadObject, withImageUrls } from '../services/r2.js';
+import { norm, separarOpciones, resolverCorrecta, opcionesDepuradas } from '../services/importacionPreguntas.js';
 
 /** Exams live inside a module; each is also an activity in that module. */
 
@@ -109,34 +110,6 @@ const addQuestionSchema = z.object({
   videoUrl: z.string().url('URL de vídeo no válida').optional().or(z.literal('')),
 });
 
-/**
- * Depura las opciones sin mover la respuesta correcta de sitio.
- *
- * Las opciones en blanco se descartan, y eso DESPLAZA a las que vienen detrás.
- * Antes se guardaba el índice tal cual lo había marcado el autor, que estaba
- * referido a la lista original: quien rellenaba ["Adrenalina", "", "Amiodarona",
- * "Atropina"] y marcaba la 3.ª acababa con «Atropina» como correcta, sin ningún
- * aviso, y todo el que acertaba quedaba suspenso. Aquí se recalcula el índice
- * sobre la lista ya depurada.
- */
-export function opcionesDepuradas(
-  brutas: string[],
-  marcada: number | undefined,
-): { options: string[]; correctIndex: number } {
-  const vivas = brutas
-    .map((o, original) => ({ texto: String(o ?? '').trim(), original }))
-    .filter((o) => o.texto !== '');
-  const options = vivas.map((o) => o.texto);
-  if (options.length < 2) throw badRequest('Un test necesita al menos 2 opciones', 'FEW_OPTIONS');
-
-  const correctIndex = vivas.findIndex((o) => o.original === marcada);
-  if (marcada === undefined || correctIndex === -1) {
-    // O no marcó ninguna, o marcó precisamente una que estaba vacía.
-    throw badRequest('Marca cuál de las opciones escritas es la correcta', 'BAD_CORRECT');
-  }
-  return { options, correctIndex };
-}
-
 export async function addExamQuestion(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
@@ -166,30 +139,10 @@ export async function addExamQuestion(req: Request, res: Response): Promise<void
 // Bulk import of exam questions (JSON)
 // ---------------------------------------------------------------------------
 function normFmt(v: unknown): 'test' | 'vf' | 'abierta' | null {
-  const s = String(v ?? '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const s = norm(v);
   if (['test', 'opcion_multiple', 'multiple', 'opciones'].includes(s)) return 'test';
   if (['vf', 'verdadero_falso', 'verdadero/falso', 'verdaderofalso', 'v/f', 'vof'].includes(s)) return 'vf';
   if (['abierta', 'libre', 'texto'].includes(s)) return 'abierta';
-  return null;
-}
-/**
- * Opciones tal y como vienen, SIN descartar las vacías.
- *
- * Es importante que conserven su posición: la respuesta correcta del fichero
- * («C», «3») está referida a esta lista. Si se quitan aquí los huecos, la letra
- * del autor pasa a señalar otra opción. El descarte se hace después, en
- * opcionesDepuradas, que reajusta el índice a la vez.
- */
-function toList(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map((x) => String(x).trim());
-  return String(v ?? '').split(/[|;]/).map((x) => x.trim());
-}
-function resolveCorrect(v: unknown, n: number): number | null {
-  const s = String(v ?? '').trim().toUpperCase();
-  const letter = { A: 0, B: 1, C: 2, D: 3, E: 4, F: 5 }[s as 'A'];
-  if (letter !== undefined && letter < n) return letter;
-  const num = parseInt(s, 10);
-  if (Number.isInteger(num) && num >= 1 && num <= n) return num - 1;
   return null;
 }
 /**
@@ -238,8 +191,8 @@ export async function importExamQuestions(req: Request, res: Response): Promise<
       // después se depuran las opciones, reajustando el índice. Al revés, una
       // opción en blanco corría las siguientes y la letra del fichero acababa
       // señalando otra respuesta.
-      const brutas = toList(q.options ?? q.opciones);
-      const ci = resolveCorrect(q.correcta ?? q.correct, brutas.length);
+      const brutas = separarOpciones(q.options ?? q.opciones);
+      const ci = resolverCorrecta(q.correcta ?? q.correct, brutas.length);
       if (ci === null) errs.push('correcta inválida (A/B/C/D o número)');
       else {
         try {
