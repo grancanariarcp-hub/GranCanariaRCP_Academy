@@ -4,6 +4,7 @@ import { query } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
+import { stripe, stripeConfigurado } from '../services/stripe.js';
 
 /**
  * Suscripción del alumno a un curso por periodos.
@@ -135,10 +136,10 @@ export async function miSuscripcion(req: Request, res: Response): Promise<void> 
   const { rows } = await query<{
     status: string; periodo: string | null; price_paid_cents: number | null;
     access_until: string | null; auto_renew: boolean; cancelled_at: string | null;
-    withdrawal_until: string | null; billing_type: string;
+    withdrawal_until: string | null; billing_type: string; stripe_subscription_id: string | null;
   }>(
     `SELECT e.status, e.periodo, e.price_paid_cents, e.access_until, e.auto_renew,
-            e.cancelled_at, e.withdrawal_until, c.billing_type
+            e.cancelled_at, e.withdrawal_until, e.stripe_subscription_id, c.billing_type
        FROM enrollments e JOIN courses c ON c.id = e.course_id
       WHERE e.course_id = $1 AND e.student_id = $2`,
     [req.params.courseId, req.auth!.sub],
@@ -158,7 +159,14 @@ export async function miSuscripcion(req: Request, res: Response): Promise<void> 
     importeCents: s.price_paid_cents ?? 0,
     accessUntil: s.access_until,
     diasRestantes,
-    renovacionAutomatica: s.auto_renew && !s.cancelled_at,
+    /**
+     * Solo hay renovación automática si existe una suscripción real en la
+     * pasarela. Mientras el cobro sea un pago único por periodo, NO se renueva
+     * nada y decir lo contrario sería engañar al cliente.
+     */
+    cobroRecurrenteActivo: !!s.stripe_subscription_id,
+    renovacionAutomatica: !!s.stripe_subscription_id && s.auto_renew && !s.cancelled_at,
+    renovacionPendienteDeActivar: !s.stripe_subscription_id,
     canceladaEl: s.cancelled_at,
     // Dentro de plazo aún cabe desistir; fuera, ya no.
     desistimientoHasta: s.withdrawal_until,
@@ -173,13 +181,35 @@ export async function miSuscripcion(req: Request, res: Response): Promise<void> 
  * cláusula abusiva. El acceso se conserva hasta que venza lo pagado.
  */
 export async function cancelarRenovacion(req: Request, res: Response): Promise<void> {
-  const { rows } = await query<{ access_until: string | null }>(
+  const { rows } = await query<{ access_until: string | null; stripe_subscription_id: string | null }>(
     `UPDATE enrollments SET auto_renew = FALSE, cancelled_at = NOW()
       WHERE course_id = $1 AND student_id = $2 AND auto_renew = TRUE
-      RETURNING access_until`,
+      RETURNING access_until, stripe_subscription_id`,
     [req.params.courseId, req.auth!.sub],
   );
   if (rows.length === 0) throw badRequest('Esta suscripción ya estaba cancelada', 'YA_CANCELADA');
+
+  // Si hay cobro recurrente en la pasarela, hay que detenerlo ALLÍ: apagar solo
+  // la marca interna dejaría al cliente pagando después de haber cancelado.
+  const subId = rows[0].stripe_subscription_id;
+  if (subId && stripeConfigurado()) {
+    try {
+      // Al final del periodo, no al instante: el acceso ya pagado se conserva.
+      await stripe().subscriptions.update(subId, { cancel_at_period_end: true });
+    } catch (e) {
+      // Se revierte la cancelación local: es preferible que el cliente
+      // reintente a que crea que canceló y le sigan cobrando.
+      await query(
+        `UPDATE enrollments SET auto_renew = TRUE, cancelled_at = NULL
+          WHERE course_id = $1 AND student_id = $2`,
+        [req.params.courseId, req.auth!.sub],
+      );
+      throw badRequest(
+        'No hemos podido cancelar el cobro en la pasarela. Vuelve a intentarlo o escríbenos.',
+        'CANCELACION_PASARELA',
+      );
+    }
+  }
 
   await audit({
     actorId: req.auth!.sub, actorType: 'student', action: 'SUBSCRIPTION_CANCELLED',

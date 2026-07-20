@@ -20,6 +20,8 @@ interface Estado {
   accessUntil?: string | null;
   diasRestantes?: number | null;
   renovacionAutomatica?: boolean;
+  cobroRecurrenteActivo?: boolean;
+  renovacionPendienteDeActivar?: boolean;
   canceladaEl?: string | null;
   desistimientoHasta?: string | null;
   puedeDesistir?: boolean;
@@ -68,7 +70,7 @@ export function MySubscription({ courseId }: { courseId: string }) {
   return (
     <div className="card" style={{
       marginBottom: 20,
-      borderLeft: `4px solid ${s.renovacionAutomatica ? 'var(--success)' : 'var(--warning)'}`,
+      borderLeft: `4px solid ${s.renovacionAutomatica || s.renovacionPendienteDeActivar ? 'var(--success)' : 'var(--warning)'}`,
     }}>
       <div className="card-header">
         <div className="card-title">Tu suscripción</div>
@@ -94,16 +96,31 @@ export function MySubscription({ courseId }: { courseId: string }) {
           )}
         </div>
         <div>
-          <div className="muted" style={{ fontSize: 12 }}>Renovación automática</div>
+          <div className="muted" style={{ fontSize: 12 }}>Renovación</div>
           <div style={{ fontSize: 17, fontWeight: 700 }}>
-            {s.renovacionAutomatica
-              ? <span style={{ color: 'var(--success)' }}>Activa</span>
-              : <span style={{ color: 'var(--warning)' }}>Cancelada</span>}
+            {s.renovacionPendienteDeActivar
+              ? <span>Manual</span>
+              : s.renovacionAutomatica
+                ? <span style={{ color: 'var(--success)' }}>Automática</span>
+                : <span style={{ color: 'var(--warning)' }}>Cancelada</span>}
           </div>
         </div>
       </div>
 
-      {s.renovacionAutomatica ? (
+      {/* Mientras el cobro recurrente no esté activo en la pasarela, NO se
+          renueva nada: decir lo contrario sería prometer un cargo que no
+          ocurrirá y dejar al alumno sin acceso sin avisarle. */}
+      {s.renovacionPendienteDeActivar ? (
+        <>
+          <p style={{ fontSize: 13.5, marginBottom: 12 }}>
+            Has pagado un periodo completo. <strong>No hay cobro automático</strong>: tu acceso llega hasta
+            el {vence} y, para continuar después, tendrás que renovarlo tú.
+          </p>
+          <p className="muted" style={{ fontSize: 12.5 }}>
+            Te avisaremos antes de que venza. No tienes nada que cancelar.
+          </p>
+        </>
+      ) : s.renovacionAutomatica ? (
         <>
           <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
             Se te cobrará {euros(s.importeCents ?? 0)} automáticamente el {vence}. Puedes cancelar cuando

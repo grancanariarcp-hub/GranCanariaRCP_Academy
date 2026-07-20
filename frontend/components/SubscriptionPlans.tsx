@@ -101,13 +101,11 @@ export function SubscriptionPlans({ courseId, onContratado }: { courseId: string
               {elegido.meses === 1 ? 'mes' : 'meses'} completos.
             </li>
             <li>
-              <strong>La renovación es automática</strong>: al terminar el periodo se cobrará de nuevo{' '}
-              {euros(elegido.totalCents)} cada {elegido.meses === 1 ? 'mes' : `${elegido.meses} meses`}, salvo
-              que canceles.
+              <strong>No hay cobro automático</strong>: pasado el periodo, el acceso se cierra y decides tú
+              si renuevas. Te avisaremos antes de que venza.
             </li>
             <li>
-              <strong>Puedes cancelar cuando quieras</strong>, con un botón y sin avisar con antelación.
-              Conservas el acceso hasta que termine el periodo que ya has pagado.
+              No tienes que cancelar nada ni avisar con antelación: si no renuevas, simplemente termina.
             </li>
             <li>
               Al cancelar <strong>no se devuelve la parte no consumida</strong> del periodo en curso: lo
@@ -133,7 +131,7 @@ export function SubscriptionPlans({ courseId, onContratado }: { courseId: string
         <input type="checkbox" checked={condiciones} onChange={(e) => setCondiciones(e.target.checked)} style={{ marginTop: 3 }} />
         <span>
           He leído y acepto las <Link href="/terminos">condiciones de la suscripción</Link> y la{' '}
-          <Link href="/privacidad">política de privacidad</Link>, incluida la renovación automática.
+          <Link href="/privacidad">política de privacidad</Link>, incluido el funcionamiento de la renovación.
         </span>
       </label>
 
