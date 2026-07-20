@@ -5,7 +5,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { myOpeBanks, opeBankDetail } from '../controllers/ope.controller.js';
 import { myConvocatorias } from '../controllers/convocatoria.controller.js';
-import { generarTest, respuestaInmediata, enviarTest, misTests } from '../controllers/practiceTest.controller.js';
+import { generarTest, respuestaInmediata, enviarTest, misTests, repetirTest } from '../controllers/practiceTest.controller.js';
 
 /** Practice engine — any authenticated user. */
 const router = Router();
@@ -24,6 +24,7 @@ router.get('/tests', asyncHandler(misTests));
 router.post('/tests', asyncHandler(generarTest));
 router.get('/tests/:id/answer/:questionId', asyncHandler(respuestaInmediata));
 router.post('/tests/:id/submit', asyncHandler(enviarTest));
+router.post('/tests/:id/repeat', asyncHandler(repetirTest));
 router.get('/failed-general', asyncHandler(globalFailedStats)); // preguntas más falladas por todos (opcional ?bankId=)
 
 export default router;

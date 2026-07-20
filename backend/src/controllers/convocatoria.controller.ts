@@ -78,6 +78,23 @@ export async function deleteConvocatoria(req: Request, res: Response): Promise<v
 /** PUT /api/admin/convocatorias/:id/banks — fijar qué bancos la componen. */
 export async function setConvocatoriaBanks(req: Request, res: Response): Promise<void> {
   const { bankIds } = z.object({ bankIds: z.array(z.string().uuid()) }).parse(req.body);
+
+  // Una convocatoria solo se compone de bancos de oposición: son los que llevan
+  // las preguntas numeradas y las etiquetas que el opositor necesita filtrar.
+  if (bankIds.length > 0) {
+    const validos = await query<{ id: string; name: string; kind: string }>(
+      'SELECT id, name, kind FROM question_banks WHERE id = ANY($1::uuid[])',
+      [bankIds],
+    );
+    const ajenos = validos.rows.filter((b) => b.kind !== 'ope' && b.kind !== 'mir');
+    if (ajenos.length > 0) {
+      throw badRequest(
+        `Solo se pueden asignar bancos de tipo OPE o MIR. No válidos: ${ajenos.map((b) => b.name).join(', ')}`,
+        'BANCO_NO_OPE',
+      );
+    }
+  }
+
   await query('DELETE FROM ope_convocatoria_banks WHERE convocatoria_id = $1', [req.params.id]);
   for (const [i, bankId] of bankIds.entries()) {
     await query(

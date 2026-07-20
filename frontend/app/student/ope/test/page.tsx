@@ -18,6 +18,12 @@ import { TestBuilder, type BancoConv, type ConfigTest } from '@/components/TestB
 
 interface Convocatoria { id: string; name: string; comunidad: string | null; anio: number | null; bancos: BancoConv[] }
 interface Pregunta { id: string; text: string; options: string[]; tema: string | null; orden: number | null; banco: string | null }
+interface TestPrevio {
+  id: string; criterio: string; rango_desde: number | null; rango_hasta: number | null;
+  temas: string[] | null; minutos: number | null; correccion: string; preguntas: number;
+  correct: number | null; total: number | null; started_at: string; submitted_at: string | null;
+  bancos: string | null; repite_de: string | null;
+}
 interface Correccion { correcta: number; explicacion: string | null; fuente: { documento: string; pagina: number | null } | null }
 interface FilaRevision {
   n: number; id: string; numeroEnBanco: number | null; tema: string | null; text: string; options: string[];
@@ -41,13 +47,21 @@ export default function TestOpePage() {
   const [restante, setRestante] = useState<number | null>(null);
   const [resultado, setResultado] = useState<{ correct: number; total: number; pct: number; revision: FilaRevision[] } | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [previos, setPrevios] = useState<TestPrevio[]>([]);
 
   useEffect(() => {
     if (!user) return;
     api<{ convocatorias: Convocatoria[] }>('/api/practice/convocatorias', { auth: true })
       .then((r) => { setConvs(r.convocatorias); if (r.convocatorias[0]) setConvSel(r.convocatorias[0].id); })
       .catch(() => {});
+    cargarPrevios();
   }, [user]);
+
+  function cargarPrevios() {
+    api<{ tests: TestPrevio[] }>('/api/practice/tests', { auth: true })
+      .then((r) => setPrevios(r.tests))
+      .catch(() => {});
+  }
 
   // Cuenta atrás: al llegar a cero se corrige solo, como en el examen real.
   useEffect(() => {
@@ -87,23 +101,24 @@ export default function TestOpePage() {
     if (enviando || resultado) return;
     setEnviando(true);
     try {
-      setResultado(await api(`/api/practice/tests/${testId}/submit`, {
+      const r: any = await api(`/api/practice/tests/${testId}/submit`, {
         method: 'POST', auth: true,
         body: JSON.stringify({ answers: respuestas, seconds: Math.round((Date.now() - inicio) / 1000) }),
-      }));
+      });
+      setResultado(r);
       setRestante(null);
+      cargarPrevios();
     } finally {
       setEnviando(false);
     }
   }
 
-  async function repetirBarajado() {
-    if (!cfg) return;
-    const r = await api(`/api/practice/tests`, {
-      method: 'POST', auth: true,
-      body: JSON.stringify({ ...cfg, barajarPreguntas: true, repiteDe: testId }),
+  async function repetir(id: string) {
+    const r = await api<any>(`/api/practice/tests/${id}/repeat`, { method: 'POST', auth: true });
+    alGenerar(r, {
+      bankIds: [], criterio: r.config.criterio, count: r.config.servidas,
+      minutos: r.config.minutos, correccion: r.config.correccion, barajarPreguntas: true,
     });
-    alGenerar(r, { ...cfg, barajarPreguntas: true });
   }
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
@@ -147,6 +162,54 @@ export default function TestOpePage() {
             {conv && conv.bancos.length > 0
               ? <TestBuilder bancos={conv.bancos} onGenerado={alGenerar} />
               : <div className="card"><p className="muted" style={{ margin: 0 }}>Esta convocatoria aún no tiene bancos asignados.</p></div>}
+
+            {/* Repetir un test anterior: mismas condiciones, preguntas barajadas */}
+            {previos.length > 0 && (
+              <div className="card" style={{ marginTop: 20 }}>
+                <div className="card-header">
+                  <div className="card-title">Tus tests anteriores</div>
+                  <div className="card-subtitle">Repite cualquiera con sus mismas condiciones y las preguntas barajadas</div>
+                </div>
+                <div className="table-responsive">
+                  <table className="table-plain">
+                    <thead>
+                      <tr><th>Test</th><th>Fecha</th><th>Resultado</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                      {previos.map((t) => (
+                        <tr key={t.id}>
+                          <td>
+                            <strong>{t.preguntas} preguntas</strong>
+                            {t.repite_de && <span className="badge" style={{ marginLeft: 6, fontSize: 11 }}>repetición</span>}
+                            <div className="muted" style={{ fontSize: 12 }}>
+                              {t.criterio === 'rango' ? `Nº ${t.rango_desde}–${t.rango_hasta}`
+                                : t.criterio === 'tema' ? (t.temas || []).join(', ')
+                                  : 'Aleatorias'}
+                              {t.minutos ? ` · ${t.minutos} min` : ' · sin tiempo'}
+                              {t.correccion === 'inmediata' ? ' · corrección inmediata' : ''}
+                              {t.bancos && ` · ${t.bancos}`}
+                            </div>
+                          </td>
+                          <td className="muted" style={{ fontSize: 13 }}>
+                            {new Date(t.started_at).toLocaleDateString('es-ES')}
+                          </td>
+                          <td>
+                            {t.submitted_at && t.total
+                              ? <strong style={{ color: (t.correct ?? 0) / t.total >= 0.5 ? 'var(--success)' : 'var(--danger)' }}>
+                                {t.correct}/{t.total}
+                              </strong>
+                              : <span className="muted">sin terminar</span>}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <button className="link-action" onClick={() => repetir(t.id)}>Repetir</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </>
         )
       )}
@@ -240,7 +303,7 @@ export default function TestOpePage() {
             </div>
             <div style={{ fontSize: 17, marginTop: 4 }}>{resultado.pct} % de aciertos</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
-              <button className="btn btn-primary press" onClick={repetirBarajado}>Repetir barajado</button>
+              <button className="btn btn-primary press" onClick={() => repetir(testId)}>Repetir barajado</button>
               <button className="btn btn-outline press" onClick={() => { setTestId(''); setResultado(null); }}>
                 Configurar otro test
               </button>

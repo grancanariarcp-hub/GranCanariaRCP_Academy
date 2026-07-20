@@ -226,12 +226,37 @@ export async function enviarTest(req: Request, res: Response): Promise<void> {
   res.json({ correct, total: t.question_ids.length, pct, revision });
 }
 
+/**
+ * POST /api/practice/tests/:id/repeat — repetir un test anterior.
+ * Reutiliza su configuración exacta y baraja las preguntas, que es para lo que
+ * sirve repetir: comprobar si se sabe la materia, no si se recuerda el orden.
+ */
+export async function repetirTest(req: Request, res: Response): Promise<void> {
+  const t = await cargarTest(req.params.id, req.auth!.sub);
+  req.body = {
+    bankIds: t.bank_ids,
+    criterio: t.criterio,
+    rangoDesde: t.rango_desde ?? undefined,
+    rangoHasta: t.rango_hasta ?? undefined,
+    temas: t.temas ?? undefined,
+    count: t.question_ids.length,
+    minutos: t.minutos,
+    correccion: t.correccion,
+    barajarPreguntas: true,
+    repiteDe: t.id,
+  };
+  await generarTest(req, res);
+}
+
 /** GET /api/practice/tests — mis tests, para repetirlos o revisarlos. */
 export async function misTests(req: Request, res: Response): Promise<void> {
   const { rows } = await query(
-    `SELECT id, criterio, rango_desde, rango_hasta, temas, minutos, correccion, barajado,
-            array_length(question_ids, 1) AS preguntas, correct, total, seconds, started_at, submitted_at
-       FROM practice_tests WHERE user_id = $1 ORDER BY started_at DESC LIMIT 30`,
+    `SELECT t.id, t.criterio, t.rango_desde, t.rango_hasta, t.temas, t.minutos, t.correccion, t.barajado,
+            array_length(t.question_ids, 1) AS preguntas, t.correct, t.total, t.seconds,
+            t.started_at, t.submitted_at, t.repite_de,
+            (SELECT string_agg(b.name, ', ' ORDER BY b.name)
+               FROM question_banks b WHERE b.id = ANY(t.bank_ids)) AS bancos
+       FROM practice_tests t WHERE t.user_id = $1 ORDER BY t.started_at DESC LIMIT 30`,
     [req.auth!.sub],
   );
   res.json({ tests: rows });

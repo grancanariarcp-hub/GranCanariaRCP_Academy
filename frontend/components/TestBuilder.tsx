@@ -61,6 +61,23 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
     set(lista.includes(v) ? lista.filter((x) => x !== v) : [...lista, v]);
   }
 
+  /** Atajo: aleatorias, sin tiempo, corrección al final. */
+  async function generarRapido(n: number) {
+    setError('');
+    setGenerando(true);
+    const cfg: ConfigTest = {
+      bankIds, criterio: 'aleatorio', count: n, minutos: null,
+      correccion: 'final', barajarPreguntas: true,
+    };
+    try {
+      onGenerado(await api('/api/practice/tests', { method: 'POST', auth: true, body: JSON.stringify(cfg) }), cfg);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo generar el test');
+    } finally {
+      setGenerando(false);
+    }
+  }
+
   async function generar() {
     setError('');
     setGenerando(true);
@@ -97,6 +114,27 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
       </div>
 
       {error && <p className="alert alert-error">{error}</p>}
+
+      {/* Atajo: elegido el banco, un clic y a responder. Es lo que se usa a
+          diario; el asistente completo queda para cuando se quiere afinar. */}
+      <div style={{ background: 'var(--gray-100)', borderRadius: 10, padding: 14, marginBottom: 20 }}>
+        <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 4 }}>Generación rápida</div>
+        <p className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
+          Aleatorias del banco elegido, sin tiempo y con corrección al final.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {[10, 20, 50, 100].map((n) => (
+            <button key={n} type="button" className="btn btn-primary btn-small press"
+              disabled={bankIds.length === 0 || generando}
+              onClick={() => generarRapido(n)}>
+              {n} preguntas
+            </button>
+          ))}
+        </div>
+        {bankIds.length === 0 && (
+          <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>Elige abajo al menos un banco.</p>
+        )}
+      </div>
 
       {/* 1 · Bancos */}
       <Paso n={1} titulo="¿De qué bancos?">
