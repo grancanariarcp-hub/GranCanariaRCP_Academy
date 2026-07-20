@@ -127,6 +127,7 @@ export default function TestOpePage() {
     { label: 'Inicio', href: '/student' },
     { label: 'Oposiciones', href: '/student/ope' },
     { label: 'Generar test', href: '/student/ope/test', active: true },
+        { label: 'Estadísticas', href: '/student/ope/estadisticas' },
   ];
   const reloj = restante !== null
     ? `${String(Math.floor(restante / 60)).padStart(2, '0')}:${String(restante % 60).padStart(2, '0')}`

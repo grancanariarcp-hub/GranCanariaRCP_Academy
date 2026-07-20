@@ -18,6 +18,17 @@ import { badRequest, notFound } from '../utils/httpError.js';
 
 const generarSchema = z.object({
   bankIds: z.array(z.string().uuid()).min(1, 'Elige al menos un banco'),
+  /**
+   * De dónde salen las preguntas dentro de los bancos elegidos:
+   *  · banco            → todas las del banco
+   *  · mis_fallos       → las que YO fallé la última vez que las respondí
+   *  · comunidad_fallos → las que más falla el conjunto de opositores
+   *  · poco_vistas      → las que menos veces he respondido (empezando por 0)
+   *
+   * No son bancos físicos: se calculan al vuelo, porque un banco de fallos
+   * materializado quedaría desfasado en cuanto se acierta una pregunta.
+   */
+  fuente: z.enum(['banco', 'mis_fallos', 'comunidad_fallos', 'poco_vistas']).default('banco'),
   criterio: z.enum(['aleatorio', 'rango', 'tema']),
   rangoDesde: z.number().int().min(1).optional(),
   rangoHasta: z.number().int().min(1).optional(),
@@ -53,6 +64,35 @@ export async function generarTest(req: Request, res: Response): Promise<void> {
 
   const conds = ['q.is_active = TRUE', 'q.bank_id = ANY($1::uuid[])'];
   const params: unknown[] = [bankIds];
+
+  // La fuente se aplica ANTES que el criterio: primero de qué conjunto salen y
+  // luego cómo se eligen dentro de él.
+  let ordenFuente = '';
+  if (d.fuente === 'mis_fallos') {
+    params.push(uid);
+    conds.push(`q.id IN (
+      SELECT ultima.question_id FROM (
+        SELECT DISTINCT ON (al.question_id) al.question_id, al.is_correct
+          FROM answer_log al WHERE al.user_id = $${params.length}
+         ORDER BY al.question_id, al.answered_at DESC
+      ) ultima WHERE NOT ultima.is_correct
+    )`);
+  } else if (d.fuente === 'comunidad_fallos') {
+    // Preguntas con más de un 40 % de fallo y al menos 5 respuestas: por debajo
+    // de esa muestra el porcentaje no significa nada.
+    conds.push(`q.id IN (
+      SELECT al.question_id FROM answer_log al
+       GROUP BY al.question_id
+      HAVING COUNT(*) >= 5
+         AND COUNT(*) FILTER (WHERE NOT al.is_correct)::numeric / COUNT(*) > 0.4
+    )`);
+  } else if (d.fuente === 'poco_vistas') {
+    // Las menos respondidas por esta persona, empezando por las que nunca vio.
+    params.push(uid);
+    ordenFuente = `(SELECT COUNT(*) FROM answer_log al
+                     WHERE al.question_id = q.id AND al.user_id = $${params.length}) ASC`;
+  }
+
   if (d.criterio === 'rango') {
     params.push(d.rangoDesde, d.rangoHasta);
     conds.push(`q.orden BETWEEN $${params.length - 1} AND $${params.length}`);
@@ -62,8 +102,11 @@ export async function generarTest(req: Request, res: Response): Promise<void> {
   }
 
   // Con barajado se sortean; sin él, se respeta el número de orden del pool,
-  // que es como el opositor estudia el documento oficial.
-  const orden = d.barajarPreguntas ? 'RANDOM()' : 'q.bank_id, q.orden NULLS LAST';
+  // que es como el opositor estudia el documento oficial. La fuente
+  // "poco vistas" manda sobre ambos: su gracia es empezar por las no vistas.
+  const orden = ordenFuente
+    ? `${ordenFuente}, ${d.barajarPreguntas ? 'RANDOM()' : 'q.orden NULLS LAST'}`
+    : d.barajarPreguntas ? 'RANDOM()' : 'q.bank_id, q.orden NULLS LAST';
   params.push(d.count);
 
   const { rows } = await query<{ id: string }>(
@@ -73,16 +116,24 @@ export async function generarTest(req: Request, res: Response): Promise<void> {
       LIMIT $${params.length}`,
     params,
   );
-  if (rows.length === 0) throw badRequest('No hay preguntas que cumplan esos criterios', 'SIN_PREGUNTAS');
+  if (rows.length === 0) {
+    const porFuente: Record<string, string> = {
+      mis_fallos: 'No tienes fallos pendientes en esos bancos. ¡Buena señal!',
+      comunidad_fallos: 'Todavía no hay preguntas con suficientes respuestas de la comunidad para saber cuáles se fallan más.',
+      poco_vistas: 'No hay preguntas disponibles con ese criterio.',
+      banco: 'No hay preguntas que cumplan esos criterios',
+    };
+    throw badRequest(porFuente[d.fuente] ?? porFuente.banco, 'SIN_PREGUNTAS');
+  }
 
   const ids = rows.map((r) => r.id);
   const test = await query<{ id: string; started_at: string }>(
     `INSERT INTO practice_tests
-       (user_id, bank_ids, criterio, rango_desde, rango_hasta, temas, question_ids, minutos, correccion, barajado, repite_de)
-     VALUES ($1,$2::uuid[],$3,$4,$5,$6::text[],$7::uuid[],$8,$9,$10,$11)
+       (user_id, bank_ids, criterio, fuente, rango_desde, rango_hasta, temas, question_ids, minutos, correccion, barajado, repite_de)
+     VALUES ($1,$2::uuid[],$3,$4,$5,$6,$7::text[],$8::uuid[],$9,$10,$11,$12)
      RETURNING id, started_at`,
     [
-      uid, bankIds, d.criterio, d.rangoDesde ?? null, d.rangoHasta ?? null, d.temas ?? null,
+      uid, bankIds, d.criterio, d.fuente, d.rangoDesde ?? null, d.rangoHasta ?? null, d.temas ?? null,
       ids, d.minutos ?? null, d.correccion, d.barajarPreguntas, d.repiteDe ?? null,
     ],
   );
@@ -91,6 +142,7 @@ export async function generarTest(req: Request, res: Response): Promise<void> {
     testId: test.rows[0].id,
     startedAt: test.rows[0].started_at,
     config: {
+      fuente: d.fuente,
       criterio: d.criterio, minutos: d.minutos ?? null, correccion: d.correccion,
       barajado: d.barajarPreguntas, solicitadas: d.count, servidas: ids.length,
     },
@@ -118,7 +170,7 @@ async function preguntasServidas(ids: string[]) {
 async function cargarTest(testId: string, uid: string) {
   const { rows } = await query<{
     id: string; question_ids: string[]; correccion: string; submitted_at: string | null;
-    minutos: number | null; started_at: string; bank_ids: string[]; criterio: string;
+    minutos: number | null; started_at: string; bank_ids: string[]; criterio: string; fuente: string | null;
     rango_desde: number | null; rango_hasta: number | null; temas: string[] | null; barajado: boolean;
   }>(
     'SELECT * FROM practice_tests WHERE id = $1 AND user_id = $2',
@@ -236,6 +288,7 @@ export async function repetirTest(req: Request, res: Response): Promise<void> {
   req.body = {
     bankIds: t.bank_ids,
     criterio: t.criterio,
+    fuente: t.fuente ?? 'banco',
     rangoDesde: t.rango_desde ?? undefined,
     rangoHasta: t.rango_hasta ?? undefined,
     temas: t.temas ?? undefined,
@@ -253,7 +306,7 @@ export async function misTests(req: Request, res: Response): Promise<void> {
   const { rows } = await query(
     `SELECT t.id, t.criterio, t.rango_desde, t.rango_hasta, t.temas, t.minutos, t.correccion, t.barajado,
             array_length(t.question_ids, 1) AS preguntas, t.correct, t.total, t.seconds,
-            t.started_at, t.submitted_at, t.repite_de,
+            t.started_at, t.submitted_at, t.repite_de, t.fuente,
             (SELECT string_agg(b.name, ', ' ORDER BY b.name)
                FROM question_banks b WHERE b.id = ANY(t.bank_ids)) AS bancos
        FROM practice_tests t WHERE t.user_id = $1 ORDER BY t.started_at DESC LIMIT 30`,

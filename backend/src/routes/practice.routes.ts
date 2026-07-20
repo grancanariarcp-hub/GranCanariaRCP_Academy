@@ -6,6 +6,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { myOpeBanks, opeBankDetail } from '../controllers/ope.controller.js';
 import { myConvocatorias } from '../controllers/convocatoria.controller.js';
 import { generarTest, respuestaInmediata, enviarTest, misTests, repetirTest } from '../controllers/practiceTest.controller.js';
+import { estadisticaPreguntas, estadisticaMaterias, estadisticaComunidad } from '../controllers/opeStats.controller.js';
 
 /** Practice engine — any authenticated user. */
 const router = Router();
@@ -18,6 +19,9 @@ router.get('/stats', asyncHandler(getPracticeStats));
 router.get('/ope-banks', asyncHandler(myOpeBanks));
 router.get('/ope-banks/:id', asyncHandler(opeBankDetail));
 router.get('/convocatorias', asyncHandler(myConvocatorias));
+router.get('/ope-banks/:id/questions', asyncHandler(estadisticaPreguntas));
+router.get('/ope-banks/:id/materias', asyncHandler(estadisticaMaterias));
+router.get('/community-stats', asyncHandler(estadisticaComunidad));
 
 // Generador de tests configurable
 router.get('/tests', asyncHandler(misTests));

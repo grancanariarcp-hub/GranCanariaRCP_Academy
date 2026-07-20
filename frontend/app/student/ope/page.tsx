@@ -81,6 +81,7 @@ export default function OpePage() {
         { label: 'Inicio', href: '/student' },
         { label: 'Oposiciones', href: '/student/ope', active: true },
         { label: 'Generar test', href: '/student/ope/test' },
+        { label: 'Estadísticas', href: '/student/ope/estadisticas' },
         { label: 'Práctica RCP básico', href: '/practica' },
         { label: 'Perfil', href: '/student/perfil' },
       ]}
@@ -164,9 +165,12 @@ export default function OpePage() {
                   <Link href="/student/ope/test" className="btn btn-outline press">
                     Configurar un test a mi medida
                   </Link>
-                  <Link href={`/practica?bankId=${b.id}&modo=fallos`} className="btn btn-outline press"
+                  <Link href="/student/ope/test" className="btn btn-outline press"
                     style={detalle?.fallosPendientes ? undefined : { pointerEvents: 'none', opacity: 0.5 }}>
                     Repasar mis fallos{detalle?.fallosPendientes ? ` (${detalle.fallosPendientes})` : ''}
+                  </Link>
+                  <Link href="/student/ope/estadisticas" className="btn btn-outline press">
+                    Mis estadísticas
                   </Link>
                 </div>
                 {b.simulacros > 0 && (

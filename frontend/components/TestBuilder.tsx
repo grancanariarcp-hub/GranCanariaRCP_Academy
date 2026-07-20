@@ -25,6 +25,7 @@ export interface BancoConv {
 
 export interface ConfigTest {
   bankIds: string[];
+  fuente?: 'banco' | 'mis_fallos' | 'comunidad_fallos' | 'poco_vistas';
   criterio: 'aleatorio' | 'rango' | 'tema';
   rangoDesde?: number;
   rangoHasta?: number;
@@ -37,6 +38,7 @@ export interface ConfigTest {
 
 export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGenerado: (r: any, cfg: ConfigTest) => void }) {
   const [bankIds, setBankIds] = useState<string[]>(bancos.length === 1 ? [bancos[0].id] : []);
+  const [fuente, setFuente] = useState<'banco' | 'mis_fallos' | 'comunidad_fallos' | 'poco_vistas'>('banco');
   const [criterio, setCriterio] = useState<'aleatorio' | 'rango' | 'tema'>('aleatorio');
   const [desde, setDesde] = useState('1');
   const [hasta, setHasta] = useState('50');
@@ -66,7 +68,7 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
     setError('');
     setGenerando(true);
     const cfg: ConfigTest = {
-      bankIds, criterio: 'aleatorio', count: n, minutos: null,
+      bankIds, fuente, criterio: 'aleatorio', count: n, minutos: null,
       correccion: 'final', barajarPreguntas: true,
     };
     try {
@@ -83,6 +85,7 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
     setGenerando(true);
     const cfg: ConfigTest = {
       bankIds,
+      fuente,
       criterio,
       rangoDesde: criterio === 'rango' ? Number(desde) : undefined,
       rangoHasta: criterio === 'rango' ? Number(hasta) : undefined,
@@ -120,7 +123,8 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
       <div style={{ background: 'var(--gray-100)', borderRadius: 10, padding: 14, marginBottom: 20 }}>
         <div style={{ fontWeight: 700, fontSize: 14.5, marginBottom: 4 }}>Generación rápida</div>
         <p className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>
-          Aleatorias del banco elegido, sin tiempo y con corrección al final.
+          {fuente === 'banco' ? 'Aleatorias del banco elegido' : 'Del conjunto elegido en el paso 2'}, sin
+          tiempo y con corrección al final.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {[10, 20, 50, 100].map((n) => (
@@ -164,8 +168,26 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
         )}
       </Paso>
 
-      {/* 2 · Criterio */}
-      <Paso n={2} titulo="¿Qué preguntas?">
+      {/* 2 · Fuente */}
+      <Paso n={2} titulo="¿De qué conjunto?">
+        <div style={{ display: 'grid', gap: 8 }}>
+          <Opcion activo={fuente === 'banco'} onClick={() => setFuente('banco')}
+            titulo="Todo el banco"
+            texto="Cualquier pregunta de los bancos elegidos." />
+          <Opcion activo={fuente === 'mis_fallos'} onClick={() => setFuente('mis_fallos')}
+            titulo="Mis fallos"
+            texto="Solo las que fallaste la última vez que te salieron. Se vacía sola en cuanto las aciertas." />
+          <Opcion activo={fuente === 'comunidad_fallos'} onClick={() => setFuente('comunidad_fallos')}
+            titulo="Las que más falla la comunidad"
+            texto="Las que suspende más del 40 % del resto de opositores. Suelen ser las trampas del temario." />
+          <Opcion activo={fuente === 'poco_vistas'} onClick={() => setFuente('poco_vistas')}
+            titulo="Las que menos he visto"
+            texto="Empieza por las que nunca te han salido. Sirve para tapar los puntos ciegos del temario." />
+        </div>
+      </Paso>
+
+      {/* 3 · Criterio */}
+      <Paso n={3} titulo="¿Cómo se eligen?">
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
           {([
             ['aleatorio', 'Aleatorias'],
@@ -217,7 +239,7 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
       </Paso>
 
       {/* 3 · Número */}
-      <Paso n={3} titulo="¿Cuántas preguntas?">
+      <Paso n={4} titulo="¿Cuántas preguntas?">
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input className="form-input" inputMode="numeric" style={{ width: 110 }}
             value={count} onChange={(e) => setCount(e.target.value)} />
@@ -234,7 +256,7 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
       </Paso>
 
       {/* 4 · Tiempo */}
-      <Paso n={4} titulo="¿Con tiempo límite?">
+      <Paso n={5} titulo="¿Con tiempo límite?">
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14.5, marginBottom: 8 }}>
           <input type="checkbox" checked={conTiempo} onChange={(e) => setConTiempo(e.target.checked)} />
           Poner un tiempo máximo
@@ -252,7 +274,7 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
       </Paso>
 
       {/* 5 · Corrección */}
-      <Paso n={5} titulo="¿Cuándo quieres la corrección?">
+      <Paso n={6} titulo="¿Cuándo quieres la corrección?">
         <div style={{ display: 'grid', gap: 8 }}>
           <Opcion activo={correccion === 'inmediata'} onClick={() => setCorreccion('inmediata')}
             titulo="Tras cada respuesta"
@@ -264,7 +286,7 @@ export function TestBuilder({ bancos, onGenerado }: { bancos: BancoConv[]; onGen
       </Paso>
 
       {/* 6 · Barajado */}
-      <Paso n={6} titulo="¿Barajar las preguntas?">
+      <Paso n={7} titulo="¿Barajar las preguntas?">
         <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 14.5 }}>
           <input type="checkbox" checked={barajar} onChange={(e) => setBarajar(e.target.checked)} style={{ marginTop: 3 }} />
           <span>
