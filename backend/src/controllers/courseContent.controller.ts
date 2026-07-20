@@ -41,6 +41,7 @@ const updateCourseSchema = z.object({
   lateSurchargePct: z.number().min(0).max(500).optional(),
   // Cursos por suscripción: se paga por periodos mientras se prepara.
   billingType: z.enum(['unico', 'suscripcion']).optional(),
+  esOpe: z.boolean().optional(),
   priceMensualCents: z.number().int().min(0).max(10_000_00).nullish(),
   priceTrimestralCents: z.number().int().min(0).max(10_000_00).nullish(),
   priceSemestralCents: z.number().int().min(0).max(10_000_00).nullish(),
@@ -73,7 +74,7 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     whatsapp_url: d.whatsappUrl,
     min_per_page: d.minPerPage, words_per_min: d.wordsPerMin, min_per_question: d.minPerQuestion,
     price_cents: d.priceCents, early_bird_until: d.earlyBirdUntil, late_surcharge_pct: d.lateSurchargePct,
-    billing_type: d.billingType,
+    billing_type: d.billingType, es_ope: d.esOpe,
     price_mensual_cents: d.priceMensualCents,
     price_trimestral_cents: d.priceTrimestralCents,
     price_semestral_cents: d.priceSemestralCents,

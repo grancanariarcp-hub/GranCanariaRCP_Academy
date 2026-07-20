@@ -178,8 +178,24 @@ async function confirmarPago(sesion: Stripe.Checkout.Session): Promise<void> {
     );
     if (upd.rowCount === 0) return false;
 
+    // En una suscripción, el pago abre (o prorroga) el periodo contratado. Se
+    // suma sobre el vencimiento vigente si aún queda tiempo, para que renovar
+    // antes de tiempo no regale ni robe días.
     await c.query(
-      `UPDATE enrollments SET status = 'activo' WHERE id = $1 AND status <> 'activo'`,
+      `UPDATE enrollments e
+          SET status = 'activo',
+              access_until = CASE
+                WHEN e.periodo IS NULL THEN e.access_until
+                ELSE GREATEST(COALESCE(e.access_until, NOW()), NOW()) + (
+                  CASE e.periodo
+                    WHEN 'mensual'     THEN INTERVAL '1 month'
+                    WHEN 'trimestral'  THEN INTERVAL '3 months'
+                    WHEN 'semestral'   THEN INTERVAL '6 months'
+                    WHEN 'anual'       THEN INTERVAL '12 months'
+                    ELSE INTERVAL '0'
+                  END)
+              END
+        WHERE e.id = $1`,
       [enrollmentId],
     );
     return true;

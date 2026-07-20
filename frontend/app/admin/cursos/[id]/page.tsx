@@ -63,6 +63,7 @@ interface Course {
   early_bird_until: string | null;
   late_surcharge_pct: number | string | null;
   billing_type: string;
+  es_ope: boolean;
   price_mensual_cents: number | null;
   price_trimestral_cents: number | null;
   price_semestral_cents: number | null;
@@ -467,14 +468,35 @@ export default function CourseDetailPage() {
             </div>
           )}
 
-          {/* Acta: cierra la actividad formativa y congela sus datos */}
-        <ActaPanel courseId={courseId} />
+          {/* Acta: un curso OPE no titula, así que no la necesita */}
+        {!course.es_ope && <ActaPanel courseId={courseId} />}
+
+        {/* Tipo de curso: un curso OPE es un generador de exámenes y no
+            necesita profesorado, encuesta, certificado ni acta. */}
+        <div className="card" style={{ marginBottom: 24 }}>
+          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14.5, cursor: 'pointer' }}>
+            <input type="checkbox" checked={!!course.es_ope} style={{ marginTop: 3 }}
+              onChange={(e) => patchCourse({ esOpe: e.target.checked })} />
+            <span>
+              <strong>Curso de preparación de oposiciones (OPE)</strong>
+              <span className="muted" style={{ display: 'block', fontSize: 12.5, marginTop: 2 }}>
+                Es un generador de exámenes con seguimiento del avance: no imparte docencia, no evalúa ni
+                titula. Al marcarlo se ocultan los bloques que no le aplican —profesorado, encuesta de
+                satisfacción, acreditación CFC, certificado, asistencia y acta— y quedan la ficha, el precio
+                y sus bancos de preguntas.
+              </span>
+            </span>
+          </label>
+        </div>
 
         {/* Precio de matrícula, con matrícula anticipada */}
         <CoursePricing courseId={courseId} course={course} onSaved={load} />
 
-        {/* Asistencia presencial: jornadas, QR y lista de clase */}
-        <AttendancePanel courseId={courseId} />
+        {/* Cobro recurrente por periodos */}
+        <CourseSubscription courseId={courseId} course={course} onSaved={load} />
+
+        {/* Asistencia presencial: no aplica a un curso OPE */}
+        {!course.es_ope && <AttendancePanel courseId={courseId} />}
 
         {/* Ficha del curso */}
           <div className="card" style={{ marginBottom: 24 }}>
@@ -596,8 +618,8 @@ export default function CourseDetailPage() {
             </div>
           )}
 
-          {/* Resultados de la encuesta */}
-          {surv && (
+          {/* Resultados de la encuesta: un curso OPE no evalúa docencia */}
+          {surv && !course.es_ope && (
             <div className="card animate-in" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Encuesta de satisfacción</div>
@@ -645,8 +667,8 @@ export default function CourseDetailPage() {
             </div>
           )}
 
-          {/* Asistente CFC */}
-          {cfc && (
+          {/* Asistente CFC: un curso OPE no se acredita */}
+          {cfc && !course.es_ope && (
             <div className="card animate-in" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Asistente de acreditación (CFC)</div>
@@ -673,7 +695,8 @@ export default function CourseDetailPage() {
             </div>
           )}
 
-          {/* Certificado */}
+          {/* Certificado: un curso OPE no titula, así que no lo emite */}
+          {!course.es_ope && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <div className="card-title">Certificado</div>
@@ -714,6 +737,7 @@ export default function CourseDetailPage() {
               <button className="btn btn-outline btn-small" onClick={previewCert}>👁️ Ver previsualización</button>
             </div>
           </div>
+          )}
 
           <div className="grid grid-2">
             {/* Módulos + actividades */}
@@ -868,6 +892,7 @@ export default function CourseDetailPage() {
             </div>
 
             {/* Staff */}
+            {!course.es_ope && (
             <div className="card">
               <div className="card-header">
                 <div className="card-title">Profesores del curso</div>
@@ -906,6 +931,7 @@ export default function CourseDetailPage() {
                 <button className="btn btn-primary btn-full">Añadir al curso</button>
               </form>
             </div>
+            )}
           </div>
         </>
       )}

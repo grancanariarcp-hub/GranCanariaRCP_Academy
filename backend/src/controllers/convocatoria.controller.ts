@@ -77,8 +77,8 @@ export async function createConvocatoria(req: Request, res: Response): Promise<v
         `INSERT INTO courses
            (title, tema, subtema, modality, publico_objetivo, price_cents, created_by,
             billing_type, price_mensual_cents, price_trimestral_cents, price_semestral_cents, price_anual_cents,
-            resumen, objetivo_general)
-         VALUES ($1,'OPE',$2,'online','{}',0,$3,'suscripcion',$4,$5,$6,$7,$8,$9)
+            resumen, objetivo_general, es_ope)
+         VALUES ($1,'OPE',$2,'online','{}',0,$3,'suscripcion',$4,$5,$6,$7,$8,$9,TRUE)
          RETURNING id`,
         [
           d.name,

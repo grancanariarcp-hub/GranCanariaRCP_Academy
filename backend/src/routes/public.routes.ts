@@ -11,11 +11,13 @@ import { subscribeLead, unsubscribeLead } from '../controllers/lead.controller.j
 import { verificarActa } from '../controllers/acta.controller.js';
 import { verifyRecognition, recognitionPdf } from '../controllers/recognition.controller.js';
 import { anonStatus, anonStart, anonSubmit, anonConverted } from '../controllers/anonPractice.controller.js';
+import { planesDelCurso } from '../controllers/suscripcion.controller.js';
 
 /** Public endpoints (no auth) — course discovery + challenges/rankings. */
 const router = Router();
 router.get('/courses', asyncHandler(listOpenCourses));
 router.get('/courses/:id', asyncHandler(getPublicCourse));
+router.get('/courses/:id/planes', asyncHandler(planesDelCurso));
 router.get('/professors', asyncHandler(listPublicProfessors));
 router.get('/professors/:id/cv', asyncHandler(getProfessorCv));
 router.get('/challenges', asyncHandler(listChallenges));

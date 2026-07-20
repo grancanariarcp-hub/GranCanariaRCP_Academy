@@ -10,6 +10,7 @@ import { Carousel } from '@/components/Carousel';
 import { temaPalette } from '@/lib/temaColors';
 import { PageNav } from '@/components/PageNav';
 import { Contacto } from '@/components/Contacto';
+import { SubscriptionPlans } from '@/components/SubscriptionPlans';
 
 interface Course {
   id: string;
@@ -217,6 +218,9 @@ export default function PublicCoursePage() {
             )}
 
             {msg && <div className="alert alert-error">{msg}</div>}
+
+            {/* Suscripción: si el curso se cobra por periodos, se elige aquí */}
+            {isStudent && <SubscriptionPlans courseId={courseId} />}
 
             {/* Acción de matrícula */}
             {!course.enrollment_open ? (

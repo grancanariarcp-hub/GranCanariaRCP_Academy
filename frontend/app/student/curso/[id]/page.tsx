@@ -12,6 +12,7 @@ import { api, ApiError, downloadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
 import { MyAttendance } from '@/components/MyAttendance';
 import { PaymentGate } from '@/components/PaymentGate';
+import { MySubscription } from '@/components/MySubscription';
 
 interface Activity {
   id: string;
@@ -106,6 +107,7 @@ export default function StudentCoursePage() {
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={[{ label: 'Inicio', href: '/student', active: true }]}>
       <TimeTracker courseId={courseId} />
       <MyAttendance courseId={courseId} />
+      <MySubscription courseId={courseId} />
       <PageNav backHref="/student" backLabel="Volver a mis cursos" />
       {error && <div className="alert alert-error">{error}</div>}
 
