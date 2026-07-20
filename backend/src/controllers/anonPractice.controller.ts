@@ -68,8 +68,10 @@ export async function anonStart(req: Request, res: Response): Promise<void> {
     throw badRequest('Ya has hecho tu test gratuito. Regístrate para seguir practicando.', 'REGISTRO_REQUERIDO');
   }
 
-  // Solo bancos públicos: la práctica libre no puede filtrar material privado.
-  const conds = ['q.is_active = TRUE', "b.visibility = 'publico'"];
+  // Solo bancos públicos, y nunca material de oposición: los bancos OPE son
+  // públicos en el sentido de «no privados de un profesor», pero se venden. La
+  // ronda gratuita es divulgación de RCP, no una muestra del producto de pago.
+  const conds = ['q.is_active = TRUE', "b.visibility = 'publico'", "b.kind NOT IN ('ope', 'mir')"];
   const params: unknown[] = [];
   if (d.bankId) { params.push(d.bankId); conds.push(`q.bank_id = $${params.length}`); }
   if (d.tema) { params.push(d.tema); conds.push(`q.tema = $${params.length}`); }
@@ -102,8 +104,17 @@ export async function anonSubmit(req: Request, res: Response): Promise<void> {
   const ids = Object.keys(d.answers);
   if (ids.length === 0) throw badRequest('No hay respuestas que corregir', 'SIN_RESPUESTAS');
 
+  // Se corrige ÚNICAMENTE contenido de la ronda gratuita. Sin este filtro, esta
+  // ruta —que es pública y no pide sesión— devolvía la respuesta correcta de
+  // cualquier pregunta de la plataforma con solo conocer su identificador: el
+  // temario de oposición entero quedaba a la vista de quien lo pidiera.
   const { rows } = await query<{ id: string; correct_index: number; explanation: string | null; options: string[] }>(
-    'SELECT id, correct_index, explanation, options FROM questions WHERE id = ANY($1::uuid[])',
+    `SELECT q.id, q.correct_index, q.explanation, q.options
+       FROM questions q JOIN question_banks b ON b.id = q.bank_id
+      WHERE q.id = ANY($1::uuid[])
+        AND q.is_active = TRUE
+        AND b.visibility = 'publico'
+        AND b.kind NOT IN ('ope', 'mir')`,
     [ids],
   );
 

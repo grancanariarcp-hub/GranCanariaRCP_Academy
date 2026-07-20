@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../config/database.js';
 import { badRequest } from '../utils/httpError.js';
+import { bancosOpeAccesibles, filtroBancos } from '../services/accesoOpe.js';
 
 /**
  * Generic practice engine over a question bank (RCP now; OPE and others later).
@@ -17,6 +18,25 @@ const startSchema = z.object({
   count: z.number().int().min(1).max(100).default(10),
 });
 
+/**
+ * Contenido de oposición al que esta persona NO tiene derecho.
+ *
+ * Este motor de práctica es anterior al de oposiciones y no comprobaba nada: con
+ * pasarle el identificador de un banco OPE —o sin pasarle ninguno, que consulta
+ * todos— servía el temario de pago a cualquier cuenta gratuita, y devolvía la
+ * respuesta correcta al corregir. El muro de pago estaba puesto en el generador
+ * nuevo y esta puerta se quedó abierta al lado.
+ */
+async function condicionOpeVetada(uid: string, rol: string, params: unknown[]): Promise<string> {
+  const acceso = await bancosOpeAccesibles(uid, rol);
+  if (acceso.todos) return 'TRUE';
+  const permitidos = filtroBancos(acceso, 'q.bank_id', params);
+  return `(q.bank_id IS NULL
+           OR NOT EXISTS (SELECT 1 FROM question_banks b
+                           WHERE b.id = q.bank_id AND b.kind IN ('ope','mir'))
+           OR ${permitidos})`;
+}
+
 export async function startPractice(req: Request, res: Response): Promise<void> {
   const { mode, bankId, category, tema, count } = startSchema.parse(req.body);
   const uid = req.auth!.sub;
@@ -25,6 +45,10 @@ export async function startPractice(req: Request, res: Response): Promise<void> 
   let params: unknown[];
   if (mode === 'fallos') {
     // Failed pool = questions whose latest answer was incorrect (optionally within a bank).
+    // Se filtra igualmente por acceso: quien pierda la suscripción no debe
+    // seguir repasando el temario de pago a través de sus fallos antiguos.
+    const p: unknown[] = [uid, count];
+    const cond = bankId ? (p.push(bankId), `AND q.bank_id = $${p.length}`) : '';
     sql = `
       WITH latest AS (
         SELECT DISTINCT ON (question_id) question_id, is_correct
@@ -32,19 +56,22 @@ export async function startPractice(req: Request, res: Response): Promise<void> 
       )
       SELECT q.id, q.category, q.tema, q.text, q.options
       FROM questions q JOIN latest l ON l.question_id = q.id AND l.is_correct = FALSE
-      WHERE q.is_active = TRUE ${bankId ? 'AND q.bank_id = $3' : ''}
+      WHERE q.is_active = TRUE ${cond}
+        AND ${await condicionOpeVetada(uid, req.auth!.role, p)}
       ORDER BY RANDOM() LIMIT $2`;
-    params = bankId ? [uid, count, bankId] : [uid, count];
+    params = p;
   } else {
-    const conds = ['is_active = TRUE'];
+    const conds = ['q.is_active = TRUE'];
     const p: unknown[] = [];
-    if (bankId) { p.push(bankId); conds.push(`bank_id = $${p.length}`); }
+    if (bankId) { p.push(bankId); conds.push(`q.bank_id = $${p.length}`); }
     if (mode === 'tema') {
-      if (tema) { p.push(tema); conds.push(`tema = $${p.length}`); }
-      else if (category) { p.push(category); conds.push(`category = $${p.length}`); }
+      if (tema) { p.push(tema); conds.push(`q.tema = $${p.length}`); }
+      else if (category) { p.push(category); conds.push(`q.category = $${p.length}`); }
     }
+    conds.push(await condicionOpeVetada(uid, req.auth!.role, p));
     p.push(count);
-    sql = `SELECT id, category, tema, text, options FROM questions WHERE ${conds.join(' AND ')} ORDER BY RANDOM() LIMIT $${p.length}`;
+    sql = `SELECT q.id, q.category, q.tema, q.text, q.options FROM questions q
+            WHERE ${conds.join(' AND ')} ORDER BY RANDOM() LIMIT $${p.length}`;
     params = p;
   }
   const { rows } = await query(sql, params);
@@ -67,11 +94,14 @@ export async function submitPractice(req: Request, res: Response): Promise<void>
   const ids = Object.keys(answers);
   if (ids.length === 0) throw badRequest('Sin respuestas', 'EMPTY');
 
+  // Corregir también revela la respuesta correcta: el mismo veto que al servir.
+  const p: unknown[] = [ids];
+  const veto = await condicionOpeVetada(uid, req.auth!.role, p);
   const qs = await query<{ id: string; category: string; correct_index: number; explanation: string | null; ref_page: number | null; bank_id: string | null; document_title: string | null }>(
     `SELECT q.id, q.category, q.correct_index, q.explanation, q.ref_page, q.bank_id, d.title AS document_title
      FROM questions q LEFT JOIN documents d ON d.id = q.ref_document_id
-     WHERE q.id = ANY($1)`,
-    [ids],
+     WHERE q.id = ANY($1) AND ${veto}`,
+    p,
   );
 
   let correct = 0;
