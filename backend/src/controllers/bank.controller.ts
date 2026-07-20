@@ -156,7 +156,11 @@ export async function exportBank(req: Request, res: Response): Promise<void> {
  * la etiqueta que ve quien lo usa.
  */
 export async function listBanks(req: Request, res: Response): Promise<void> {
-  const isSuper = !req.auth || req.auth.role === 'super_admin';
+  // NO tener sesión no es ser super admin. Escrito como `!req.auth || ...`, un
+  // visitante anónimo pasaba por administrador y el filtro de visibilidad se
+  // cumplía siempre: la lista pública devolvía los bancos privados de cada
+  // profesor y los bancos OPE de pago, marcados además como administrables.
+  const isSuper = req.auth?.role === 'super_admin' || req.auth?.role === 'auditor';
   const uid = req.auth?.sub ?? null;
   const f = req.query as Record<string, string | undefined>;
 
@@ -280,6 +284,20 @@ export async function listBankQuestions(req: Request, res: Response): Promise<vo
 
 /** Temas de un banco con nº de preguntas (para elegir en la práctica). */
 export async function getBankTemas(req: Request, res: Response): Promise<void> {
+  // Esta ruta también se sirve sin sesión, así que solo puede hablar de bancos
+  // públicos que no sean de oposición: el temario de un banco de pago —qué
+  // materias entran y cuántas preguntas hay de cada una— es parte de lo que se
+  // vende, y el de un banco privado no es de nadie más que de su autor.
+  const banco = await query<{ visibility: string; kind: string; created_by: string | null }>(
+    'SELECT visibility, kind, created_by FROM question_banks WHERE id = $1',
+    [req.params.id],
+  );
+  if (banco.rows.length === 0) throw notFound('Banco no encontrado');
+  const b = banco.rows[0];
+  const propio = !!req.auth && (b.created_by === req.auth.sub || req.auth.role === 'super_admin' || req.auth.role === 'auditor');
+  const abierto = b.visibility === 'publico' && !['ope', 'mir'].includes(b.kind);
+  if (!propio && !abierto) throw notFound('Banco no encontrado');
+
   const { rows } = await query(
     `SELECT COALESCE(tema, '(sin tema)') AS tema, COUNT(*) AS questions
      FROM questions WHERE bank_id = $1 AND is_active = TRUE GROUP BY tema ORDER BY tema`,

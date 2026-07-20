@@ -75,8 +75,10 @@ export async function enrollCourse(req: Request, res: Response): Promise<void> {
   const course = await query<{
     status: string; enrollment_open: boolean; price_cents: number; title: string;
     early_bird_until: string | null; late_surcharge_pct: number | null;
+    billing_type: string; price_mensual_cents: number | null;
   }>(
-    `SELECT status, enrollment_open, price_cents, title, early_bird_until, late_surcharge_pct
+    `SELECT status, enrollment_open, price_cents, title, early_bird_until, late_surcharge_pct,
+            billing_type, price_mensual_cents
        FROM courses WHERE id = $1`,
     [courseId],
   );
@@ -91,7 +93,14 @@ export async function enrollCourse(req: Request, res: Response): Promise<void> {
     earlyBirdUntil: c.early_bird_until,
     lateSurchargePct: c.late_surcharge_pct,
   });
-  const status = precio.cents > 0 ? 'pendiente_pago' : 'activo';
+  // Un curso por SUSCRIPCIÓN no vale nada en price_cents —su precio vive en los
+  // importes por periodo—, así que mirar solo ese campo lo daba por gratuito y
+  // abría la matrícula al instante: cualquiera se apuntaba a una convocatoria
+  // OPE y accedía al temario completo sin pagar un euro. La matrícula nace
+  // pendiente de pago y solo el cobro confirmado la activa.
+  const porSuscripcion = c.billing_type === 'suscripcion';
+  const hayQuePagar = precio.cents > 0 || porSuscripcion;
+  const status = hayQuePagar ? 'pendiente_pago' : 'activo';
   const { rows } = await query(
     `INSERT INTO enrollments (student_id, course_id, status, price_paid_cents)
      VALUES ($1, $2, $3, $4)
@@ -112,7 +121,7 @@ export async function enrollCourse(req: Request, res: Response): Promise<void> {
   }
 
   await audit({ actorId: req.auth!.sub, actorType: 'student', action: 'ENROLL', entity: 'course', entityId: courseId, ip: clientIp(req) });
-  res.status(201).json({ enrollment: rows[0], paymentRequired: c.price_cents > 0 });
+  res.status(201).json({ enrollment: rows[0], paymentRequired: hayQuePagar, porSuscripcion });
 }
 
 /** "Mis cursos": los cursos en los que está matriculado. */

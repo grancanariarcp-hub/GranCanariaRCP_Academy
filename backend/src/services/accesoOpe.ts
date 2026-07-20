@@ -27,10 +27,17 @@ export async function bancosOpeAccesibles(
       WHERE c.course_id IS NULL
          OR EXISTS (
               SELECT 1 FROM enrollments e
+                JOIN courses cu ON cu.id = e.course_id
                WHERE e.course_id = c.course_id
                  AND e.student_id = $1
                  AND e.status <> 'pendiente_pago'
-                 AND (e.access_until IS NULL OR e.access_until > NOW())
+                 -- En un curso por suscripción, «sin fecha de fin» no puede
+                 -- significar «para siempre»: si no hay vencimiento es que
+                 -- nunca se llegó a pagar un periodo.
+                 AND (CASE WHEN cu.billing_type = 'suscripcion'
+                           THEN e.access_until IS NOT NULL AND e.access_until > NOW()
+                           ELSE e.access_until IS NULL OR e.access_until > NOW()
+                      END)
             )
      UNION
      SELECT id AS bank_id FROM question_banks WHERE created_by = $1`,

@@ -318,37 +318,14 @@ export async function studentLoginCode(req: Request, res: Response): Promise<voi
 // ---------------------------------------------------------------------------
 // Minor login (method 4): institución + seudónimo + edad (sin el código en mano)
 // ---------------------------------------------------------------------------
-const studentLoginInstitutionSchema = z.object({
-  institutionId: z.string().uuid(),
-  nickname: z.string().min(2).max(120),
-  age: z.number().int().min(3).max(17),
-});
-
-export async function studentLoginInstitution(req: Request, res: Response): Promise<void> {
-  const { institutionId, nickname, age } = studentLoginInstitutionSchema.parse(req.body);
-  const ip = clientIp(req);
-
-  const { rows } = await query<{ id: string; display_name: string; institution_id: string | null }>(
-    `SELECT id, display_name, institution_id FROM students
-     WHERE institution_id = $1 AND is_minor = TRUE AND is_active = TRUE
-       AND LOWER(display_name) = LOWER($2) AND age = $3`,
-    [institutionId, nickname.trim(), age],
-  );
-
-  if (rows.length === 0) {
-    await audit({ actorType: 'anonymous', action: 'STUDENT_LOGIN_FAILED', ip, metadata: { method: 'institution' } });
-    throw unauthorized('No encontramos ese apodo y edad en esa institución. Usa tu código.', 'NOT_FOUND');
-  }
-  if (rows.length > 1) {
-    throw conflict('Hay varios alumnos con ese apodo y edad. Entra con tu código.', 'AMBIGUOUS');
-  }
-
-  const student = rows[0];
-  await query('UPDATE students SET last_login_at = NOW() WHERE id = $1', [student.id]);
-  const token = signToken({ sub: student.id, role: 'student', institutionId: student.institution_id, name: student.display_name });
-  await audit({ actorId: student.id, actorType: 'student', action: 'STUDENT_LOGIN_SUCCESS', entity: 'student', entityId: student.id, ip, metadata: { method: 'institution' } });
-  res.json({ token, user: { id: student.id, name: student.display_name, role: 'student', institutionId: student.institution_id } });
-}
+// Nota: existió un acceso "ya me registré" que pedía institución + apodo + edad
+// y NINGUNA credencial. La institución se publica en /api/public/institutions,
+// la edad tiene quince valores posibles y el apodo lo elige un niño, así que
+// cualquiera podía entrar en la cuenta de un menor a base de probar. Se ha
+// retirado: era además redundante, porque el código de acceso ya cubre ese
+// caso y el maestro lo tiene siempre a la vista en su clase para volver a
+// dárselo a quien lo pierda.
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Unified login (email + password) — works for admins, professors and students

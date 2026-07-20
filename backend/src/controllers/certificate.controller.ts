@@ -116,8 +116,15 @@ export async function previewCertificate(req: Request, res: Response): Promise<v
 // GET /api/student/courses/:courseId/certificate — solo si aprobó
 export async function studentCertificate(req: Request, res: Response): Promise<void> {
   const courseId = req.params.courseId;
-  const enr = await query('SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2', [req.auth!.sub, courseId]);
+  // Un certificado acreditado no se entrega sobre una matrícula sin pagar.
+  const enr = await query<{ status: string }>(
+    'SELECT status FROM enrollments WHERE student_id = $1 AND course_id = $2',
+    [req.auth!.sub, courseId],
+  );
   if (enr.rows.length === 0) throw forbidden('No estás matriculado en este curso');
+  if (enr.rows[0].status === 'pendiente_pago') {
+    throw forbidden('Tu matrícula está pendiente de pago: no se puede emitir el certificado.');
+  }
 
   const passed = await query(
     `SELECT 1 FROM exam_attempts a JOIN exams e ON e.id = a.exam_id JOIN modules m ON m.id = e.module_id

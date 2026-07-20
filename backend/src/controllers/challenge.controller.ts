@@ -153,30 +153,38 @@ export async function startChallenge(req: Request, res: Response): Promise<void>
     : await query('SELECT id, category, text, options FROM questions WHERE is_active = TRUE AND category = ANY($1) ORDER BY RANDOM() LIMIT $2', [areaCategories(c.area), c.num_questions]);
   if (questions.rows.length === 0) throw badRequest('Este desafío aún no tiene preguntas disponibles', 'NO_QUESTIONS');
 
+  // Se guarda QUÉ preguntas le han tocado: es lo que permite corregir sobre
+  // ellas y no sobre lo que el navegador diga después.
   const att = await query<{ id: string }>(
-    'INSERT INTO challenge_attempts (challenge_id, participant_id, participant_name, participant_role, institution_id) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-    [c.id, req.auth!.sub, name, req.auth!.role, institutionId],
+    `INSERT INTO challenge_attempts
+       (challenge_id, participant_id, participant_name, participant_role, institution_id, served_questions)
+     VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING id`,
+    [c.id, req.auth!.sub, name, req.auth!.role, institutionId, JSON.stringify(questions.rows.map((q) => q.id))],
   );
   res.status(201).json({ attemptId: att.rows[0].id, timeLimitSeconds: c.time_limit_seconds, questions: questions.rows });
 }
 
 // POST submit
 export async function submitChallenge(req: Request, res: Response): Promise<void> {
-  const att = await query<{ started_at: string; submitted_at: string | null; challenge_id: string }>(
-    'SELECT started_at, submitted_at, challenge_id FROM challenge_attempts WHERE id = $1 AND participant_id = $2',
+  const att = await query<{ started_at: string; submitted_at: string | null; challenge_id: string; served_questions: string[] | null }>(
+    'SELECT started_at, submitted_at, challenge_id, served_questions FROM challenge_attempts WHERE id = $1 AND participant_id = $2',
     [req.params.attemptId, req.auth!.sub],
   );
   if (att.rows.length === 0) throw notFound('Intento no encontrado');
   if (att.rows[0].submitted_at) throw badRequest('Ya enviado', 'ALREADY_SUBMITTED');
 
   const answers = z.record(z.union([z.number(), z.null()])).parse(req.body.answers ?? {});
-  const ids = Object.keys(answers);
+  // Se corrige sobre las preguntas SERVIDAS, no sobre las que devuelva el
+  // navegador. Antes el total era «cuántas me has mandado», así que enviar solo
+  // las acertadas daba un 100 % y falseaba el ranking público.
+  const servidas = att.rows[0].served_questions ?? Object.keys(answers);
   let correct = 0;
-  if (ids.length > 0) {
-    const qs = await query<{ id: string; correct_index: number }>('SELECT id, correct_index FROM questions WHERE id = ANY($1)', [ids]);
+  if (servidas.length > 0) {
+    const qs = await query<{ id: string; correct_index: number }>(
+      'SELECT id, correct_index FROM questions WHERE id = ANY($1)', [servidas]);
     for (const q of qs.rows) if (answers[q.id] === q.correct_index) correct += 1;
   }
-  const total = ids.length;
+  const total = servidas.length;
   const timeSeconds = Math.max(0, Math.round((Date.now() - new Date(att.rows[0].started_at).getTime()) / 1000));
 
   await query(

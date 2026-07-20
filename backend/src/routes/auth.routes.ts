@@ -7,8 +7,7 @@ import {
   studentRegisterPublic,
   studentLoginEmail,
   studentLoginCode,
-  studentLoginInstitution,
-  institutionRegister,
+    institutionRegister,
   logout,
   me,
 } from '../controllers/auth.controller.js';
@@ -40,7 +39,6 @@ router.post('/institution/register', authLimiter, asyncHandler(institutionRegist
 router.post('/student/register', authLimiter, asyncHandler(studentRegister)); // 1
 router.post('/student/login-email', authLimiter, asyncHandler(studentLoginEmail)); // 2
 router.post('/student/login-code', authLimiter, asyncHandler(studentLoginCode)); // 3
-router.post('/student/login-institution', authLimiter, asyncHandler(studentLoginInstitution)); // 4
 
 // Session
 router.post('/logout', requireAuth, asyncHandler(logout));

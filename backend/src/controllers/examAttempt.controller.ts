@@ -27,8 +27,20 @@ async function examForStudent(examId: string, studentId: string): Promise<ExamRo
     [examId],
   );
   if (rows.length === 0) throw notFound('Examen no encontrado');
-  const enr = await query('SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2', [studentId, rows[0].course_id]);
+  // No basta con estar matriculado: hay que estarlo AL DÍA. Comprobar solo la
+  // existencia de la fila dejaba examinarse —y con ello obtener el certificado
+  // acreditado— con la matrícula sin pagar o con la suscripción caducada.
+  const enr = await query<{ status: string; access_until: string | null }>(
+    'SELECT status, access_until FROM enrollments WHERE student_id = $1 AND course_id = $2',
+    [studentId, rows[0].course_id],
+  );
   if (enr.rows.length === 0) throw forbidden('No estás matriculado en este curso');
+  if (enr.rows[0].status === 'pendiente_pago') {
+    throw forbidden('Tu matrícula está pendiente de pago: abónala para poder examinarte.');
+  }
+  if (enr.rows[0].access_until && new Date(enr.rows[0].access_until) < new Date()) {
+    throw forbidden('Tu acceso a este curso ha vencido. Renueva para poder examinarte.');
+  }
   return rows[0];
 }
 
