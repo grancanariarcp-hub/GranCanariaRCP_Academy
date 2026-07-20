@@ -7,6 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { saveSession, homeForRole, type SessionUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 import { PageNav } from '@/components/PageNav';
+import { AvisoSesionCaducada } from '@/components/AvisoSesionCaducada';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -49,6 +50,7 @@ export default function LoginPage() {
           <p>Alumnos, profesores y administración</p>
         </div>
 
+        <AvisoSesionCaducada />
         {error && <div className="alert alert-error">{error}</div>}
 
         <form onSubmit={onSubmit}>

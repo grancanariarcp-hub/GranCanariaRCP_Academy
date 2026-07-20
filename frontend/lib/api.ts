@@ -1,8 +1,23 @@
 'use client';
 
-import { getToken } from './auth';
+import { clearSession, getToken, getUser } from './auth';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000';
+
+/**
+ * La sesión ya no vale: se limpia y se lleva a la puerta que le corresponde,
+ * avisando de por qué. Se hace una sola vez aunque fallen varias peticiones a
+ * la vez, para no encadenar redirecciones.
+ */
+let redirigiendo = false;
+function sesionCaducada(): void {
+  if (typeof window === 'undefined' || redirigiendo) return;
+  redirigiendo = true;
+  const rol = getUser()?.role;
+  clearSession();
+  const destino = rol === 'student' ? '/login/student' : rol ? '/login/admin' : '/login';
+  window.location.href = `${destino}?caducada=1`;
+}
 
 /** Base pública de la API (para construir URLs de imágenes como el QR). */
 export const apiBase = API_URL;
@@ -52,6 +67,11 @@ export async function api<T = unknown>(
 
   if (!res.ok) {
     const b = body as { error?: string; code?: string; details?: unknown } | null;
+    // Sesión caducada o cerrada desde otro dispositivo. Sin esto, la petición
+    // fallaba y cada pantalla se las apañaba como podía: donde no había un
+    // catch, no ocurría absolutamente nada y el usuario se quedaba pulsando un
+    // botón muerto sin saber que ya no tenía sesión.
+    if (res.status === 401 && auth) sesionCaducada();
     throw new ApiError(
       res.status,
       b?.error ?? `Error ${res.status}`,

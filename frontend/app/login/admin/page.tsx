@@ -7,6 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { saveSession, type SessionUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 import { PageNav } from '@/components/PageNav';
+import { AvisoSesionCaducada } from '@/components/AvisoSesionCaducada';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -43,6 +44,7 @@ export default function AdminLoginPage() {
           <p>Super Admin / Administrador de institución</p>
         </div>
 
+        <AvisoSesionCaducada />
         {error && <div className="alert alert-error">{error}</div>}
 
         <form onSubmit={onSubmit}>

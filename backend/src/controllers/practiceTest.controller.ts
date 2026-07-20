@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { query } from '../config/database.js';
+import { query, withTransaction } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { bancosOpeAccesibles } from '../services/accesoOpe.js';
 
@@ -265,25 +265,41 @@ export async function enviarTest(req: Request, res: Response): Promise<void> {
     };
   }).filter(Boolean);
 
-  await query(
-    `UPDATE practice_tests SET submitted_at = NOW(), correct = $2, total = $3, seconds = $4 WHERE id = $1`,
-    [t.id, correct, t.question_ids.length, d.seconds ?? 0],
-  );
-
-  // Alimenta las estadísticas y la cobertura del temario, como cualquier tanda.
-  for (const q of rows) {
-    const marcada = d.answers[q.id] ?? null;
-    await query(
-      `INSERT INTO answer_log (user_id, question_id, bank_id, category, is_correct, source)
-       VALUES ($1,$2,$3,$4,$5,'practica')`,
-      [uid, q.id, q.bank_id, q.tema, marcada !== null && marcada === q.correct_index],
+  // Todo o nada. Antes se marcaba el test como enviado y DESPUÉS se volcaba el
+  // histórico; si ese volcado fallaba, el opositor recibía un error, perdía la
+  // nota y al reintentar se le respondía que el test ya estaba corregido: el
+  // examen quedaba inutilizable. Dentro de una transacción, un fallo deja el
+  // test intacto y se puede volver a corregir.
+  await withTransaction(async (c) => {
+    // El WHERE protege de dos envíos simultáneos (dos pestañas, o un reintento
+    // tras un tiempo de espera agotado): solo el primero corrige.
+    const upd = await c.query(
+      `UPDATE practice_tests SET submitted_at = NOW(), correct = $2, total = $3, seconds = $4
+        WHERE id = $1 AND submitted_at IS NULL`,
+      [t.id, correct, t.question_ids.length, d.seconds ?? 0],
     );
-  }
-  await query(
-    `INSERT INTO practice_sessions (user_id, bank_id, total, correct, seconds, is_simulacro)
-     VALUES ($1,$2,$3,$4,$5,$6)`,
-    [uid, t.bank_ids[0] ?? null, t.question_ids.length, correct, d.seconds ?? 0, !!t.minutos],
-  );
+    if (upd.rowCount === 0) throw badRequest('Este test ya fue corregido', 'YA_ENVIADO');
+
+    // Alimenta las estadísticas y la cobertura del temario, como cualquier tanda.
+    // Las preguntas SIN RESPONDER no se anotan: no son fallos del opositor, y
+    // contarlas envenenaba su banco de fallos, su cobertura del temario —donde
+    // aparecían como «vistas» sin haberlas leído— y la estadística compartida de
+    // preguntas difíciles de toda la comunidad.
+    for (const q of rows) {
+      const marcada = d.answers[q.id] ?? null;
+      if (marcada === null) continue;
+      await c.query(
+        `INSERT INTO answer_log (user_id, question_id, bank_id, category, is_correct, source)
+         VALUES ($1,$2,$3,$4,$5,'practica')`,
+        [uid, q.id, q.bank_id, q.tema, marcada === q.correct_index],
+      );
+    }
+    await c.query(
+      `INSERT INTO practice_sessions (user_id, bank_id, total, correct, seconds, is_simulacro)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [uid, t.bank_ids[0] ?? null, t.question_ids.length, correct, d.seconds ?? 0, !!t.minutos],
+    );
+  });
 
   const pct = Math.round((correct / t.question_ids.length) * 100);
   res.json({ correct, total: t.question_ids.length, pct, revision });

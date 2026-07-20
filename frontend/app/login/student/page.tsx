@@ -7,6 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { saveSession, type SessionUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 import { PageNav } from '@/components/PageNav';
+import { AvisoSesionCaducada } from '@/components/AvisoSesionCaducada';
 
 type Method = 'code' | 'email' | 'register';
 
@@ -86,6 +87,7 @@ export default function StudentLoginPage() {
           </button>
         </div>
 
+        <AvisoSesionCaducada />
         {error && <div className="alert alert-error">{error}</div>}
         {notice && <div className="alert alert-success">{notice}</div>}
 

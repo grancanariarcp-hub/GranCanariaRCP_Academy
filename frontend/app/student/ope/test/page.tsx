@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { AppShell } from '@/components/AppShell';
 import { PageNav } from '@/components/PageNav';
 import { useSession } from '@/hooks/useSession';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { TestBuilder, type BancoConv, type ConfigTest } from '@/components/TestBuilder';
 
 /**
@@ -47,6 +47,7 @@ export default function TestOpePage() {
   const [restante, setRestante] = useState<number | null>(null);
   const [resultado, setResultado] = useState<{ correct: number; total: number; pct: number; revision: FilaRevision[] } | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [fallo, setFallo] = useState<string | null>(null);
   const [previos, setPrevios] = useState<TestPrevio[]>([]);
 
   useEffect(() => {
@@ -97,9 +98,13 @@ export default function TestOpePage() {
     }
   }
 
+  // Un test corregido no puede perderse en silencio: si algo falla, el opositor
+  // tiene que enterarse y poder reintentarlo, no quedarse pulsando un botón
+  // muerto creyendo que la plataforma le ha tragado el examen.
   async function enviar() {
     if (enviando || resultado) return;
     setEnviando(true);
+    setFallo(null);
     try {
       const r: any = await api(`/api/practice/tests/${testId}/submit`, {
         method: 'POST', auth: true,
@@ -108,17 +113,28 @@ export default function TestOpePage() {
       setResultado(r);
       setRestante(null);
       cargarPrevios();
+    } catch (e) {
+      setFallo(e instanceof ApiError
+        ? `No se ha podido corregir: ${e.message}`
+        : 'No se ha podido corregir. Comprueba tu conexión y vuelve a intentarlo; tus respuestas siguen aquí.');
     } finally {
       setEnviando(false);
     }
   }
 
   async function repetir(id: string) {
-    const r = await api<any>(`/api/practice/tests/${id}/repeat`, { method: 'POST', auth: true });
-    alGenerar(r, {
-      bankIds: [], criterio: r.config.criterio, count: r.config.servidas,
-      minutos: r.config.minutos, correccion: r.config.correccion, barajarPreguntas: true,
-    });
+    setFallo(null);
+    try {
+      const r = await api<any>(`/api/practice/tests/${id}/repeat`, { method: 'POST', auth: true });
+      alGenerar(r, {
+        bankIds: [], criterio: r.config.criterio, count: r.config.servidas,
+        minutos: r.config.minutos, correccion: r.config.correccion, barajarPreguntas: true,
+      });
+    } catch (e) {
+      setFallo(e instanceof ApiError
+        ? `No se ha podido repetir el test: ${e.message}`
+        : 'No se ha podido repetir el test.');
+    }
   }
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
@@ -279,6 +295,8 @@ export default function TestOpePage() {
                 )}
               </div>
             )}
+
+            {fallo && <div className="alert alert-error" style={{ fontSize: 13.5 }}>{fallo}</div>}
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <button className="btn btn-outline btn-small" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>Anterior</button>
