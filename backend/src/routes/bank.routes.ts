@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  createBank, updateBank, deleteBank, exportBank, listBanks, getBankTemas, importBankQuestions,
+  createBank, updateBank, deleteBank, exportBank, listBanks, listBankQuestions, getBankTemas, importBankQuestions,
 } from '../controllers/bank.controller.js';
 import { bankAvailability } from '../controllers/exam.controller.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -22,6 +22,7 @@ router.patch('/:id', asyncHandler(updateBank));
 router.delete('/:id', asyncHandler(deleteBank));
 router.get('/:id/export', asyncHandler(exportBank));
 router.get('/:id/temas', asyncHandler(getBankTemas));
+router.get('/:id/questions', asyncHandler(listBankQuestions));
 router.post('/:id/import', asyncHandler(importBankQuestions));
 
 export default router;

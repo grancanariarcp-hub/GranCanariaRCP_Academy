@@ -5,6 +5,8 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, downloadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
+import { BankFilters, FILTROS_VACIOS, type FiltrosBanco, type Facetas } from '@/components/BankFilters';
+import { BankQuestionList } from '@/components/BankQuestionList';
 
 interface Bank {
   id: string;
@@ -45,6 +47,10 @@ function shapeFor(kind: string) {
 export default function BancosPage() {
   const user = useSession(['super_admin', 'profesor'], '/login/admin');
   const [banks, setBanks] = useState<Bank[]>([]);
+  const [filtros, setFiltros] = useState<FiltrosBanco>({ ...FILTROS_VACIOS });
+  const [facetas, setFacetas] = useState<Facetas | null>(null);
+  const [total, setTotal] = useState(0);
+  const [verPreguntasDe, setVerPreguntasDe] = useState<Bank | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Formulario (sirve para crear y para editar)
@@ -72,10 +78,25 @@ export default function BancosPage() {
 
   async function load() {
     try {
-      setBanks((await api<{ banks: Bank[] }>('/api/banks', { auth: true })).banks);
+      const qs = new URLSearchParams();
+      if (filtros.kind) qs.set('kind', filtros.kind);
+      if (filtros.dim1) qs.set('dim1', filtros.dim1);
+      if (filtros.dim2) qs.set('dim2', filtros.dim2);
+      if (filtros.anio) qs.set('anio', filtros.anio);
+      if (filtros.visibility) qs.set('visibility', filtros.visibility);
+      if (filtros.mine) qs.set('mine', '1');
+      if (filtros.conPreguntas) qs.set('conPreguntas', '1');
+      if (filtros.q) qs.set('q', filtros.q);
+      const r = await api<{ banks: Bank[]; total: number; facetas: Facetas }>(
+        `/api/banks?${qs.toString()}`, { auth: true },
+      );
+      setBanks(r.banks);
+      setFacetas(r.facetas);
+      setTotal(r.total);
     } catch { /* ignore */ }
   }
-  useEffect(() => { if (user) load(); /* eslint-disable-next-line */ }, [user]);
+  // Los filtros se resuelven en el servidor, así que recargamos al cambiarlos.
+  useEffect(() => { if (user) load(); /* eslint-disable-next-line */ }, [user, filtros]);
 
   function resetForm() {
     setEditingId(null); setName(''); setKind('rcp'); setAnio('');
@@ -296,7 +317,9 @@ export default function BancosPage() {
 
         {/* Listado */}
         <div className="card animate-in">
-          <div className="card-header"><div className="card-title">Bancos</div><div className="card-subtitle">{banks.length}</div></div>
+          <div className="card-header"><div className="card-title">Bancos</div><div className="card-subtitle">{banks.length} de {total}</div></div>
+
+          <BankFilters filtros={filtros} setFiltros={setFiltros} facetas={facetas} total={total} />
           <div className="table-responsive">
             <table>
               <thead><tr><th>Banco</th><th>Preguntas</th><th>Acciones</th></tr></thead>
@@ -323,6 +346,7 @@ export default function BancosPage() {
                       <div className="row-actions">
                         {b.canManage ? (
                           <>
+                            <button className="link-action" onClick={() => setVerPreguntasDe(verPreguntasDe?.id === b.id ? null : b)} title="Ver y filtrar sus preguntas">Preguntas</button>
                             <button className="link-action" onClick={() => loadTemas(b.id)} title="Importar preguntas y ver temas">Importar</button>
                             <button className="link-action" onClick={() => startEdit(b)} title="Editar la ficha del banco">Editar</button>
                             <button className="link-action" onClick={() => download(b)} title="Descargar las preguntas en JSON">Descargar</button>
@@ -343,6 +367,9 @@ export default function BancosPage() {
           </div>
         </div>
       </div>
+
+      {/* Preguntas del banco, con sus propios filtros */}
+      {verPreguntasDe && <BankQuestionList bankId={verPreguntasDe.id} bankName={verPreguntasDe.name} />}
 
       {/* Importar preguntas al banco seleccionado */}
       {selBank && (

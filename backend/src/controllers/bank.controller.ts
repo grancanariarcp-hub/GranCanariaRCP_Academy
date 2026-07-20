@@ -143,21 +143,139 @@ export async function exportBank(req: Request, res: Response): Promise<void> {
   res.send(JSON.stringify(data, null, 2));
 }
 
+/**
+ * Listado de bancos con filtros.
+ *
+ * Con veinte bancos, elegir el de un examen a ojo es inviable. Los filtros se
+ * resuelven en el servidor y no en el navegador, para que sigan sirviendo
+ * cuando haya cientos.
+ *
+ * Las dos dimensiones libres del banco cambian de significado segun el tipo
+ * (en RCP son institucion y poblacion objetivo; en OPE, comunidad y categoria)
+ * pero se guardan en las mismas columnas: el filtro es el mismo y solo cambia
+ * la etiqueta que ve quien lo usa.
+ */
 export async function listBanks(req: Request, res: Response): Promise<void> {
   const isSuper = !req.auth || req.auth.role === 'super_admin';
   const uid = req.auth?.sub ?? null;
+  const f = req.query as Record<string, string | undefined>;
+
+  const visibles = "($1::boolean OR b.visibility = 'publico' OR b.created_by = $2)";
+  const conds = [visibles];
+  const params: unknown[] = [isSuper, uid];
+
+  if (f.kind) { params.push(f.kind); conds.push(`b.kind = $${params.length}`); }
+  if (f.dim1) { params.push(f.dim1); conds.push(`b.comunidad_autonoma = $${params.length}`); }
+  if (f.dim2) { params.push(f.dim2); conds.push(`b.categoria_profesional = $${params.length}`); }
+  if (f.anio) { params.push(Number(f.anio)); conds.push(`b.anio = $${params.length}`); }
+  if (f.visibility) { params.push(f.visibility); conds.push(`b.visibility = $${params.length}`); }
+  if (f.official === '1') conds.push('b.official = TRUE');
+  if (f.mine === '1' && uid) { params.push(uid); conds.push(`b.created_by = $${params.length}`); }
+  if (f.q) {
+    params.push(`%${f.q}%`);
+    conds.push(`(b.name ILIKE $${params.length} OR b.descripcion ILIKE $${params.length})`);
+  }
+  // Con contenido: evita ofrecer bancos vacios al montar un examen.
+  if (f.conPreguntas === '1') conds.push('EXISTS (SELECT 1 FROM questions q WHERE q.bank_id = b.id AND q.is_active)');
+
   const { rows } = await query(
     `SELECT b.id, b.name, b.kind, b.comunidad_autonoma, b.anio, b.categoria_profesional, b.official, b.descripcion,
             b.sim_questions, b.sim_minutes, b.sim_pass_pct, b.visibility, b.created_by,
             ($2::uuid IS NOT NULL AND b.created_by = $2) AS mine,
             (SELECT COUNT(*) FROM questions q WHERE q.bank_id = b.id) AS questions
      FROM question_banks b
-     WHERE $1::boolean OR b.visibility = 'publico' OR b.created_by = $2
+     WHERE ${conds.join(' AND ')}
      ORDER BY (b.created_by = $2) DESC NULLS LAST, (b.kind = 'rcp') DESC, b.created_at DESC`,
+    params,
+  );
+
+  // Valores que existen de verdad, para no ofrecer filtros que no dan resultado.
+  const facetas = await query<{ campo: string; valor: string; n: string }>(
+    `SELECT 'kind' AS campo, b.kind AS valor, COUNT(*)::text AS n FROM question_banks b
+      WHERE ${visibles} GROUP BY b.kind
+     UNION ALL
+     SELECT 'dim1', b.comunidad_autonoma, COUNT(*)::text FROM question_banks b
+      WHERE ${visibles} AND b.comunidad_autonoma IS NOT NULL GROUP BY b.comunidad_autonoma
+     UNION ALL
+     SELECT 'dim2', b.categoria_profesional, COUNT(*)::text FROM question_banks b
+      WHERE ${visibles} AND b.categoria_profesional IS NOT NULL GROUP BY b.categoria_profesional
+     UNION ALL
+     SELECT 'anio', b.anio::text, COUNT(*)::text FROM question_banks b
+      WHERE ${visibles} AND b.anio IS NOT NULL GROUP BY b.anio
+     ORDER BY 1, 2`,
     [isSuper, uid],
   );
-  // canManage: puede editar, borrar y descargar (solo el dueño o el super admin)
-  res.json({ banks: rows.map((b) => ({ ...b, canManage: isSuper || b.mine === true })) });
+  const agrupar = (campo: string) =>
+    facetas.rows.filter((x) => x.campo === campo).map((x) => ({ valor: x.valor, n: Number(x.n) }));
+
+  res.json({
+    // canManage: puede editar, borrar y descargar (solo el dueno o el super admin)
+    banks: rows.map((b) => ({ ...b, canManage: isSuper || b.mine === true })),
+    total: rows.length,
+    facetas: { kind: agrupar('kind'), dim1: agrupar('dim1'), dim2: agrupar('dim2'), anio: agrupar('anio') },
+  });
+}
+
+/**
+ * GET /api/banks/:id/questions — preguntas de un banco, con filtros.
+ * Sirve tanto para revisar el banco como para escoger de que parte sale un
+ * examen sin tener que abrirlo entero.
+ */
+export async function listBankQuestions(req: Request, res: Response): Promise<void> {
+  const bankId = req.params.id;
+  const f = req.query as Record<string, string | undefined>;
+
+  const conds = ['q.bank_id = $1'];
+  const params: unknown[] = [bankId];
+  if (f.activas !== '0') conds.push('q.is_active = TRUE');
+  if (f.tema) { params.push(f.tema); conds.push(`q.tema = $${params.length}`); }
+  if (f.dificultad) { params.push(Number(f.dificultad)); conds.push(`q.difficulty = $${params.length}`); }
+  if (f.qtype) { params.push(f.qtype); conds.push(`q.qtype = $${params.length}`); }
+  if (f.audiencia) { params.push(f.audiencia); conds.push(`$${params.length} = ANY(q.audiences)`); }
+  if (f.media === 'imagen') conds.push('q.image_key IS NOT NULL');
+  else if (f.media === 'video') conds.push("q.video_url IS NOT NULL AND q.video_url <> ''");
+  else if (f.media === 'sin') conds.push("q.image_key IS NULL AND (q.video_url IS NULL OR q.video_url = '')");
+  if (f.criticas === '1') conds.push('q.is_critical = TRUE');
+  if (f.q) { params.push(`%${f.q}%`); conds.push(`q.text ILIKE $${params.length}`); }
+
+  const { rows } = await query(
+    `SELECT q.id, q.orden, q.tema, q.difficulty, q.qtype, q.audiences, q.is_critical, q.is_active,
+            LEFT(q.text, 180) AS text, (q.image_key IS NOT NULL) AS con_imagen,
+            (q.video_url IS NOT NULL AND q.video_url <> '') AS con_video
+       FROM questions q
+      WHERE ${conds.join(' AND ')}
+      ORDER BY q.orden NULLS LAST, q.created_at
+      LIMIT 500`,
+    params,
+  );
+
+  // Facetas del propio banco: solo se ofrecen valores que existen en el.
+  const facetas = await query<{ campo: string; valor: string; n: string }>(
+    `SELECT 'tema' AS campo, COALESCE(tema, '(sin materia)') AS valor, COUNT(*)::text AS n
+       FROM questions WHERE bank_id = $1 AND is_active GROUP BY tema
+     UNION ALL
+     SELECT 'dificultad', difficulty::text, COUNT(*)::text FROM questions
+      WHERE bank_id = $1 AND is_active AND difficulty IS NOT NULL GROUP BY difficulty
+     UNION ALL
+     SELECT 'qtype', qtype, COUNT(*)::text FROM questions
+      WHERE bank_id = $1 AND is_active GROUP BY qtype
+     UNION ALL
+     SELECT 'audiencia', a, COUNT(*)::text FROM questions, UNNEST(audiences) a
+      WHERE bank_id = $1 AND is_active GROUP BY a
+     ORDER BY 1, 2`,
+    [bankId],
+  );
+  const agrupar = (campo: string) =>
+    facetas.rows.filter((x) => x.campo === campo).map((x) => ({ valor: x.valor, n: Number(x.n) }));
+
+  res.json({
+    questions: rows,
+    total: rows.length,
+    facetas: {
+      tema: agrupar('tema'), dificultad: agrupar('dificultad'),
+      qtype: agrupar('qtype'), audiencia: agrupar('audiencia'),
+    },
+  });
 }
 
 /** Temas de un banco con nº de preguntas (para elegir en la práctica). */
