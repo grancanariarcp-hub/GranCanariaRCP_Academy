@@ -8,6 +8,7 @@ import { adminNav } from '@/lib/nav';
 import { BankFilters, FILTROS_VACIOS, type FiltrosBanco, type Facetas } from '@/components/BankFilters';
 import { BankQuestionList } from '@/components/BankQuestionList';
 import { COMUNIDADES, CATEGORIAS } from '@/lib/sanidad';
+import { useDebounced } from '@/hooks/useDebounced';
 
 interface Bank {
   id: string;
@@ -97,7 +98,10 @@ export default function BancosPage() {
     } catch { /* ignore */ }
   }
   // Los filtros se resuelven en el servidor, así que recargamos al cambiarlos.
-  useEffect(() => { if (user) load(); /* eslint-disable-next-line */ }, [user, filtros]);
+  // Con retraso: el campo de texto cambia en cada tecla y sin esperar a que la
+  // mano se detenga se lanzaba una petición por carácter.
+  const filtrosEstables = useDebounced(filtros);
+  useEffect(() => { if (user) load(); /* eslint-disable-next-line */ }, [user, filtrosEstables]);
 
   function resetForm() {
     setEditingId(null); setName(''); setKind('rcp'); setAnio('');

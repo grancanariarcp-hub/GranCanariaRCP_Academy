@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { useDebounced } from '@/hooks/useDebounced';
 
 /**
  * Preguntas de un banco, con sus filtros.
@@ -27,10 +28,13 @@ export function BankQuestionList({ bankId, bankName }: { bankId: string; bankNam
   const [cargando, setCargando] = useState(true);
   const [f, setF] = useState({ tema: '', dificultad: '', qtype: '', audiencia: '', media: '', q: '' });
 
+  // Igual que en el listado de bancos: sin esperar, una petición por tecla.
+  const fEstable = useDebounced(f);
+
   const cargar = useCallback(async () => {
     setCargando(true);
     const qs = new URLSearchParams();
-    Object.entries(f).forEach(([k, v]) => { if (v) qs.set(k, v); });
+    Object.entries(fEstable).forEach(([k, v]) => { if (v) qs.set(k, v); });
     try {
       const r = await api<{ questions: Pregunta[]; total: number; facetas: Record<string, Faceta[]> }>(
         `/api/banks/${bankId}/questions?${qs.toString()}`, { auth: true },
@@ -39,7 +43,7 @@ export function BankQuestionList({ bankId, bankName }: { bankId: string; bankNam
       setTotal(r.total);
       setFacetas(r.facetas);
     } catch { /* la lista queda vacía */ } finally { setCargando(false); }
-  }, [bankId, f]);
+  }, [bankId, fEstable]);
 
   useEffect(() => { cargar(); }, [cargar]);
 

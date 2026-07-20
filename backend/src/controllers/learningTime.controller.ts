@@ -21,22 +21,18 @@ export async function heartbeat(req: Request, res: Response): Promise<void> {
   const { courseId, seconds, active } = beatSchema.parse(req.body);
   const studentId = req.auth!.sub;
 
-  const upd = await query(
-    `UPDATE learning_time
-        SET active_seconds  = active_seconds  + $1,
-            session_seconds = session_seconds + $2
-      WHERE student_id = $3 AND day = CURRENT_DATE
-        AND course_id IS NOT DISTINCT FROM $4
-      RETURNING id`,
-    [active ? seconds : 0, seconds, studentId, courseId ?? null],
+  // Una sola sentencia atómica. Antes era «UPDATE, y si no actualizó nada,
+  // INSERT»: con dos pestañas abiertas los dos latidos encontraban la fila
+  // vacía y los dos insertaban, duplicando el día. Como todo se lee con SUM(),
+  // las horas se inflaban sin que se notara en ninguna pantalla.
+  await query(
+    `INSERT INTO learning_time (student_id, course_id, day, active_seconds, session_seconds)
+     VALUES ($1,$2,CURRENT_DATE,$3,$4)
+     ON CONFLICT (student_id, COALESCE(course_id, '00000000-0000-0000-0000-000000000000'::uuid), day)
+     DO UPDATE SET active_seconds  = learning_time.active_seconds  + EXCLUDED.active_seconds,
+                   session_seconds = learning_time.session_seconds + EXCLUDED.session_seconds`,
+    [studentId, courseId ?? null, active ? seconds : 0, seconds],
   );
-  if (upd.rows.length === 0) {
-    await query(
-      `INSERT INTO learning_time (student_id, course_id, day, active_seconds, session_seconds)
-       VALUES ($1,$2,CURRENT_DATE,$3,$4)`,
-      [studentId, courseId ?? null, active ? seconds : 0, seconds],
-    );
-  }
   res.json({ ok: true });
 }
 

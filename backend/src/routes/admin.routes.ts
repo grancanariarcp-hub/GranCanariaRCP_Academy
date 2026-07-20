@@ -81,15 +81,7 @@ router.get('/professors', asyncHandler(listProfessors));
 router.post('/professors', asyncHandler(createProfessor));
 router.post('/professors/:id/:action', asyncHandler(setProfessorStatus));
 
-router.get('/questions', asyncHandler(listQuestions));
-router.post('/questions', asyncHandler(createQuestion));
-router.post('/questions/image', upload.single('file'), asyncHandler(createQuestionWithImage));
-router.get('/questions/template', getTemplate);
-router.post('/questions/import', upload.single('file'), asyncHandler(importQuestions));
 
-router.get('/documents', asyncHandler(listDocuments));
-router.post('/documents', upload.single('file'), asyncHandler(uploadDocument));
-router.get('/documents/:id/url', asyncHandler(getDocumentUrl));
 
 router.get('/challenges', asyncHandler(listAllChallenges));
 router.post('/challenges', asyncHandler(createChallenge));
@@ -98,14 +90,11 @@ router.delete('/challenges/:id', asyncHandler(deleteChallenge));
 router.get('/challenges/:id/export', asyncHandler(exportChallenge));
 router.post('/challenges/:id/thumbnail', upload.single('file'), asyncHandler(uploadChallengeThumbnail));
 
-router.get('/banks', asyncHandler(listBanks));
-router.post('/banks', asyncHandler(createBank));
-router.patch('/banks/:id', asyncHandler(updateBank));
-router.delete('/banks/:id', asyncHandler(deleteBank));
-router.get('/banks/:id/export', asyncHandler(exportBank));
-router.get('/banks/:id/temas', asyncHandler(getBankTemas));
-router.post('/banks/:id/import', asyncHandler(importBankQuestions));
-router.get('/failed-general', asyncHandler(globalFailedStats));
+
+// Nota: aquí vivían duplicados de /api/questions, /api/documents, /api/banks y
+// /api/practice/failed-general, montados sobre los mismos controladores. Nadie
+// los llamaba —el frontend usa siempre la ruta canónica— y eran superficie de
+// ataque gratis: dos puertas a la misma habitación, y la de atrás sin revisar.
 
 router.post('/reset-password/:type/:id', asyncHandler(adminResetPassword));
 router.get('/whatsapp', asyncHandler(getGlobalWhatsapp));

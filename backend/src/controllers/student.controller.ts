@@ -4,7 +4,7 @@ import { badRequest, forbidden, notFound, HttpError } from '../utils/httpError.j
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { withImageUrls } from '../services/r2.js';
-import { notify } from '../services/notify.js';
+import { notifyCourseStaff } from '../services/notify.js';
 import { precioDe } from '../services/pricing.js';
 
 /**
@@ -110,15 +110,10 @@ export async function enrollCourse(req: Request, res: Response): Promise<void> {
   );
 
   // Avisar al profesorado del curso del nuevo alumno.
-  const [staff, st] = await Promise.all([
-    query<{ user_id: string }>('SELECT user_id FROM course_staff WHERE course_id = $1', [courseId]),
-    query<{ display_name: string }>('SELECT display_name FROM students WHERE id = $1', [req.auth!.sub]),
-  ]);
+  const st = await query<{ display_name: string }>('SELECT display_name FROM students WHERE id = $1', [req.auth!.sub]);
   const alumno = st.rows[0]?.display_name ?? 'Un alumno';
-  for (const s of staff.rows) {
-    await notify({ id: s.user_id, type: 'user' }, 'Nueva matrícula',
-      `${alumno} se matriculó en «${c.title}»`, `/admin/cursos/${courseId}`).catch(() => { /* no bloquear */ });
-  }
+  await notifyCourseStaff(courseId, 'Nueva matrícula',
+    `${alumno} se matriculó en «${c.title}»`, `/admin/cursos/${courseId}`).catch(() => { /* no bloquear */ });
 
   await audit({ actorId: req.auth!.sub, actorType: 'student', action: 'ENROLL', entity: 'course', entityId: courseId, ip: clientIp(req) });
   res.status(201).json({ enrollment: rows[0], paymentRequired: hayQuePagar, porSuscripcion });

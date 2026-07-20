@@ -39,6 +39,28 @@ export async function notify(
   }
 }
 
+/**
+ * Avisa de una vez a todo el profesorado de un curso.
+ *
+ * Era un bucle repetido en tres sitios que hacía una consulta por profesor.
+ * Dos de esas copias están dentro del webhook de Stripe, que tiene un plazo de
+ * respuesta: cuanto menos trabajo haya entre el cobro y el 200, menos
+ * posibilidades de que Stripe lo dé por fallido y reintente el cobro entero.
+ * Aquí es una sola sentencia, sin bucle y sin viaje por destinatario.
+ */
+export async function notifyCourseStaff(
+  courseId: string,
+  title: string,
+  body: string | null,
+  link: string | null,
+): Promise<void> {
+  await query(
+    `INSERT INTO notifications (user_id, user_type, title, body, link)
+     SELECT cs.user_id, 'user', $2, $3, $4 FROM course_staff cs WHERE cs.course_id = $1`,
+    [courseId, title, body, link],
+  );
+}
+
 /** Notifica a varios destinatarios. `link` puede depender del tipo de destinatario. */
 export async function notifyMany(
   recipients: Recipient[],

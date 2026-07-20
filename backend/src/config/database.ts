@@ -1,6 +1,9 @@
 import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 import { env } from './env.js';
 
+/** Copias, migraciones y semillas: procesos que legítimamente tardan. */
+const TAREA_DE_MANTENIMIENTO = /db[\\/](migrate|backup|setup|seed|limpiarPruebas)/.test(process.argv[1] ?? '');
+
 /**
  * Single shared connection pool for the whole process.
  * pg manages the underlying sockets; we just borrow clients per query.
@@ -11,6 +14,19 @@ export const pool = new Pool({
   ssl: env.isProduction ? { rejectUnauthorized: false } : undefined,
   max: 10,
   idleTimeoutMillis: 30_000,
+  // Sin estos topes, una sola consulta lenta secuestra una de las diez
+  // conexiones hasta que termine —o para siempre—, y con unas pocas así la
+  // plataforma entera deja de responder aunque la base esté sana.
+  connectionTimeoutMillis: 10_000,
+  // Ninguna petición de la aplicación necesita quince segundos de base de
+  // datos: si los pasa, es que algo va mal y es mejor fallar esa petición que
+  // arrastrar a las demás.
+  //
+  // Las tareas de mantenimiento comparten este pool y sí tardan legítimamente
+  // más —una copia de seguridad vuelca tablas enteras—, así que se quedan sin
+  // tope. Se distinguen por el comando que las arrancó, no por una variable de
+  // entorno, para que no dependa de acordarse de ponerla.
+  statement_timeout: TAREA_DE_MANTENIMIENTO ? undefined : 15_000,
 });
 
 pool.on('error', (err) => {

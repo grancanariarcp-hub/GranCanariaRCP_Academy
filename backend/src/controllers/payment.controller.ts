@@ -4,7 +4,7 @@ import { query, withTransaction } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { stripe, stripeConfigurado, stripeEnProduccion, diagnosticoClave, NOTA_EXENCION } from '../services/stripe.js';
 import { precioDe, euros } from '../services/pricing.js';
-import { notify } from '../services/notify.js';
+import { notify, notifyCourseStaff } from '../services/notify.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 
@@ -221,12 +221,9 @@ async function confirmarPago(sesion: Stripe.Checkout.Session): Promise<void> {
     `/student/curso/${p.course_id}`,
   ).catch(() => { /* no bloquear la confirmación por un aviso */ });
 
-  const staff = await query<{ user_id: string }>('SELECT user_id FROM course_staff WHERE course_id = $1', [p.course_id]);
-  for (const s of staff.rows) {
-    await notify({ id: s.user_id, type: 'user' }, 'Matrícula pagada',
-      `Se ha cobrado ${euros(p.amount_cents)} de «${p.title}»`, `/admin/cursos/${p.course_id}`)
-      .catch(() => { /* idem */ });
-  }
+  await notifyCourseStaff(p.course_id, 'Matrícula pagada',
+    `Se ha cobrado ${euros(p.amount_cents)} de «${p.title}»`, `/admin/cursos/${p.course_id}`)
+    .catch(() => { /* idem */ });
 
   await audit({
     actorId: p.student_id, actorType: 'student', action: 'PAYMENT_CONFIRMED',
@@ -280,12 +277,9 @@ async function confirmarDevolucion(cargo: Stripe.Charge): Promise<void> {
     `/curso/${p.course_id}`,
   ).catch(() => { /* no bloquear la devolución por un aviso */ });
 
-  const staff = await query<{ user_id: string }>('SELECT user_id FROM course_staff WHERE course_id = $1', [p.course_id]);
-  for (const s of staff.rows) {
-    await notify({ id: s.user_id, type: 'user' }, 'Matrícula reembolsada',
-      `Se han devuelto ${euros(devuelto)} de «${p.title}». El alumno ha perdido el acceso.`,
-      `/admin/cursos/${p.course_id}`).catch(() => { /* idem */ });
-  }
+  await notifyCourseStaff(p.course_id, 'Matrícula reembolsada',
+    `Se han devuelto ${euros(devuelto)} de «${p.title}». El alumno ha perdido el acceso.`,
+    `/admin/cursos/${p.course_id}`).catch(() => { /* idem */ });
 
   await audit({
     actorId: p.student_id, actorType: 'student', action: 'PAYMENT_REFUNDED',
