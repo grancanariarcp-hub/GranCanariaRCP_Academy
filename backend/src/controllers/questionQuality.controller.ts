@@ -98,5 +98,65 @@ export async function setQuestionGrading(req: Request, res: Response): Promise<v
     [excluded, req.params.questionId, req.params.examId, req.params.id],
   );
   if (r.rows.length === 0) throw badRequest('Pregunta no encontrada en este examen', 'NOT_FOUND');
-  res.json({ ok: true, excluded });
+
+  const recalificados = await recalificarIntentos(req.params.examId, Number(
+    (await query<{ p: number }>('SELECT pass_pct AS p FROM exams WHERE id = $1', [req.params.examId])).rows[0]?.p ?? 50,
+  ));
+  res.json({ ok: true, excluded, recalificados });
+}
+
+/**
+ * Vuelve a calificar los exámenes YA ENTREGADOS.
+ *
+ * Anular una pregunta solo cambiaba una casilla: las notas seguían siendo las
+ * que se congelaron al entregar, así que una pregunta reconocida como errónea
+ * dejaba en pie todos los suspensos que había provocado. En formación
+ * acreditada eso es una nota que no se puede defender ante quien la reclame.
+ *
+ * Se recalcula sobre las respuestas guardadas de cada intento, contando solo
+ * las preguntas vigentes y las que le tocaron a cada alumno. Nadie baja de
+ * nota: anular puede subir el porcentaje o dejarlo igual, nunca perjudicar.
+ */
+async function recalificarIntentos(examId: string, passPct: number): Promise<number> {
+  const preguntas = await query<{ id: string; format: string; correct_index: number | null }>(
+    `SELECT id, format, correct_index FROM exam_questions
+      WHERE exam_id = $1 AND excluded_from_grading = FALSE`,
+    [examId],
+  );
+  const vigentes = new Map(preguntas.rows.map((q) => [q.id, q]));
+
+  const intentos = await query<{ id: string; answers: Record<string, unknown> | null; served_questions: string[] | null }>(
+    `SELECT id, answers, served_questions FROM exam_attempts
+      WHERE exam_id = $1 AND submitted_at IS NOT NULL`,
+    [examId],
+  );
+
+  let tocados = 0;
+  for (const intento of intentos.rows) {
+    const suyas = intento.served_questions && intento.served_questions.length > 0
+      ? intento.served_questions.filter((id) => vigentes.has(id))
+      : [...vigentes.keys()];
+
+    let total = 0;
+    let aciertos = 0;
+    for (const id of suyas) {
+      const q = vigentes.get(id)!;
+      if (q.format === 'abierta') continue;
+      total += 1;
+      const marcada = (intento.answers ?? {})[id];
+      if (typeof marcada === 'number' && marcada === q.correct_index) aciertos += 1;
+    }
+    const nota = total > 0 ? Math.round((aciertos / total) * 100) : null;
+    const aprobado = nota !== null ? nota >= passPct : null;
+
+    const upd = await query(
+      `UPDATE exam_attempts
+          SET score = $1, passed = $2, auto_total = $3, auto_correct = $4
+        WHERE id = $5 AND fuera_de_plazo = FALSE
+          AND (score IS DISTINCT FROM $1 OR passed IS DISTINCT FROM $2)`,
+      [nota, aprobado, total, aciertos, intento.id],
+    );
+    if (upd.rowCount && upd.rowCount > 0) tocados += 1;
+  }
+  return tocados;
 }

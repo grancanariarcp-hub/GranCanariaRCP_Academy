@@ -109,6 +109,34 @@ const addQuestionSchema = z.object({
   videoUrl: z.string().url('URL de vídeo no válida').optional().or(z.literal('')),
 });
 
+/**
+ * Depura las opciones sin mover la respuesta correcta de sitio.
+ *
+ * Las opciones en blanco se descartan, y eso DESPLAZA a las que vienen detrás.
+ * Antes se guardaba el índice tal cual lo había marcado el autor, que estaba
+ * referido a la lista original: quien rellenaba ["Adrenalina", "", "Amiodarona",
+ * "Atropina"] y marcaba la 3.ª acababa con «Atropina» como correcta, sin ningún
+ * aviso, y todo el que acertaba quedaba suspenso. Aquí se recalcula el índice
+ * sobre la lista ya depurada.
+ */
+export function opcionesDepuradas(
+  brutas: string[],
+  marcada: number | undefined,
+): { options: string[]; correctIndex: number } {
+  const vivas = brutas
+    .map((o, original) => ({ texto: String(o ?? '').trim(), original }))
+    .filter((o) => o.texto !== '');
+  const options = vivas.map((o) => o.texto);
+  if (options.length < 2) throw badRequest('Un test necesita al menos 2 opciones', 'FEW_OPTIONS');
+
+  const correctIndex = vivas.findIndex((o) => o.original === marcada);
+  if (marcada === undefined || correctIndex === -1) {
+    // O no marcó ninguna, o marcó precisamente una que estaba vacía.
+    throw badRequest('Marca cuál de las opciones escritas es la correcta', 'BAD_CORRECT');
+  }
+  return { options, correctIndex };
+}
+
 export async function addExamQuestion(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
@@ -118,10 +146,7 @@ export async function addExamQuestion(req: Request, res: Response): Promise<void
   let correctIndex: number | null = null;
 
   if (d.format === 'test') {
-    options = (d.options ?? []).map((o) => o.trim()).filter(Boolean);
-    if (options.length < 2) throw badRequest('Un test necesita al menos 2 opciones', 'FEW_OPTIONS');
-    if (d.correctIndex === undefined || d.correctIndex >= options.length) throw badRequest('Marca la opción correcta', 'BAD_CORRECT');
-    correctIndex = d.correctIndex;
+    ({ options, correctIndex } = opcionesDepuradas(d.options ?? [], d.correctIndex));
   } else if (d.format === 'vf') {
     options = ['Verdadero', 'Falso'];
     if (d.correctIndex !== 0 && d.correctIndex !== 1) throw badRequest('Indica si es Verdadero o Falso', 'BAD_VF');
@@ -147,9 +172,17 @@ function normFmt(v: unknown): 'test' | 'vf' | 'abierta' | null {
   if (['abierta', 'libre', 'texto'].includes(s)) return 'abierta';
   return null;
 }
+/**
+ * Opciones tal y como vienen, SIN descartar las vacías.
+ *
+ * Es importante que conserven su posición: la respuesta correcta del fichero
+ * («C», «3») está referida a esta lista. Si se quitan aquí los huecos, la letra
+ * del autor pasa a señalar otra opción. El descarte se hace después, en
+ * opcionesDepuradas, que reajusta el índice a la vez.
+ */
 function toList(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean);
-  return String(v ?? '').split(/[|;]/).map((x) => x.trim()).filter(Boolean);
+  if (Array.isArray(v)) return v.map((x) => String(x).trim());
+  return String(v ?? '').split(/[|;]/).map((x) => x.trim());
 }
 function resolveCorrect(v: unknown, n: number): number | null {
   const s = String(v ?? '').trim().toUpperCase();
@@ -159,10 +192,26 @@ function resolveCorrect(v: unknown, n: number): number | null {
   if (Number.isInteger(num) && num >= 1 && num <= n) return num - 1;
   return null;
 }
+/**
+ * Verdadero o falso.
+ *
+ * Los números se leen empezando por 1 —1 = Verdadero, 2 = Falso—, igual que
+ * resolveCorrect, para que un mismo fichero no signifique una cosa en las
+ * preguntas de test y otra en las de V/F.
+ *
+ * Antes había dos reglas contradictorias: `'1'` estaba en la lista de Verdadero
+ * y `v === 1` pretendía significar Falso. Como el valor se convierte a texto
+ * antes de compararse, la segunda no llegaba a ejecutarse nunca y un fichero
+ * que usara 1 para «Falso» se importaba como «Verdadero», en silencio y sin
+ * fila de error. El 0 ya no se adivina: se rechaza indicándolo, que es
+ * preferible a colar mal la respuesta de un examen.
+ */
 function resolveVF(v: unknown): number | null {
+  if (v === true) return 0;
+  if (v === false) return 1;
   const s = String(v ?? '').trim().toLowerCase();
-  if (['v', 'verdadero', 'true', 'si', 'sí', '1', '0-verdadero'].includes(s) || v === true || v === 0) return 0;
-  if (['f', 'falso', 'false', 'no', '2'].includes(s) || v === false || v === 1) return 1;
+  if (['v', 'verdadero', 'true', 'si', 'sí', '1', '0-verdadero'].includes(s)) return 0;
+  if (['f', 'falso', 'false', 'no', '2'].includes(s)) return 1;
   return null;
 }
 
@@ -185,11 +234,20 @@ export async function importExamQuestions(req: Request, res: Response): Promise<
     let options: string[] = [];
     let correctIndex: number | null = null;
     if (format === 'test') {
-      options = toList(q.options ?? q.opciones);
-      if (options.length < 2) errs.push('faltan opciones (mínimo 2)');
-      const ci = resolveCorrect(q.correcta ?? q.correct, options.length);
+      // La correcta se resuelve contra la lista ORIGINAL —con sus huecos— y solo
+      // después se depuran las opciones, reajustando el índice. Al revés, una
+      // opción en blanco corría las siguientes y la letra del fichero acababa
+      // señalando otra respuesta.
+      const brutas = toList(q.options ?? q.opciones);
+      const ci = resolveCorrect(q.correcta ?? q.correct, brutas.length);
       if (ci === null) errs.push('correcta inválida (A/B/C/D o número)');
-      else correctIndex = ci;
+      else {
+        try {
+          ({ options, correctIndex } = opcionesDepuradas(brutas, ci));
+        } catch {
+          errs.push('faltan opciones (mínimo 2) o la correcta señala una opción vacía');
+        }
+      }
     } else if (format === 'vf') {
       options = ['Verdadero', 'Falso'];
       const ci = resolveVF(q.correcta ?? q.correct);
@@ -433,17 +491,15 @@ export async function addExamQuestionWithImage(req: Request, res: Response): Pro
   if (text.length < 3) throw badRequest('Escribe el enunciado', 'NO_TEXT');
 
   let options: string[] = [];
-  const correctIndex = Number(req.body.correctIndex);
+  const marcada = Number(req.body.correctIndex);
+  let correctIndex = marcada;
   if (format === 'vf') {
     options = ['Verdadero', 'Falso'];
-    if (correctIndex !== 0 && correctIndex !== 1) throw badRequest('Indica si es Verdadero o Falso', 'BAD_VF');
+    if (marcada !== 0 && marcada !== 1) throw badRequest('Indica si es Verdadero o Falso', 'BAD_VF');
   } else {
-    try { options = JSON.parse(String(req.body.options ?? '[]')); } catch { options = []; }
-    options = options.map((o) => String(o).trim()).filter(Boolean);
-    if (options.length < 2) throw badRequest('Un test necesita al menos 2 opciones', 'FEW_OPTIONS');
-    if (!Number.isInteger(correctIndex) || correctIndex < 0 || correctIndex >= options.length) {
-      throw badRequest('Marca la opción correcta', 'BAD_CORRECT');
-    }
+    let brutas: string[] = [];
+    try { brutas = JSON.parse(String(req.body.options ?? '[]')); } catch { brutas = []; }
+    ({ options, correctIndex } = opcionesDepuradas(brutas, Number.isInteger(marcada) ? marcada : undefined));
   }
 
   const key = buildKey(file.originalname, 'exam-questions');
