@@ -14,7 +14,8 @@
     "db:migrate:prod": "node dist/db/migrate.js",
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/setup.ts --reset",
-    "db:backup": "tsx src/db/backup.ts"
+    "db:backup": "tsx src/db/backup.ts",
+    "db:limpiar-pruebas": "tsx src/db/limpiarPruebas.ts"
   },
   "keywords": [
     "rcp",
