@@ -17,7 +17,7 @@ interface Check { clave: string; titulo: string; estado: Estado; detalle: string
 
 export async function cfcAssistant(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
-  if (req.auth!.role !== 'super_admin') {
+  if (req.auth!.role !== 'super_admin' && req.auth!.role !== 'auditor') {
     const staff = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [id, req.auth!.sub]);
     if (staff.rows.length === 0) throw forbidden('No formas parte de este curso');
   }

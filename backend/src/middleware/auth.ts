@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyToken, type TokenPayload } from '../utils/jwt.js';
 import { unauthorized } from '../utils/httpError.js';
+import { restringirAuditor } from './auditor.js';
 
 // Augment Express Request so downstream handlers see `req.auth` typed.
 declare global {
@@ -24,8 +25,11 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction): v
   const token = header.slice('Bearer '.length).trim();
   try {
     req.auth = verifyToken(token);
-    next();
   } catch {
     throw unauthorized('Token inválido o expirado', 'BAD_TOKEN');
   }
+  // Las restricciones del auditor se aplican aquí y no a nivel de aplicación:
+  // allí req.auth todavía no existe, porque este middleware es quien lo pone.
+  restringirAuditor(req);
+  next();
 }

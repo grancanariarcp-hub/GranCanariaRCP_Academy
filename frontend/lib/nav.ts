@@ -10,6 +10,16 @@ import type { Role } from '@/lib/auth';
  * siquiera llegar a la pantalla de documentos para subir el material.
  */
 export function adminNav(role: Role, activeHref?: string) {
+  // El auditor solo consulta: se le ofrece lo que puede revisar, sin las
+  // secciones de gestión que no podría usar.
+  if (role === 'auditor') {
+    return [
+      { label: 'Cursos', href: '/admin/cursos' },
+      { label: 'Bancos', href: '/admin/bancos' },
+      { label: 'Perfil', href: '/admin/perfil' },
+    ].map((i) => ({ ...i, active: i.href === activeHref }));
+  }
+
   const items =
     role === 'super_admin'
       ? [
@@ -22,6 +32,7 @@ export function adminNav(role: Role, activeHref?: string) {
           { label: 'Desafíos', href: '/admin/desafios' },
           { label: 'Diplomas', href: '/admin/reconocimientos' },
           { label: 'Profesores', href: '/admin/profesores' },
+          { label: 'Comisión CFC', href: '/admin/auditores' },
           { label: 'Perfil', href: '/admin/perfil' },
         ]
       : [

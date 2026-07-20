@@ -24,7 +24,7 @@ interface Tax {
 }
 
 export default function CursosPage() {
-  const user = useSession(['super_admin', 'profesor'], '/login/admin');
+  const user = useSession(['super_admin', 'profesor', 'auditor'], '/login/admin');
   const router = useRouter();
 
   const [courses, setCourses] = useState<Course[]>([]);

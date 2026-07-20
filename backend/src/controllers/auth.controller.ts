@@ -365,16 +365,23 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
   // 1) Staff (super_admin / institution_admin / profesor)
   const u = await query<{
     id: string; password_hash: string; name: string;
-    role: 'super_admin' | 'institution_admin' | 'profesor';
+    role: 'super_admin' | 'institution_admin' | 'profesor' | 'auditor';
     institution_id: string | null; is_active: boolean; status: string;
-    must_change_password: boolean;
-  }>('SELECT id, password_hash, name, role, institution_id, is_active, status, must_change_password FROM users WHERE email = $1', [lower]);
+    must_change_password: boolean; access_expires_at: string | null;
+  }>(`SELECT id, password_hash, name, role, institution_id, is_active, status, must_change_password,
+             access_expires_at
+        FROM users WHERE email = $1`, [lower]);
 
   if (u.rows.length > 0) {
     const user = u.rows[0];
     if (user.is_active && (await verifyPassword(password, user.password_hash))) {
       if (user.status === 'pending') throw unauthorized('Tu cuenta de profesor está pendiente de validación', 'PENDING_APPROVAL');
       if (user.status === 'rejected') throw unauthorized('Tu solicitud no fue aprobada', 'REJECTED');
+      if (user.status === 'blocked') throw unauthorized('Esta cuenta está bloqueada', 'BLOCKED');
+      // Acceso con caducidad: el de una comisión no dura para siempre.
+      if (user.access_expires_at && new Date(user.access_expires_at) < new Date()) {
+        throw unauthorized('Tu acceso ha caducado. Ponte en contacto con la organización.', 'ACCESS_EXPIRED');
+      }
       // Re-hasheo transparente: acelera los siguientes accesos de cuentas antiguas.
       if (needsRehash(user.password_hash)) {
         hashPassword(password)

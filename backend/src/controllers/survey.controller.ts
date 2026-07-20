@@ -110,7 +110,7 @@ export async function submitSurvey(req: Request, res: Response): Promise<void> {
 /** GET /api/courses/:id/survey/results — resultados agregados (profesorado). */
 export async function surveyResults(req: Request, res: Response): Promise<void> {
   const courseId = req.params.id;
-  if (req.auth!.role !== 'super_admin') {
+  if (req.auth!.role !== 'super_admin' && req.auth!.role !== 'auditor') {
     const staff = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [courseId, req.auth!.sub]);
     if (staff.rows.length === 0) throw forbidden('No formas parte de este curso');
   }
@@ -167,7 +167,7 @@ export async function surveyResults(req: Request, res: Response): Promise<void> 
 /** PATCH /api/courses/:id/survey — abrir o cerrar la encuesta (director). */
 export async function setSurveyOpen(req: Request, res: Response): Promise<void> {
   const courseId = req.params.id;
-  if (req.auth!.role !== 'super_admin') {
+  if (req.auth!.role !== 'super_admin' && req.auth!.role !== 'auditor') {
     const staff = await query("SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2 AND role = 'director'", [courseId, req.auth!.sub]);
     if (staff.rows.length === 0) throw forbidden('Solo el director puede abrir o cerrar la encuesta');
   }

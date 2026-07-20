@@ -68,7 +68,7 @@ const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', en
 export default function CourseDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
-  const user = useSession(['super_admin', 'profesor'], '/login/admin');
+  const user = useSession(['super_admin', 'profesor', 'auditor'], '/login/admin');
 
   const [course, setCourse] = useState<Course | null>(null);
   const [modules, setModules] = useState<Module[]>([]);

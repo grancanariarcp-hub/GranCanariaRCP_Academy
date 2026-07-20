@@ -18,12 +18,15 @@ export async function roleInCourse(courseId: string, userId: string): Promise<st
 
 export async function assertEditor(req: Request): Promise<void> {
   if (req.auth!.role === 'super_admin') return;
+  // El auditor consulta cualquier curso; escribir ya se lo impide requireAuth.
+  if (req.auth!.role === 'auditor') return;
   const role = await roleInCourse(req.params.id, req.auth!.sub);
   if (!role) throw forbidden('No formas parte de este curso');
 }
 
 export async function assertDirector(req: Request): Promise<void> {
   if (req.auth!.role === 'super_admin') return;
+  if (req.auth!.role === 'auditor') return;
   const role = await roleInCourse(req.params.id, req.auth!.sub);
   if (role !== 'director') throw forbidden('Solo un director del curso puede hacer esto');
 }

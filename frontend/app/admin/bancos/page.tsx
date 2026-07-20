@@ -45,7 +45,7 @@ function shapeFor(kind: string) {
 }
 
 export default function BancosPage() {
-  const user = useSession(['super_admin', 'profesor'], '/login/admin');
+  const user = useSession(['super_admin', 'profesor', 'auditor'], '/login/admin');
   const [banks, setBanks] = useState<Bank[]>([]);
   const [filtros, setFiltros] = useState<FiltrosBanco>({ ...FILTROS_VACIOS });
   const [facetas, setFacetas] = useState<Facetas | null>(null);

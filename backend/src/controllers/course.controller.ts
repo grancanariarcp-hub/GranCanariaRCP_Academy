@@ -150,7 +150,9 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
 }
 
 export async function listCourses(req: Request, res: Response): Promise<void> {
-  const isSuper = req.auth!.role === 'super_admin';
+  // El auditor de la comisión revisa la plataforma entera, igual que el super
+  // admin, pero sin poder tocar nada (lo impide requireAuth).
+  const isSuper = req.auth!.role === 'super_admin' || req.auth!.role === 'auditor';
   const { rows } = isSuper
     ? await query(
         `SELECT c.id, c.title, c.tema, c.subtema, c.status, c.enrollment_open, c.modality,
@@ -288,7 +290,7 @@ export async function listCourseStudents(req: Request, res: Response): Promise<v
 }
 
 async function assertCanAccess(courseId: string, req: Request): Promise<void> {
-  if (req.auth!.role === 'super_admin') return;
+  if (req.auth!.role === 'super_admin' || req.auth!.role === 'auditor') return;
   const { rows } = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [
     courseId, req.auth!.sub,
   ]);

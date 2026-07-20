@@ -60,6 +60,7 @@ app.use(
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), asyncHandler(stripeWebhook));
 
 app.use(express.json({ limit: '1mb' }));
+
 app.use(globalLimiter);
 
 // Health check (used by the frontend and by uptime monitors)

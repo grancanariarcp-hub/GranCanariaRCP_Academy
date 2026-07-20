@@ -89,6 +89,8 @@ function roleLabel(role: SessionUser['role']): string {
       return 'Maestro';
     case 'profesor':
       return 'Profesor';
+    case 'auditor':
+      return 'Comisión CFC';
     default:
       return 'Alumno';
   }
