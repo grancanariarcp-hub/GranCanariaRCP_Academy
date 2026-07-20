@@ -8,6 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { api, ApiError, uploadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
 import { adminNav } from '@/lib/nav';
+import { CalidadPreguntas } from '@/components/CalidadPreguntas';
 
 type Format = 'test' | 'vf' | 'abierta';
 interface ExamQuestion {
@@ -192,6 +193,8 @@ export default function ExamEditorPage() {
     <AppShell user={user} title={exam?.title ?? 'Examen'} nav={nav}>
       <PageNav backHref={`/admin/cursos/${courseId}`} backLabel="Volver al curso" />
       {error && <div className="alert alert-error">{error}</div>}
+
+      <CalidadPreguntas courseId={courseId} examId={examId} />
 
       <div className="grid grid-2">
         {/* Config + añadir pregunta */}

@@ -68,12 +68,16 @@ export async function examQuality(req: Request, res: Response): Promise<void> {
          FROM respuestas r JOIN exam_questions eq ON eq.id = r.question_id
         GROUP BY r.question_id
      )
+     -- Los recuentos se convierten a entero aquí: Postgres devuelve COUNT y
+     -- ROUND como texto, y comparar "0" < 30 en la pantalla solo funciona por
+     -- coerción de JavaScript. Un contrato que se apoya en eso se rompe el día
+     -- que alguien escribe una comparación estricta.
      SELECT eq.id, eq.text, eq.format, eq.excluded_from_grading,
-            COALESCE(s.respondida, 0) AS respondida,
-            COALESCE(s.aciertos, 0) AS aciertos,
+            COALESCE(s.respondida, 0)::int AS respondida,
+            COALESCE(s.aciertos, 0)::int AS aciertos,
             CASE WHEN COALESCE(s.respondida,0) > 0
-                 THEN ROUND(100.0 * COALESCE(s.aciertos,0) / s.respondida) END AS acierto_pct,
-            (SELECT COUNT(*) FROM question_reports qr WHERE qr.exam_question_id = eq.id AND qr.kind <> 'ok') AS avisos,
+                 THEN ROUND(100.0 * COALESCE(s.aciertos,0) / s.respondida)::int END AS acierto_pct,
+            (SELECT COUNT(*) FROM question_reports qr WHERE qr.exam_question_id = eq.id AND qr.kind <> 'ok')::int AS avisos,
             (SELECT COALESCE(json_agg(json_build_object('kind', qr.kind, 'comment', qr.comment)), '[]')
                FROM question_reports qr WHERE qr.exam_question_id = eq.id AND qr.kind <> 'ok') AS detalle_avisos
        FROM exam_questions eq

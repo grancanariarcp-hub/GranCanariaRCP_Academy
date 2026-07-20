@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
+import { AvisarPregunta } from '@/components/AvisarPregunta';
 
 type Format = 'test' | 'vf' | 'abierta';
 interface Q { id: string; format: Format; text: string; options: string[]; correct_index?: number | null }
@@ -215,6 +216,7 @@ export default function TakeExamPage() {
                     );
                   })
                 )}
+                <AvisarPregunta examId={examId} questionId={q.id} />
               </div>
             );
           })}

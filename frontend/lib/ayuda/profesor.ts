@@ -320,6 +320,50 @@ export const PROFESOR: Articulo[] = [
   },
 
   {
+    id: 'profesor-calidad',
+    titulo: 'Preguntas mal planteadas',
+    resumen: 'Los avisos de los alumnos, la dificultad real y cómo anular una pregunta.',
+    seccion: 'Dirigir un curso',
+    para: ['profesor', 'super_admin'],
+    cuerpo: [
+      {
+        tipo: 'texto',
+        texto:
+          'En todo examen acaba habiendo una pregunta ambigua o directamente equivocada. Quien mejor lo detecta es quien acaba de responderla, así que el alumno puede avisar desde la revisión de su examen, y tú lo ves aquí.',
+      },
+      { tipo: 'titulo', texto: 'Cómo leer la tabla' },
+      {
+        tipo: 'lista',
+        items: [
+          '**Avisos.** Alumnos que han señalado la pregunta, con su motivo y comentario. Pulsa el número para leerlos.',
+          '**Aciertos.** Qué porcentaje la acierta. Se ordena poniendo arriba lo señalado y lo más fallado.',
+        ],
+      },
+      {
+        tipo: 'aviso',
+        texto:
+          'Un acierto muy bajo **no siempre** significa que la pregunta esté mal: puede ser el punto del temario que peor se explicó, y esa información también es valiosa. Léela antes de anularla.',
+      },
+      { tipo: 'titulo', texto: 'Anular una pregunta' },
+      {
+        tipo: 'texto',
+        texto:
+          'Al anularla deja de contar para la nota de **todos**, y los exámenes ya entregados se recalculan al momento. Nadie puede bajar de nota: anular solo puede subir el porcentaje o dejarlo igual.',
+      },
+      {
+        tipo: 'texto',
+        texto:
+          'Es reversible: si te precipitas, «Volver a contar» la reincorpora y vuelve a recalcular.',
+      },
+      {
+        tipo: 'truco',
+        texto:
+          'Anular es preferible a corregir la pregunta a mitad de una edición. Si la cambias, unos alumnos habrán respondido a una versión y otros a otra, y la nota deja de ser comparable.',
+      },
+    ],
+    relacionados: ['profesor-examen', 'profesor-acta'],
+  },
+  {
     id: 'profesor-precio',
     titulo: 'Precio de matrícula y matrícula anticipada',
     resumen: 'Poner precio, el recargo por fecha y qué ve el alumno.',
