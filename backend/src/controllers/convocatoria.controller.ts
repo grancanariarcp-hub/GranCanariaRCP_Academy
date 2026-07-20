@@ -17,19 +17,26 @@ const convSchema = z.object({
   anio: z.number().int().min(2000).max(2100).nullish(),
   descripcion: z.string().max(2000).nullish(),
   isActive: z.boolean().optional(),
+  /** Curso que da acceso. Vacío = convocatoria abierta a cualquiera. */
+  courseId: z.string().uuid().nullish(),
 });
 
 /** GET /api/admin/convocatorias */
 export async function listConvocatorias(_req: Request, res: Response): Promise<void> {
   const { rows } = await query(
     `SELECT c.*,
+            cur.title  AS curso_titulo,
+            cur.status AS curso_estado,
+            cur.enrollment_open AS curso_matricula,
             COALESCE(json_agg(json_build_object('id', b.id, 'name', b.name, 'preguntas',
               (SELECT COUNT(*) FROM questions q WHERE q.bank_id = b.id AND q.is_active))
               ORDER BY cb.sort_order) FILTER (WHERE b.id IS NOT NULL), '[]') AS bancos
        FROM ope_convocatorias c
+       LEFT JOIN courses cur ON cur.id = c.course_id
        LEFT JOIN ope_convocatoria_banks cb ON cb.convocatoria_id = c.id
        LEFT JOIN question_banks b ON b.id = cb.bank_id
-      GROUP BY c.id ORDER BY c.anio DESC NULLS LAST, c.name`,
+      GROUP BY c.id, cur.title, cur.status, cur.enrollment_open
+      ORDER BY c.anio DESC NULLS LAST, c.name`,
   );
   res.json({ convocatorias: rows });
 }
@@ -38,9 +45,10 @@ export async function listConvocatorias(_req: Request, res: Response): Promise<v
 export async function createConvocatoria(req: Request, res: Response): Promise<void> {
   const d = convSchema.parse(req.body);
   const { rows } = await query<{ id: string }>(
-    `INSERT INTO ope_convocatorias (name, comunidad, categoria, anio, descripcion, is_active)
-     VALUES ($1,$2,$3,$4,$5,COALESCE($6, TRUE)) RETURNING id`,
-    [d.name, d.comunidad || null, d.categoria || null, d.anio ?? null, d.descripcion || null, d.isActive],
+    `INSERT INTO ope_convocatorias (name, comunidad, categoria, anio, descripcion, is_active, course_id)
+     VALUES ($1,$2,$3,$4,$5,COALESCE($6, TRUE),$7) RETURNING id`,
+    [d.name, d.comunidad || null, d.categoria || null, d.anio ?? null, d.descripcion || null, d.isActive,
+     d.courseId || null],
   );
   res.status(201).json({ id: rows[0].id });
 }
@@ -50,7 +58,7 @@ export async function updateConvocatoria(req: Request, res: Response): Promise<v
   const d = convSchema.partial().parse(req.body);
   const map: Record<string, unknown> = {
     name: d.name, comunidad: d.comunidad, categoria: d.categoria,
-    anio: d.anio, descripcion: d.descripcion, is_active: d.isActive,
+    anio: d.anio, descripcion: d.descripcion, is_active: d.isActive, course_id: d.courseId,
   };
   const sets: string[] = [];
   const vals: unknown[] = [];
@@ -128,6 +136,12 @@ export async function myConvocatorias(req: Request, res: Response): Promise<void
        LEFT JOIN ope_convocatoria_banks cb ON cb.convocatoria_id = c.id
        LEFT JOIN question_banks b ON b.id = cb.bank_id AND b.visibility = 'publico'
       WHERE c.is_active
+        -- Abierta, o bien su curso está matriculado y pagado por esta persona.
+        AND (c.course_id IS NULL OR EXISTS (
+              SELECT 1 FROM enrollments e
+               WHERE e.course_id = c.course_id AND e.student_id = $1
+                 AND e.status <> 'pendiente_pago'
+            ))
       GROUP BY c.id ORDER BY c.anio DESC NULLS LAST, c.name`,
     [req.auth!.sub],
   );

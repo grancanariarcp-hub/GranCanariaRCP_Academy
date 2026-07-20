@@ -19,15 +19,19 @@ interface Banco { id: string; name: string; kind: string; preguntas?: number }
 interface Convocatoria {
   id: string; name: string; comunidad: string | null; categoria: string | null;
   anio: number | null; descripcion: string | null; is_active: boolean;
+  course_id: string | null; curso_titulo: string | null;
+  curso_estado: string | null; curso_matricula: boolean | null;
   bancos: Array<{ id: string; name: string; preguntas: number }>;
 }
+interface Curso { id: string; title: string; status: string }
 
-const VACIA = { name: '', comunidad: '', categoria: '', anio: '', descripcion: '' };
+const VACIA = { name: '', comunidad: '', categoria: '', anio: '', descripcion: '', courseId: '' };
 
 export default function ConvocatoriasPage() {
   const user = useSession(['super_admin'], '/login/admin');
   const [items, setItems] = useState<Convocatoria[]>([]);
   const [bancos, setBancos] = useState<Banco[]>([]);
+  const [cursos, setCursos] = useState<Curso[]>([]);
   const [form, setForm] = useState({ ...VACIA });
   const [editando, setEditando] = useState<string | null>(null);
   const [asignando, setAsignando] = useState<string | null>(null);
@@ -36,11 +40,13 @@ export default function ConvocatoriasPage() {
 
   const cargar = useCallback(async () => {
     try {
-      const [c, b] = await Promise.all([
+      const [c, b, cu] = await Promise.all([
         api<{ convocatorias: Convocatoria[] }>('/api/admin/convocatorias', { auth: true }),
         api<{ banks: Banco[] }>('/api/banks', { auth: true }),
+        api<{ courses: Curso[] }>('/api/courses', { auth: true }),
       ]);
       setItems(c.convocatorias);
+      setCursos(cu.courses);
       // Solo tienen sentido los bancos de oposición.
       setBancos(b.banks.filter((x) => x.kind === 'ope' || x.kind === 'mir'));
     } catch { /* la pantalla avisa al guardar */ }
@@ -57,6 +63,7 @@ export default function ConvocatoriasPage() {
       categoria: form.categoria || null,
       anio: form.anio ? Number(form.anio) : null,
       descripcion: form.descripcion || null,
+      courseId: form.courseId || null,
     };
     try {
       if (editando) await api(`/api/admin/convocatorias/${editando}`, { method: 'PATCH', auth: true, body: JSON.stringify(cuerpo) });
@@ -140,6 +147,20 @@ export default function ConvocatoriasPage() {
               <input id="c-anio" className="form-input" type="number" value={form.anio}
                 onChange={(e) => setForm({ ...form, anio: e.target.value })} />
             </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="c-curso">Curso que da acceso</label>
+              <select id="c-curso" className="form-select" value={form.courseId}
+                onChange={(e) => setForm({ ...form, courseId: e.target.value })}>
+                <option value="">Abierta: cualquier usuario registrado</option>
+                {cursos.map((c) => <option key={c.id} value={c.id}>{c.title} ({c.status})</option>)}
+              </select>
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                La convocatoria agrupa bancos de preguntas; <strong>la ficha, la miniatura, el precio y la
+                matrícula son del CURSO</strong>. Elige aquí el curso de preparación y publícalo desde
+                «Cursos»: quien se matricule tendrá acceso a estos bancos.
+              </p>
+            </div>
             <button className="btn btn-primary btn-full">{editando ? 'Guardar cambios' : 'Crear convocatoria'}</button>
           </form>
         </div>
@@ -175,6 +196,7 @@ export default function ConvocatoriasPage() {
                     setForm({
                       name: c.name, comunidad: c.comunidad ?? '', categoria: c.categoria ?? '',
                       anio: c.anio ? String(c.anio) : '', descripcion: c.descripcion ?? '',
+                      courseId: c.course_id ?? '',
                     });
                   }}>Editar</button>{' · '}
                   <button className="link-action danger" onClick={() => borrar(c)}>Borrar</button>
@@ -185,6 +207,31 @@ export default function ConvocatoriasPage() {
                 {c.bancos.length === 0
                   ? '⚠️ Sin bancos asignados: el opositor no verá nada'
                   : `${c.bancos.length} banco(s) · ${c.bancos.reduce((s, b) => s + Number(b.preguntas), 0)} preguntas`}
+              </div>
+
+              {/* Dónde se publica y se cobra: en el curso, no aquí. */}
+              <div style={{ fontSize: 12.5, marginTop: 4 }}>
+                {!c.course_id ? (
+                  <span className="muted">Abierta · sin curso asociado, cualquier usuario registrado la ve</span>
+                ) : (
+                  <>
+                    Curso: <a className="link-action" href={`/admin/cursos/${c.course_id}`}>{c.curso_titulo}</a>
+                    {' · '}
+                    <span className={`badge ${c.curso_estado === 'publicado' ? 'badge-success' : 'badge-warning'}`} style={{ fontSize: 11 }}>
+                      {c.curso_estado}
+                    </span>
+                    {c.curso_estado === 'publicado' && (
+                      <span className={`badge ${c.curso_matricula ? 'badge-success' : ''}`} style={{ fontSize: 11, marginLeft: 4 }}>
+                        {c.curso_matricula ? 'matrícula abierta' : 'matrícula cerrada'}
+                      </span>
+                    )}
+                    {c.curso_estado !== 'publicado' && (
+                      <div className="muted" style={{ marginTop: 2 }}>
+                        ⚠️ El curso está en borrador: publícalo desde su ficha para que aparezca en la oferta.
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {asignando === c.id && (
