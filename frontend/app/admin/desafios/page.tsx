@@ -19,12 +19,15 @@ interface Challenge {
   thumbnail_url?: string;
   starts_at: string | null;
   ends_at: string | null;
+  /** Bancos de los que salen sus preguntas; necesario para poder editarlo. */
+  bank_ids?: string[];
   participants: string;
 }
 
 export default function AdminDesafiosPage() {
   const user = useSession(['super_admin'], '/login');
   const [list, setList] = useState<Challenge[]>([]);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [title, setTitle] = useState('');
@@ -68,23 +71,48 @@ export default function AdminDesafiosPage() {
     try { await downloadFile(`/api/admin/challenges/${c.id}/export`, `ranking-${c.title}.json`); } catch { /* ignore */ }
   }
 
+  /** Carga un desafío en el formulario para editarlo. */
+  function startEdit(c: Challenge) {
+    setEditandoId(c.id);
+    setTitle(c.title);
+    setArea(c.area ?? 'SVB');
+    setAudience(c.audience ?? 'todos');
+    setKind((c.kind as 'permanente' | 'temporal') ?? 'temporal');
+    setNumQuestions(String(c.num_questions ?? 10));
+    setSecondsPerQuestion(String(c.seconds_per_question ?? 20));
+    setSelBanks(c.bank_ids ?? []);
+    setStartsAt(c.starts_at ? String(c.starts_at).slice(0, 10) : '');
+    setEndsAt(c.ends_at ? String(c.ends_at).slice(0, 10) : '');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    setEditandoId(null);
+    setTitle(''); setArea('SVB'); setAudience('todos'); setKind('temporal');
+    setNumQuestions('10'); setSecondsPerQuestion('20'); setSelBanks([]);
+    setStartsAt(''); setEndsAt('');
+  }
+
   async function create(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
+    const cuerpo = {
+      title, area, audience, kind,
+      numQuestions: Number(numQuestions),
+      secondsPerQuestion: Number(secondsPerQuestion),
+      bankIds: selBanks,
+      startsAt: kind === 'temporal' ? (startsAt || null) : null,
+      endsAt: kind === 'temporal' ? (endsAt || null) : null,
+    };
     try {
-      await api('/api/admin/challenges', {
-        method: 'POST', auth: true,
-        body: JSON.stringify({
-          title, area, audience, kind,
-          numQuestions: Number(numQuestions),
-          secondsPerQuestion: Number(secondsPerQuestion),
-          bankIds: selBanks,
-          startsAt: kind === 'temporal' ? (startsAt || undefined) : undefined,
-          endsAt: kind === 'temporal' ? (endsAt || undefined) : undefined,
-        }),
-      });
-      setMsg({ ok: true, text: 'Desafío creado ✅' });
-      setTitle(''); setStartsAt(''); setEndsAt('');
+      if (editandoId) {
+        await api(`/api/admin/challenges/${editandoId}`, { method: 'PATCH', auth: true, body: JSON.stringify(cuerpo) });
+        setMsg({ ok: true, text: 'Desafío actualizado ✅' });
+      } else {
+        await api('/api/admin/challenges', { method: 'POST', auth: true, body: JSON.stringify(cuerpo) });
+        setMsg({ ok: true, text: 'Desafío creado ✅' });
+      }
+      resetForm();
       load();
     } catch (err) {
       setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
@@ -102,7 +130,8 @@ export default function AdminDesafiosPage() {
       <div className="grid grid-2">
         <div className="card">
           <div className="card-header">
-            <div className="card-title">Nuevo desafío</div>
+            <div className="card-title">{editandoId ? 'Editar desafío' : 'Nuevo desafío'}</div>
+            {editandoId && <button type="button" className="btn btn-outline btn-small" onClick={resetForm}>Cancelar edición</button>}
             <div className="card-subtitle">Permanente o temporal, dirigido a un público concreto</div>
           </div>
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
@@ -176,7 +205,7 @@ export default function AdminDesafiosPage() {
               Para entrenar sin límite está la <strong>práctica libre</strong> de su perfil.
             </div>
 
-            <button className="btn btn-primary btn-full">Crear desafío</button>
+            <button className="btn btn-primary btn-full">{editandoId ? 'Guardar cambios' : 'Crear desafío'}</button>
           </form>
         </div>
 
@@ -204,6 +233,7 @@ export default function AdminDesafiosPage() {
                     <td>
                       <div className="row-actions">
                         <Link className="link-action" href={`/desafios/${c.id}`}>Ver</Link>
+                        <button className="link-action" onClick={() => startEdit(c)} title="Editar el desafío">Editar</button>
                         <label className="link-action" style={{ cursor: 'pointer' }} title="Subir o cambiar la miniatura">
                           Miniatura
                           <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadThumb(c, e.target.files?.[0]); e.target.value = ''; }} />

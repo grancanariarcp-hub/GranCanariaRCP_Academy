@@ -13,6 +13,7 @@ import { AttendancePanel } from '@/components/AttendancePanel';
 import { adminNav } from '@/lib/nav';
 import { CoursePricing } from '@/components/CoursePricing';
 import { ActaPanel } from '@/components/ActaPanel';
+import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 
 interface Activity {
   id: string;
@@ -377,6 +378,7 @@ export default function CourseDetailPage() {
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={nav}>
       <PageNav backHref="/admin/cursos" backLabel="Volver a cursos" />
+      {user.role === 'profesor' && <PerfilDocenteAviso compacto />}
       {error && <div className="alert alert-error">{error}</div>}
       {!course ? (
         <div className="muted">Cargando…</div>

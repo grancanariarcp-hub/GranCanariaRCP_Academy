@@ -9,6 +9,7 @@ import { AppVersion } from '@/components/AppVersion';
 import { PageNav } from '@/components/PageNav';
 import { StickyCampusBar } from '@/components/StickyCampusBar';
 import { FreeTrial } from '@/components/FreeTrial';
+import { Contacto } from '@/components/Contacto';
 
 interface Q { id: string; category: string | null; text: string; options: string[] }
 interface Feedback { id: string; correct_index: number; your: number | null; is_correct: boolean; explanation: string | null; document_title: string | null; ref_page: number | null }
@@ -431,6 +432,7 @@ function PracticaContenido() {
             )}
           </>
         )}
+        <div style={{ marginTop: 26 }}><Contacto /></div>
         <p style={{ textAlign: 'center', marginTop: 32 }}><AppVersion /></p>
       </div>
       <StickyCampusBar />

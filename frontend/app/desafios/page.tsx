@@ -7,6 +7,7 @@ import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 import { PageNav } from '@/components/PageNav';
 import { StickyCampusBar } from '@/components/StickyCampusBar';
+import { Contacto } from '@/components/Contacto';
 
 function ctaCard(background: string): React.CSSProperties {
   return {
@@ -109,6 +110,7 @@ export default function DesafiosPage() {
             );
           })
         )}
+        <div style={{ marginTop: 26 }}><Contacto /></div>
         <p style={{ textAlign: 'center', marginTop: 32 }}><AppVersion /></p>
       </div>
 

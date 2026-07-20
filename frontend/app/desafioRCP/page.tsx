@@ -7,6 +7,7 @@ import { AppVersion } from '@/components/AppVersion';
 import { Reveal } from '@/components/Reveal';
 import { StickyCampusBar } from '@/components/StickyCampusBar';
 import { temaPalette } from '@/lib/temaColors';
+import { Contacto } from '@/components/Contacto';
 
 interface OpenCourse {
   id: string;
@@ -179,6 +180,7 @@ export default function Home() {
         <p style={{ textAlign: 'center', marginTop: 32, fontSize: 13 }}>
           <Link href="/privacidad">Política de privacidad</Link> · <Link href="/terminos">Condiciones de uso</Link>
         </p>
+        <div style={{ marginTop: 26 }}><Contacto /></div>
         <p style={{ textAlign: 'center', marginTop: 8 }}><AppVersion /></p>
       </div>
 

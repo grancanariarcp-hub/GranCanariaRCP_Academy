@@ -9,6 +9,7 @@ import { temaPalette } from '@/lib/temaColors';
 import { PageNav } from '@/components/PageNav';
 import { LeadCapture } from '@/components/LeadCapture';
 import { Faq, type ItemFaq } from '@/components/Faq';
+import { Contacto } from '@/components/Contacto';
 
 interface OpenCourse {
   id: string;
@@ -397,6 +398,7 @@ export default function CampusPage() {
         <p style={{ textAlign: 'center', marginTop: 24, fontSize: 13 }}>
           <Link href="/privacidad">Política de privacidad</Link> · <Link href="/terminos">Condiciones de uso</Link>
         </p>
+        <div style={{ marginTop: 26 }}><Contacto /></div>
         <p style={{ textAlign: 'center', marginTop: 8 }}><AppVersion /></p>
       </div>
     </div>

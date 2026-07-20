@@ -9,6 +9,7 @@ import { clientIp } from '../utils/asyncHandler.js';
 import { logConsent } from '../services/consent.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl } from '../services/r2.js';
 import { renderLegajo, type LegajoCourse } from '../services/legajoPdf.js';
+import { estadoPerfilDocente } from '../services/perfilDocente.js';
 
 const COURSE_FIELDS = 'c.title, c.starts_at, c.ends_at, c.duration_hours, c.acreditacion, c.cfc, c.publico_objetivo';
 
@@ -32,6 +33,31 @@ async function receivedCourses(studentId: string): Promise<LegajoCourse[]> {
 // ---------------------------------------------------------------------------
 // GET /api/profile
 // ---------------------------------------------------------------------------
+/**
+ * PATCH /api/profile — titular y profesión del docente.
+ * Es lo que ve el alumno junto al curso, así que se edita desde su perfil.
+ */
+export async function updateMyProfile(req: Request, res: Response): Promise<void> {
+  const d = z.object({
+    headline: z.string().max(160).nullish(),
+    profession: z.string().max(120).nullish(),
+  }).parse(req.body);
+
+  const sets: string[] = [];
+  const vals: unknown[] = [];
+  if (d.headline !== undefined) { vals.push(d.headline || null); sets.push(`headline = $${vals.length}`); }
+  if (d.profession !== undefined) { vals.push(d.profession || null); sets.push(`profession = $${vals.length}`); }
+  if (sets.length === 0) throw badRequest('Nada que actualizar');
+  vals.push(req.auth!.sub);
+  await query(`UPDATE users SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${vals.length}`, vals);
+  res.json({ ok: true });
+}
+
+/** GET /api/profile/docente — qué falta para poder publicar un curso. */
+export async function estadoDocente(req: Request, res: Response): Promise<void> {
+  res.json(await estadoPerfilDocente(req.auth!.sub));
+}
+
 export async function getProfile(req: Request, res: Response): Promise<void> {
   const { sub, role } = req.auth!;
   if (role === 'student') {
@@ -39,7 +65,7 @@ export async function getProfile(req: Request, res: Response): Promise<void> {
     res.json({ profile: { ...u.rows[0], role: 'student' }, taught: [], received: await receivedCourses(sub) });
     return;
   }
-  const u = await query<{ photo_key: string | null }>('SELECT id, name, email, headline, role, photo_key FROM users WHERE id = $1', [sub]);
+  const u = await query<{ photo_key: string | null }>('SELECT id, name, email, headline, profession, role, photo_key FROM users WHERE id = $1', [sub]);
   const photoUrl = u.rows[0]?.photo_key && r2Configured() ? await presignedGetUrl(u.rows[0].photo_key, 3600) : null;
   res.json({ profile: { ...u.rows[0], photo_url: photoUrl }, taught: await taughtCourses(sub), received: [] });
 }

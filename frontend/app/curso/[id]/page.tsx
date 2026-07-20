@@ -9,6 +9,7 @@ import { AppVersion } from '@/components/AppVersion';
 import { Carousel } from '@/components/Carousel';
 import { temaPalette } from '@/lib/temaColors';
 import { PageNav } from '@/components/PageNav';
+import { Contacto } from '@/components/Contacto';
 
 interface Course {
   id: string;
@@ -249,6 +250,7 @@ export default function PublicCoursePage() {
             </div>
           </div>
         )}
+        <div style={{ marginTop: 26 }}><Contacto /></div>
         <p style={{ textAlign: 'center', marginTop: 24 }}><AppVersion /></p>
       </div>
     </div>

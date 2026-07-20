@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getProfile, changePassword, changeEmail, getConsents, updateConsents, deleteMyAccount, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
+import { getProfile, updateMyProfile, estadoDocente, changePassword, changeEmail, getConsents, updateConsents, deleteMyAccount, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
 import { myPendingGroups, markJoined } from '../controllers/whatsapp.controller.js';
 import { heartbeat, myLearningTime } from '../controllers/learningTime.controller.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -13,6 +13,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 *
 router.use(requireAuth); // any authenticated role
 
 router.get('/', asyncHandler(getProfile));
+router.patch('/', asyncHandler(updateMyProfile));
+router.get('/docente', asyncHandler(estadoDocente));
 router.post('/password', asyncHandler(changePassword));
 router.post('/email', asyncHandler(changeEmail));
 router.post('/heartbeat', asyncHandler(heartbeat));

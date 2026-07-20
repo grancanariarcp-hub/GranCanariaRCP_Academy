@@ -7,6 +7,7 @@ import { clientIp } from '../utils/asyncHandler.js';
 import { assertEditor, assertDirector } from '../services/courseAuth.js';
 import { notify } from '../services/notify.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl, deleteObject } from '../services/r2.js';
+import { estadoPerfilDocente } from '../services/perfilDocente.js';
 
 /** Editing the inside of a course: modules, activities and staff. */
 
@@ -43,6 +44,20 @@ const updateCourseSchema = z.object({
 export async function updateCourse(req: Request, res: Response): Promise<void> {
   await assertDirector(req);
   const d = updateCourseSchema.parse(req.body);
+
+  // Publicar exige tener el currículum al día: es lo que el alumno lee para
+  // decidir, y lo prometemos en la página pública. No se pide al registrarse
+  // —espantaría a quien aún no ha decidido nada— sino justo aquí.
+  if (d.status === 'publicado' && req.auth!.role === 'profesor') {
+    const perfil = await estadoPerfilDocente(req.auth!.sub);
+    if (!perfil.completo) {
+      throw badRequest(
+        `Completa tu perfil docente antes de publicar: falta ${perfil.faltan.join(', ')}. `
+        + 'Es lo que verán tus alumnos para saber quién imparte el curso.',
+        'PERFIL_INCOMPLETO',
+      );
+    }
+  }
   const map: Record<string, unknown> = {
     title: d.title, status: d.status, enrollment_open: d.enrollmentOpen,
     starts_at: d.startsAt, ends_at: d.endsAt, final_exam_start: d.finalExamStart, final_exam_end: d.finalExamEnd,

@@ -5,6 +5,7 @@ import { AppVersion } from '@/components/AppVersion';
 import { Reveal } from '@/components/Reveal';
 import { Faq, type ItemFaq } from '@/components/Faq';
 import { PageNav } from '@/components/PageNav';
+import { CONTACTO, mailtoCon, whatsappCon } from '@/components/Contacto';
 
 /**
  * Captación de docentes.
@@ -14,10 +15,8 @@ import { PageNav } from '@/components/PageNav';
  * crear cuenta e iniciar sesión quedan en segundo plano.
  */
 
-const EMAIL = 'grancanariarcp@gmail.com';
-const TELEFONO = '34624707295';
-const MAILTO = `mailto:${EMAIL}?subject=${encodeURIComponent('Quiero publicar mis cursos como docente')}`;
-const WHATSAPP = `https://wa.me/${TELEFONO}?text=${encodeURIComponent('Hola, soy docente y quiero publicar mis cursos en el campus')}`;
+const MAILTO = mailtoCon('Quiero publicar mis cursos como docente');
+const WHATSAPP = whatsappCon('Hola, soy docente y quiero publicar mis cursos en el campus');
 
 /** Verde de monitor, usado con cuentagotas sobre el azul de marca. */
 const VITAL = '#28e0a0';
@@ -138,12 +137,14 @@ function BotonesContacto({ variante = 'claro' }: { variante?: 'claro' | 'oscuro'
 
   return (
     <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
-      <a href={MAILTO} className="btn press" style={{ ...principal, fontWeight: 700, padding: '14px 26px', fontSize: 16 }}>
+      <a href={MAILTO} className="btn press" style={{ ...principal, fontWeight: 700, padding: '12px 24px', fontSize: 15.5, lineHeight: 1.35 }}>
         Contacta y solicita tu presupuesto
+        <span style={{ display: 'block', fontWeight: 400, fontSize: 12.5, opacity: 0.85 }}>{CONTACTO.email}</span>
       </a>
       <a href={WHATSAPP} target="_blank" rel="noreferrer" className="btn press"
-        style={{ ...secundario, fontWeight: 600, padding: '14px 24px', fontSize: 15 }}>
+        style={{ ...secundario, fontWeight: 600, padding: '12px 22px', fontSize: 15, lineHeight: 1.35 }}>
         WhatsApp
+        <span style={{ display: 'block', fontWeight: 400, fontSize: 12.5, opacity: 0.85 }}>{CONTACTO.telefonoTexto}</span>
       </a>
     </div>
   );
@@ -290,7 +291,9 @@ export default function DocentesPage() {
             <h2 style={{ fontSize: 25, marginBottom: 18 }}>¿Listo para publicar tu formación?</h2>
             <BotonesContacto variante="oscuro" />
             <p style={{ fontSize: 13, opacity: 0.9, marginTop: 16 }}>
-              O escríbenos a <a href={MAILTO} style={{ color: '#fff' }}>{EMAIL}</a> · +34 624 707 295
+              O escríbenos a <a href={MAILTO} style={{ color: '#fff' }}>{CONTACTO.email}</a>
+              {' · '}
+              <a href={WHATSAPP} target="_blank" rel="noreferrer" style={{ color: '#fff' }}>{CONTACTO.telefonoTexto}</a>
             </p>
           </div>
         </Reveal>

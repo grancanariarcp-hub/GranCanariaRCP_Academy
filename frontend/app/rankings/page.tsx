@@ -7,6 +7,7 @@ import { getUser } from '@/lib/auth';
 import { AppVersion } from '@/components/AppVersion';
 import { PageNav } from '@/components/PageNav';
 import { StickyCampusBar } from '@/components/StickyCampusBar';
+import { Contacto } from '@/components/Contacto';
 
 interface Inst { id: string; name: string; participants: string; attempts: string; total_correct: string; accuracy_pct: string | null; position: string }
 interface Person { name: string; institution: string | null; challenges: string; points: string; accuracy_pct: string | null; position: string }
@@ -96,6 +97,7 @@ export default function RankingsPage() {
             </div>
           )}
         </div>
+        <div style={{ marginTop: 26 }}><Contacto /></div>
         <p style={{ textAlign: 'center', marginTop: 24 }}><AppVersion /></p>
       </div>
       <StickyCampusBar />
