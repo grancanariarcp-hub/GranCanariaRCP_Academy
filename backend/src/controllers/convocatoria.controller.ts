@@ -141,6 +141,8 @@ export async function myConvocatorias(req: Request, res: Response): Promise<void
               SELECT 1 FROM enrollments e
                WHERE e.course_id = c.course_id AND e.student_id = $1
                  AND e.status <> 'pendiente_pago'
+                 -- Suscripción vencida: deja de ver la convocatoria.
+                 AND (e.access_until IS NULL OR e.access_until > NOW())
             ))
       GROUP BY c.id ORDER BY c.anio DESC NULLS LAST, c.name`,
     [req.auth!.sub],

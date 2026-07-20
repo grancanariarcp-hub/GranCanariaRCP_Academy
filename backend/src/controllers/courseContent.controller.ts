@@ -39,6 +39,12 @@ const updateCourseSchema = z.object({
   priceCents: z.number().int().min(0).max(10_000_00).optional(),
   earlyBirdUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).nullish(),
   lateSurchargePct: z.number().min(0).max(500).optional(),
+  // Cursos por suscripción: se paga por periodos mientras se prepara.
+  billingType: z.enum(['unico', 'suscripcion']).optional(),
+  priceMensualCents: z.number().int().min(0).max(10_000_00).nullish(),
+  priceTrimestralCents: z.number().int().min(0).max(10_000_00).nullish(),
+  priceSemestralCents: z.number().int().min(0).max(10_000_00).nullish(),
+  priceAnualCents: z.number().int().min(0).max(10_000_00).nullish(),
 });
 
 export async function updateCourse(req: Request, res: Response): Promise<void> {
@@ -67,6 +73,11 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     whatsapp_url: d.whatsappUrl,
     min_per_page: d.minPerPage, words_per_min: d.wordsPerMin, min_per_question: d.minPerQuestion,
     price_cents: d.priceCents, early_bird_until: d.earlyBirdUntil, late_surcharge_pct: d.lateSurchargePct,
+    billing_type: d.billingType,
+    price_mensual_cents: d.priceMensualCents,
+    price_trimestral_cents: d.priceTrimestralCents,
+    price_semestral_cents: d.priceSemestralCents,
+    price_anual_cents: d.priceAnualCents,
   };
   const fields: string[] = [];
   const params: unknown[] = [];

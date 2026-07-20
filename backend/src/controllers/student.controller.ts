@@ -130,8 +130,8 @@ export async function listMyCourses(req: Request, res: Response): Promise<void> 
 /** Contenido del curso para estudiar (solo si está matriculado). */
 export async function getMyCourseContent(req: Request, res: Response): Promise<void> {
   const courseId = req.params.courseId;
-  const enr = await query<{ status: string; price_paid_cents: number | null }>(
-    'SELECT status, price_paid_cents FROM enrollments WHERE student_id = $1 AND course_id = $2',
+  const enr = await query<{ status: string; price_paid_cents: number | null; access_until: string | null; periodo: string | null }>(
+    'SELECT status, price_paid_cents, access_until, periodo FROM enrollments WHERE student_id = $1 AND course_id = $2',
     [req.auth!.sub, courseId],
   );
   if (enr.rows.length === 0) throw forbidden('No estás matriculado en este curso');
@@ -141,6 +141,10 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
   // con matricularse y entrar para acceder a todo el curso sin pasar por caja.
   if (matricula.status === 'pendiente_pago') {
     throw new HttpError(402, 'Debes completar el pago de la matrícula para acceder al curso', 'PAYMENT_REQUIRED');
+  }
+  // Suscripción vencida: el acceso se cierra igual que si no se hubiera pagado.
+  if (matricula.access_until && new Date(matricula.access_until) < new Date()) {
+    throw new HttpError(402, 'Tu suscripción a este curso ha vencido. Renuévala para seguir accediendo.', 'SUSCRIPCION_VENCIDA');
   }
 
   const course = await query('SELECT id, title, tema, subtema, modality, objetivo_general FROM courses WHERE id = $1', [courseId]);
@@ -180,7 +184,12 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
     modules: mods,
     certificateAvailable: passed.rows.length > 0,
     progress: { total, completed, pct: total > 0 ? Math.round((completed / total) * 100) : 0 },
-    matricula: { estado: matricula.status, importeCents: matricula.price_paid_cents ?? 0 },
+    matricula: {
+      estado: matricula.status,
+      importeCents: matricula.price_paid_cents ?? 0,
+      accessUntil: matricula.access_until,
+      periodo: matricula.periodo,
+    },
   });
 }
 

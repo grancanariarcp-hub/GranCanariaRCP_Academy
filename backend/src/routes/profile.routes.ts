@@ -6,6 +6,7 @@ import { heartbeat, myLearningTime } from '../controllers/learningTime.controlle
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { myRecognitions, checkRecognitions } from '../controllers/recognition.controller.js';
+import { listarSesiones, revocarSesion } from '../controllers/sesion.controller.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
@@ -15,6 +16,8 @@ router.use(requireAuth); // any authenticated role
 router.get('/', asyncHandler(getProfile));
 router.patch('/', asyncHandler(updateMyProfile));
 router.get('/docente', asyncHandler(estadoDocente));
+router.get('/sessions', asyncHandler(listarSesiones));
+router.delete('/sessions/:id', asyncHandler(revocarSesion));
 router.post('/password', asyncHandler(changePassword));
 router.post('/email', asyncHandler(changeEmail));
 router.post('/heartbeat', asyncHandler(heartbeat));

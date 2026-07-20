@@ -31,6 +31,7 @@ import { listTemplates, createTemplate, updateTemplate, deleteTemplate, uploadTe
 import { anonStats } from '../controllers/anonPractice.controller.js';
 import { listConvocatorias, createConvocatoria, updateConvocatoria, deleteConvocatoria, setConvocatoriaBanks } from '../controllers/convocatoria.controller.js';
 import { listAuditores, crearAuditor, editarAuditor, borrarAuditor, actividadAuditor } from '../controllers/auditor.controller.js';
+import { usoCompartido } from '../controllers/sesion.controller.js';
 
 const router = Router();
 
@@ -44,6 +45,7 @@ router.get('/stats', asyncHandler(getStats));
 router.get('/stripe-status', asyncHandler(stripeStatus));
 router.get('/leads', asyncHandler(listLeads));
 router.get('/anon-practice', asyncHandler(anonStats));
+router.get('/uso-compartido', asyncHandler(usoCompartido));
 
 // Cuentas de auditoría para la comisión de formación continuada
 router.get('/auditores', asyncHandler(listAuditores));

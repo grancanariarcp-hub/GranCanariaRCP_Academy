@@ -7,6 +7,7 @@ import { badRequest, conflict, unauthorized } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { recordSignupConsents } from '../services/consent.js';
+import { abrirSesion } from '../services/sesiones.js';
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -389,11 +390,17 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           .catch(() => { /* no bloquear el login */ });
       }
       await query('UPDATE users SET last_login_at = NOW() WHERE id = $1', [user.id]);
-      const token = signToken({ sub: user.id, role: user.role, institutionId: user.institution_id, name: user.name });
+      const sesion = await abrirSesion(req, user.id, 'user');
+      const token = signToken({
+        sub: user.id, role: user.role, institutionId: user.institution_id, name: user.name, sid: sesion.id,
+      });
       await audit({ actorId: user.id, actorType: user.role, action: 'AUTH_LOGIN_SUCCESS', entity: 'user', entityId: user.id, ip });
       res.json({
         token,
         mustChangePassword: user.must_change_password,
+        // Se avisa si esta entrada cerró otra sesión: el titular debe saberlo,
+        // tanto si fue él en otro equipo como si alguien usa su cuenta.
+        sesionesCerradas: sesion.cerradas,
         user: { id: user.id, name: user.name, role: user.role, institutionId: user.institution_id },
       });
       return;
@@ -415,11 +422,17 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
           .catch(() => { /* no bloquear el login */ });
       }
       await query('UPDATE students SET last_login_at = NOW() WHERE id = $1', [st.id]);
-      const token = signToken({ sub: st.id, role: 'student', institutionId: st.institution_id, name: st.display_name });
+      const sesionSt = await abrirSesion(req, st.id, 'student');
+      const token = signToken({
+        sub: st.id, role: 'student', institutionId: st.institution_id, name: st.display_name, sid: sesionSt.id,
+      });
       await audit({ actorId: st.id, actorType: 'student', action: 'STUDENT_LOGIN_SUCCESS', entity: 'student', entityId: st.id, ip });
       res.json({
         token,
         mustChangePassword: st.must_change_password,
+        // Cuántas sesiones cerró esta entrada: el titular debe enterarse, tanto
+        // si fue él en otro equipo como si su cuenta anda repartida.
+        sesionesCerradas: sesionSt.cerradas,
         user: { id: st.id, name: st.display_name, role: 'student', institutionId: st.institution_id },
       });
       return;

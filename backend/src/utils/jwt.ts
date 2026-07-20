@@ -9,6 +9,13 @@ export interface TokenPayload {
   role: UserRole;
   institutionId: string | null;
   name: string;
+  /**
+   * Sesión a la que pertenece el token. Permite cerrarla desde el servidor
+   * cuando se supera el límite de dispositivos. Es opcional porque los tokens
+   * emitidos antes de existir este control siguen siendo válidos hasta que
+   * caduquen solos.
+   */
+  sid?: string;
 }
 
 export function signToken(payload: TokenPayload): string {
