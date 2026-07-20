@@ -16,7 +16,8 @@
     "db:reset": "tsx src/db/setup.ts --reset",
     "db:backup": "tsx src/db/backup.ts",
     "db:limpiar-pruebas": "tsx src/db/limpiarPruebas.ts",
-    "test": "tsx --test src/tests/*.test.ts"
+    "test": "tsx --test src/tests/*.test.ts",
+    "humo": "tsx scripts/humo.ts"
   },
   "keywords": [
     "rcp",

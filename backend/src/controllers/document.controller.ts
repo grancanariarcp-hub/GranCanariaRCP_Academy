@@ -142,9 +142,21 @@ export async function deleteDocument(req: Request, res: Response): Promise<void>
  * The #page anchor makes the browser open the viewer at that page.
  */
 export async function getDocumentUrl(req: Request, res: Response): Promise<void> {
+  // Esta ruta ES la frontera de acceso al almacén: devuelve un enlace firmado
+  // con el que cualquiera puede descargar el fichero durante diez minutos. Las
+  // claves del almacén no se pueden adivinar, así que quien controle quién
+  // recibe el enlace controla quién lee el documento. Se listaban ya con la
+  // regla correcta y se borraban con la regla correcta, pero aquí no había
+  // ninguna: con el identificador bastaba para descargar el material privado
+  // de otro profesor.
+  const esSuper = req.auth!.role === 'super_admin' || req.auth!.role === 'auditor';
   const { rows } = await query<{ storage_key: string | null }>(
-    'SELECT storage_key FROM documents WHERE id = $1',
-    [req.params.id],
+    esSuper
+      ? 'SELECT d.storage_key FROM documents d WHERE d.id = $1'
+      : `SELECT d.storage_key FROM documents d
+           LEFT JOIN users u ON u.id = d.uploaded_by
+          WHERE d.id = $1 AND (d.uploaded_by = $2 OR u.role = 'super_admin')`,
+    esSuper ? [req.params.id] : [req.params.id, req.auth!.sub],
   );
   if (rows.length === 0) throw notFound('Documento no encontrado');
   const key = rows[0].storage_key;

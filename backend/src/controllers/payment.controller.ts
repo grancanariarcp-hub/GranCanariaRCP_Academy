@@ -6,6 +6,7 @@ import { stripe, stripeConfigurado, stripeEnProduccion, diagnosticoClave, NOTA_E
 import { precioDe, euros } from '../services/pricing.js';
 import { notify, notifyCourseStaff } from '../services/notify.js';
 import { audit } from '../services/audit.js';
+import { assertEditor } from '../services/courseAuth.js';
 import { clientIp } from '../utils/asyncHandler.js';
 
 /**
@@ -303,6 +304,11 @@ export async function myPayments(req: Request, res: Response): Promise<void> {
 
 /** GET /api/courses/:id/payments — cobros del curso, para su dirección. */
 export async function coursePayments(req: Request, res: Response): Promise<void> {
+  // Sin esta comprobación bastaba con cambiar el identificador del curso en la
+  // dirección para recibir los cobros de cualquier otro, con el nombre y el
+  // correo de cada alumno que ha pagado. Todas las demás rutas del curso lo
+  // comprueban; esta se quedó sin hacerlo.
+  await assertEditor(req);
   const { rows } = await query(
     `SELECT p.id, p.amount_cents, p.status, p.receipt_number, p.paid_at, p.livemode,
             p.refunded_cents, p.refunded_at, s.display_name, s.email
