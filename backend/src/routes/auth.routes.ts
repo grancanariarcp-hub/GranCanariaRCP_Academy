@@ -13,10 +13,13 @@ import {
   me,
 } from '../controllers/auth.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { authLimiter } from '../middleware/rateLimiter.js';
+import { authLimiter, authIpLimiter } from '../middleware/rateLimiter.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
+
+// Tope por IP sobre todo el acceso, además del límite por cuenta de cada ruta.
+router.use(authIpLimiter);
 
 // Unified login (email + password) for everyone (staff + adult students)
 router.post('/login', authLimiter, asyncHandler(unifiedLogin));
