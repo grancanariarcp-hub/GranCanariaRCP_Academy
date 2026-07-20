@@ -32,7 +32,7 @@ export default function ExamEditorPage() {
   const params = useParams();
   const courseId = params.id as string;
   const examId = params.examId as string;
-  const user = useSession(['super_admin', 'profesor'], '/login/admin');
+  const user = useSession(['super_admin', 'profesor', 'auditor'], '/login/admin');
 
   const [exam, setExam] = useState<Exam | null>(null);
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);

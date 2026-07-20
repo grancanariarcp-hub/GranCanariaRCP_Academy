@@ -7,6 +7,7 @@ import { api, ApiError, downloadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
 import { BankFilters, FILTROS_VACIOS, type FiltrosBanco, type Facetas } from '@/components/BankFilters';
 import { BankQuestionList } from '@/components/BankQuestionList';
+import { COMUNIDADES, CATEGORIAS } from '@/lib/sanidad';
 
 interface Bank {
   id: string;
@@ -36,12 +37,12 @@ const POBLACIONES = ['Niños de 6 a 12 años', 'Jóvenes de 13 a 17 años', 'Adu
  */
 function shapeFor(kind: string) {
   if (kind === 'rcp') {
-    return { d1: 'Institución', d2: 'Población objetivo', o1: INSTITUCIONES, o2: POBLACIONES, official: false, sim: false };
+    return { d1: 'Institución', d2: 'Población objetivo', o1: INSTITUCIONES, o2: POBLACIONES, o2Grupos: null, official: false, sim: false };
   }
   if (kind === 'formativo') {
-    return { d1: 'Especialidad', d2: 'Tema', o1: null, o2: null, official: false, sim: false };
+    return { d1: 'Especialidad', d2: 'Tema', o1: null, o2: null, o2Grupos: null, official: false, sim: false };
   }
-  return { d1: 'Comunidad autónoma', d2: 'Categoría profesional', o1: null, o2: null, official: true, sim: true };
+  return { d1: 'Comunidad autónoma', d2: 'Categoría profesional', o1: COMUNIDADES, o2: null, official: true, sim: true, o2Grupos: CATEGORIAS };
 }
 
 export default function BancosPage() {
@@ -275,7 +276,18 @@ export default function BancosPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">{shape.d2}</label>
-                {shape.o2 ? (
+                {shape.o2Grupos ? (
+                  /* Categorías sanitarias: agrupadas, porque la lista completa
+                     sin agrupar es imposible de recorrer. */
+                  <select className="form-select" value={dim2} onChange={(e) => setDim2(e.target.value)}>
+                    <option value="">—</option>
+                    {shape.o2Grupos.map((g) => (
+                      <optgroup key={g.grupo} label={g.grupo}>
+                        {g.opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                ) : shape.o2 ? (
                   <select className="form-select" value={dim2} onChange={(e) => setDim2(e.target.value)}>
                     <option value="">—</option>
                     {shape.o2.map((o) => <option key={o} value={o}>{o}</option>)}

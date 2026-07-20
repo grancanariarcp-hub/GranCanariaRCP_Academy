@@ -6,6 +6,7 @@ import { PageNav } from '@/components/PageNav';
 import { useSession } from '@/hooks/useSession';
 import { adminNav } from '@/lib/nav';
 import { api, ApiError } from '@/lib/api';
+import { COMUNIDADES, CATEGORIAS } from '@/lib/sanidad';
 
 /**
  * Convocatorias de oposición.
@@ -114,13 +115,24 @@ export default function ConvocatoriasPage() {
             <div className="grid grid-2" style={{ gap: 12 }}>
               <div className="form-group">
                 <label className="form-label" htmlFor="c-com">Comunidad</label>
-                <input id="c-com" className="form-input" value={form.comunidad}
-                  onChange={(e) => setForm({ ...form, comunidad: e.target.value })} placeholder="Canarias" />
+                <select id="c-com" className="form-select" value={form.comunidad}
+                  onChange={(e) => setForm({ ...form, comunidad: e.target.value })}>
+                  <option value="">Sin especificar</option>
+                  {COMUNIDADES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="c-cat">Categoría</label>
-                <input id="c-cat" className="form-input" value={form.categoria}
-                  onChange={(e) => setForm({ ...form, categoria: e.target.value })} placeholder="Enfermería" />
+                {/* Agrupadas: la lista completa sin agrupar es inmanejable. */}
+                <select id="c-cat" className="form-select" value={form.categoria}
+                  onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
+                  <option value="">Sin especificar</option>
+                  {CATEGORIAS.map((g) => (
+                    <optgroup key={g.grupo} label={g.grupo}>
+                      {g.opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="form-group">
