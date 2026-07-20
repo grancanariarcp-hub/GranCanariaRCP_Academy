@@ -14,6 +14,7 @@ import { adminNav } from '@/lib/nav';
 import { CoursePricing } from '@/components/CoursePricing';
 import { ActaPanel } from '@/components/ActaPanel';
 import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
+import { CourseSubscription } from '@/components/CourseSubscription';
 
 interface Activity {
   id: string;
@@ -61,6 +62,11 @@ interface Course {
   price_cents: number;
   early_bird_until: string | null;
   late_surcharge_pct: number | string | null;
+  billing_type: string;
+  price_mensual_cents: number | null;
+  price_trimestral_cents: number | null;
+  price_semestral_cents: number | null;
+  price_anual_cents: number | null;
 }
 
 const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };

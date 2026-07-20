@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { query } from '../config/database.js';
+import { query, withTransaction } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 
 /**
@@ -41,16 +41,81 @@ export async function listConvocatorias(_req: Request, res: Response): Promise<v
   res.json({ convocatorias: rows });
 }
 
-/** POST /api/admin/convocatorias */
+/**
+ * Escala de precios por defecto, en céntimos.
+ *
+ * Cuanto más largo el compromiso, más barato el mes: es lo que reduce la baja
+ * en cuanto pasa el examen, que es el mayor riesgo de este producto. Cada
+ * periodo se cobra ENTERO por adelantado, no mes a mes: evita los impagos a
+ * mitad de periodo y simplifica el cobro.
+ */
+const PRECIOS_POR_DEFECTO = {
+  mensual: 10_00,      // 10 €/mes
+  trimestral: 27_00,   //  9 €/mes
+  semestral: 48_00,    //  8 €/mes
+  anual: 84_00,        //  7 €/mes
+};
+
+/**
+ * POST /api/admin/convocatorias
+ *
+ * La convocatoria SE COMPORTA como un curso: si no se indica uno existente, se
+ * crea el suyo con la ficha lista, su módulo de bienvenida, su encuesta y la
+ * escala de precios por suscripción. Así solo queda elegir los bancos y
+ * publicar, en lugar de tener que montar el curso aparte y acordarse de
+ * enlazarlo.
+ */
 export async function createConvocatoria(req: Request, res: Response): Promise<void> {
   const d = convSchema.parse(req.body);
-  const { rows } = await query<{ id: string }>(
-    `INSERT INTO ope_convocatorias (name, comunidad, categoria, anio, descripcion, is_active, course_id)
-     VALUES ($1,$2,$3,$4,$5,COALESCE($6, TRUE),$7) RETURNING id`,
-    [d.name, d.comunidad || null, d.categoria || null, d.anio ?? null, d.descripcion || null, d.isActive,
-     d.courseId || null],
-  );
-  res.status(201).json({ id: rows[0].id });
+  const userId = req.auth!.sub;
+
+  const creado = await withTransaction(async (client) => {
+    let courseId = d.courseId || null;
+
+    if (!courseId) {
+      const curso = await client.query<{ id: string }>(
+        `INSERT INTO courses
+           (title, tema, subtema, modality, publico_objetivo, price_cents, created_by,
+            billing_type, price_mensual_cents, price_trimestral_cents, price_semestral_cents, price_anual_cents,
+            resumen, objetivo_general)
+         VALUES ($1,'OPE',$2,'online','{}',0,$3,'suscripcion',$4,$5,$6,$7,$8,$9)
+         RETURNING id`,
+        [
+          d.name,
+          d.categoria || null,
+          userId,
+          PRECIOS_POR_DEFECTO.mensual, PRECIOS_POR_DEFECTO.trimestral,
+          PRECIOS_POR_DEFECTO.semestral, PRECIOS_POR_DEFECTO.anual,
+          `Preparación de ${d.name}: generador de exámenes y simulacros con seguimiento de tu avance por materias.`,
+          'Preparar la oposición mediante la práctica dirigida sobre los bancos oficiales de preguntas.',
+        ],
+      );
+      courseId = curso.rows[0].id;
+
+      await client.query(
+        `INSERT INTO course_staff (course_id, user_id, role) VALUES ($1, $2, 'director')`,
+        [courseId, userId],
+      );
+      // Misma estructura de partida que cualquier curso.
+      await client.query(
+        `INSERT INTO modules (course_id, title, sort_order) VALUES ($1, 'Bienvenida', 0)`,
+        [courseId],
+      );
+      await client.query(
+        'INSERT INTO course_surveys (course_id) VALUES ($1) ON CONFLICT (course_id) DO NOTHING',
+        [courseId],
+      );
+    }
+
+    const { rows } = await client.query<{ id: string }>(
+      `INSERT INTO ope_convocatorias (name, comunidad, categoria, anio, descripcion, is_active, course_id)
+       VALUES ($1,$2,$3,$4,$5,COALESCE($6, TRUE),$7) RETURNING id`,
+      [d.name, d.comunidad || null, d.categoria || null, d.anio ?? null, d.descripcion || null, d.isActive, courseId],
+    );
+    return { id: rows[0].id, courseId };
+  });
+
+  res.status(201).json({ ...creado, cursoCreado: !d.courseId });
 }
 
 /** PATCH /api/admin/convocatorias/:id */

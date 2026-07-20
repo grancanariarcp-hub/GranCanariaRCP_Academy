@@ -66,9 +66,20 @@ export default function ConvocatoriasPage() {
       courseId: form.courseId || null,
     };
     try {
-      if (editando) await api(`/api/admin/convocatorias/${editando}`, { method: 'PATCH', auth: true, body: JSON.stringify(cuerpo) });
-      else await api('/api/admin/convocatorias', { method: 'POST', auth: true, body: JSON.stringify(cuerpo) });
-      setMsg({ ok: true, text: '✅ Convocatoria guardada' });
+      if (editando) {
+        await api(`/api/admin/convocatorias/${editando}`, { method: 'PATCH', auth: true, body: JSON.stringify(cuerpo) });
+        setMsg({ ok: true, text: '✅ Convocatoria guardada' });
+      } else {
+        const r = await api<{ id: string; courseId: string; cursoCreado: boolean }>(
+          '/api/admin/convocatorias', { method: 'POST', auth: true, body: JSON.stringify(cuerpo) },
+        );
+        setMsg({
+          ok: true,
+          text: r.cursoCreado
+            ? '✅ Convocatoria creada junto a su curso, con la ficha y los precios listos. Asígnale los bancos y publícalo.'
+            : '✅ Convocatoria guardada',
+        });
+      }
       setForm({ ...VACIA });
       setEditando(null);
       cargar();
@@ -152,13 +163,13 @@ export default function ConvocatoriasPage() {
               <label className="form-label" htmlFor="c-curso">Curso que da acceso</label>
               <select id="c-curso" className="form-select" value={form.courseId}
                 onChange={(e) => setForm({ ...form, courseId: e.target.value })}>
-                <option value="">Abierta: cualquier usuario registrado</option>
-                {cursos.map((c) => <option key={c.id} value={c.id}>{c.title} ({c.status})</option>)}
+                <option value="">Crear su curso automáticamente (recomendado)</option>
+                {cursos.map((c) => <option key={c.id} value={c.id}>Usar «{c.title}» ({c.status})</option>)}
               </select>
               <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                La convocatoria agrupa bancos de preguntas; <strong>la ficha, la miniatura, el precio y la
-                matrícula son del CURSO</strong>. Elige aquí el curso de preparación y publícalo desde
-                «Cursos»: quien se matricule tendrá acceso a estos bancos.
+                Dejándolo así se crea el curso con su ficha, su módulo de bienvenida y la escala de precios
+                por suscripción (10 · 9 · 8 · 7 €/mes). Solo te quedará <strong>asignar los bancos</strong> y
+                <strong> publicarlo</strong> desde su ficha.
               </p>
             </div>
             <button className="btn btn-primary btn-full">{editando ? 'Guardar cambios' : 'Crear convocatoria'}</button>
