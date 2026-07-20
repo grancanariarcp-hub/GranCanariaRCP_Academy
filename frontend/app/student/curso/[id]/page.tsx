@@ -36,6 +36,8 @@ interface Course {
   tema: string | null;
   subtema: string | null;
   objetivo_general: string | null;
+  /** Curso de preparación de oposiciones: se practica, no se recorre. */
+  es_ope?: boolean;
 }
 
 const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
@@ -108,6 +110,40 @@ export default function StudentCoursePage() {
       <TimeTracker courseId={courseId} />
       <MyAttendance courseId={courseId} />
       <MySubscription courseId={courseId} />
+
+      {/* Un curso OPE no se recorre: se practica. Se le ofrecen sus
+          herramientas en lugar de una lista de módulos vacía. */}
+      {course?.es_ope && (
+        <div className="card animate-in" style={{ marginBottom: 20, borderLeft: '4px solid var(--primary-dark)' }}>
+          <div className="card-header">
+            <div className="card-title">Tu preparación</div>
+            <div className="card-subtitle">Genera exámenes, haz simulacros y sigue tu avance por materias</div>
+          </div>
+          <div className="grid grid-3" style={{ gap: 12 }}>
+            <Link href="/student/ope/test" className="press" style={{
+              display: 'block', textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12,
+              padding: 20, background: 'linear-gradient(135deg,var(--primary-dark),var(--secondary-dark))',
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 17 }}>Generar test</div>
+              <div style={{ fontSize: 12.5, opacity: 0.95, marginTop: 4 }}>10, 20, 50 o a tu medida</div>
+            </Link>
+            <Link href="/student/ope" className="press" style={{
+              display: 'block', textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12,
+              padding: 20, background: 'linear-gradient(135deg,#6b46c1,#9f7aea)',
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 17 }}>Simulacro</div>
+              <div style={{ fontSize: 12.5, opacity: 0.95, marginTop: 4 }}>Con las condiciones reales</div>
+            </Link>
+            <Link href="/student/ope/estadisticas" className="press" style={{
+              display: 'block', textAlign: 'center', textDecoration: 'none', color: '#fff', borderRadius: 12,
+              padding: 20, background: 'linear-gradient(135deg,#276749,#10b981)',
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 17 }}>Mis estadísticas</div>
+              <div style={{ fontSize: 12.5, opacity: 0.95, marginTop: 4 }}>Cobertura, fallos y evolución</div>
+            </Link>
+          </div>
+        </div>
+      )}
       <PageNav backHref="/student" backLabel="Volver a mis cursos" />
       {error && <div className="alert alert-error">{error}</div>}
 

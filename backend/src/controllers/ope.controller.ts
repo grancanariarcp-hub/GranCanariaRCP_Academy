@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { query } from '../config/database.js';
 import { notFound } from '../utils/httpError.js';
+import { bancosOpeAccesibles, filtroBancos } from '../services/accesoOpe.js';
 
 /**
  * Preparación de oposiciones.
@@ -14,6 +15,12 @@ import { notFound } from '../utils/httpError.js';
 /** GET /api/practice/ope-banks — mis oposiciones, con mi avance en cada una. */
 export async function myOpeBanks(req: Request, res: Response): Promise<void> {
   const uid = req.auth!.sub;
+
+  // El contenido OPE se vende: solo se listan los bancos a los que da derecho
+  // una convocatoria abierta o una suscripción vigente.
+  const acceso = await bancosOpeAccesibles(uid, req.auth!.role);
+  const params: unknown[] = [uid];
+  const permitidos = filtroBancos(acceso, 'b.id', params);
 
   const { rows } = await query(
     `SELECT b.id, b.name, b.comunidad_autonoma, b.categoria_profesional, b.anio, b.official,
@@ -33,10 +40,10 @@ export async function myOpeBanks(req: Request, res: Response): Promise<void> {
             (SELECT COUNT(*) FROM practice_sessions ps
               WHERE ps.user_id = $1 AND ps.bank_id = b.id AND ps.is_simulacro)::int AS simulacros
        FROM question_banks b
-      WHERE b.kind IN ('ope', 'mir') AND b.visibility = 'publico'
+      WHERE b.kind IN ('ope', 'mir') AND b.visibility = 'publico' AND ${permitidos}
       ORDER BY (SELECT MAX(created_at) FROM practice_sessions ps WHERE ps.user_id = $1 AND ps.bank_id = b.id) DESC NULLS LAST,
                b.anio DESC NULLS LAST, b.name`,
-    [uid],
+    params,
   );
 
   res.json({
@@ -62,6 +69,11 @@ export async function myOpeBanks(req: Request, res: Response): Promise<void> {
 export async function opeBankDetail(req: Request, res: Response): Promise<void> {
   const uid = req.auth!.sub;
   const bankId = req.params.id;
+
+  const acceso = await bancosOpeAccesibles(uid, req.auth!.role);
+  if (!acceso.todos && !acceso.ids.includes(bankId)) {
+    throw notFound('Oposición no encontrada');
+  }
 
   const banco = await query(
     `SELECT id, name, comunidad_autonoma, categoria_profesional, anio,

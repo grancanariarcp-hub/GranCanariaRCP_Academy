@@ -1,5 +1,7 @@
 import type { Request, Response } from 'express';
 import { query } from '../config/database.js';
+import { notFound } from '../utils/httpError.js';
+import { bancosOpeAccesibles } from '../services/accesoOpe.js';
 
 /**
  * Estadística fina del opositor sobre un banco.
@@ -14,6 +16,9 @@ import { query } from '../config/database.js';
 export async function estadisticaPreguntas(req: Request, res: Response): Promise<void> {
   const uid = req.auth!.sub;
   const bankId = req.params.id;
+
+  const acceso = await bancosOpeAccesibles(uid, req.auth!.role);
+  if (!acceso.todos && !acceso.ids.includes(bankId)) throw notFound('Banco no encontrado');
   const soloFalladas = req.query.falladas === '1';
 
   const { rows } = await query(
@@ -63,6 +68,9 @@ export async function estadisticaPreguntas(req: Request, res: Response): Promise
 export async function estadisticaMaterias(req: Request, res: Response): Promise<void> {
   const uid = req.auth!.sub;
   const bankId = req.params.id;
+
+  const acceso = await bancosOpeAccesibles(uid, req.auth!.role);
+  if (!acceso.todos && !acceso.ids.includes(bankId)) throw notFound('Banco no encontrado');
 
   const materias = await query(
     `SELECT COALESCE(q.tema, '(sin materia)') AS materia,

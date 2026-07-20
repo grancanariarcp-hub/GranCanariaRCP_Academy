@@ -147,7 +147,7 @@ export async function getMyCourseContent(req: Request, res: Response): Promise<v
     throw new HttpError(402, 'Tu suscripción a este curso ha vencido. Renuévala para seguir accediendo.', 'SUSCRIPCION_VENCIDA');
   }
 
-  const course = await query('SELECT id, title, tema, subtema, modality, objetivo_general FROM courses WHERE id = $1', [courseId]);
+  const course = await query('SELECT id, title, tema, subtema, modality, objetivo_general, es_ope FROM courses WHERE id = $1', [courseId]);
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
 
   const modules = await query<{ id: string }>('SELECT id, title, sort_order FROM modules WHERE course_id = $1 ORDER BY sort_order', [courseId]);

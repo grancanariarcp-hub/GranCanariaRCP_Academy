@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
+import { bancosOpeAccesibles } from '../services/accesoOpe.js';
 
 /**
  * Generador de tests y exámenes para oposiciones.
@@ -53,13 +54,23 @@ export async function generarTest(req: Request, res: Response): Promise<void> {
     throw badRequest('Elige al menos una materia', 'FALTA_TEMA');
   }
 
-  // Solo bancos que el opositor puede usar: públicos o creados por él.
+  // Solo los bancos a los que da derecho una convocatoria abierta o una
+  // suscripción vigente. Comprobarlo aquí es lo que sostiene el muro de pago:
+  // sin esto, bastaba conocer el identificador de un banco para practicarlo.
+  const acceso = await bancosOpeAccesibles(uid, req.auth!.role);
   const permitidos = await query<{ id: string }>(
     `SELECT id FROM question_banks
-      WHERE id = ANY($1::uuid[]) AND (visibility = 'publico' OR created_by = $2)`,
-    [d.bankIds, uid],
+      WHERE id = ANY($1::uuid[])
+        AND (visibility = 'publico' OR created_by = $2)
+        AND (kind NOT IN ('ope', 'mir') OR $3::boolean OR id = ANY($4::uuid[]))`,
+    [d.bankIds, uid, acceso.todos, acceso.ids],
   );
-  if (permitidos.rows.length === 0) throw badRequest('No tienes acceso a esos bancos', 'BANCOS_NO_VALIDOS');
+  if (permitidos.rows.length === 0) {
+    throw badRequest(
+      'No tienes acceso a esos bancos. Suscríbete a la convocatoria para practicar con ellos.',
+      'BANCOS_NO_VALIDOS',
+    );
+  }
   const bankIds = permitidos.rows.map((b) => b.id);
 
   const conds = ['q.is_active = TRUE', 'q.bank_id = ANY($1::uuid[])'];
