@@ -6,7 +6,7 @@
  *   - PATCH: fixes
  * Keep this in sync with the CHANGELOG in docs/.
  */
-export const APP_VERSION = '2.2.2';
+export const APP_VERSION = '2.2.3';
 
 /** Short commit hash, injected at build time (Vercel) or 'local' in dev. */
 export const APP_COMMIT = process.env.NEXT_PUBLIC_COMMIT || 'local';

@@ -163,8 +163,8 @@ export function AdminPendientes() {
             <div className="alert alert-error" style={{ fontSize: 13, marginTop: 8 }}>
               No se ha podido leer la cuenta de Stripe: {stripe.errorCuenta}
               <div style={{ marginTop: 6 }}>
-                Con una clave restringida esto suele significar que le falta permiso de lectura sobre
-                <strong> Account</strong>. No impide cobrar, pero deja el panel a ciegas.
+                No impide cobrar. Con una clave restringida suele faltarle el permiso de lectura sobre
+                <strong> Account</strong>.
               </div>
             </div>
           )}

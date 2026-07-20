@@ -287,8 +287,12 @@ export async function stripeStatus(_req: Request, res: Response): Promise<void> 
   let errorCuenta: string | null = null;
   if (configurado) {
     try {
-      // Sin argumentos apunta a la cuenta de la propia clave.
-      const a = await stripe().accounts.retrieve('');
+      // La cuenta de la propia clave se pide con retrieveCurrent (GET /v1/account).
+      // Antes se llamaba a accounts.retrieve(''), y como '' es una cadena la
+      // librería construía /v1/accounts/ —con barra final y sin identificador—,
+      // que Stripe rechaza. El error se tragaba en silencio, así que el estado
+      // de la cuenta llevaba desde el principio sin aparecer nunca.
+      const a = await stripe().accounts.retrieveCurrent();
       cuenta = { id: a.id, chargesEnabled: !!a.charges_enabled, pais: a.country ?? null };
     } catch (e) {
       errorCuenta = e instanceof Error ? e.message : 'no se ha podido consultar la cuenta';
