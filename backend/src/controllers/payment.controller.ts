@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import type Stripe from 'stripe';
 import { query, withTransaction } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
-import { stripe, stripeConfigurado, stripeEnProduccion, NOTA_EXENCION } from '../services/stripe.js';
+import { stripe, stripeConfigurado, stripeEnProduccion, diagnosticoClave, NOTA_EXENCION } from '../services/stripe.js';
 import { precioDe, euros } from '../services/pricing.js';
 import { notify } from '../services/notify.js';
 import { audit } from '../services/audit.js';
@@ -285,11 +285,17 @@ export async function stripeStatus(_req: Request, res: Response): Promise<void> 
       cuenta = null;
     }
   }
+  const secretoWebhook = (process.env.STRIPE_WEBHOOK_SECRET || '').trim();
   res.json({
     configurado,
-    webhookConfigurado: !!process.env.STRIPE_WEBHOOK_SECRET,
+    webhookConfigurado: !!secretoWebhook,
     modo: !configurado ? 'sin configurar' : stripeEnProduccion() ? 'produccion' : 'pruebas',
     cuenta,
+    // Diagnóstico: cuando el modo no es el esperado, dice POR QUÉ sin llegar a
+    // exponer la clave. Sin esto, un modo «pruebas» inesperado obliga a probar
+    // a ciegas entre cuatro causas distintas.
+    clave: diagnosticoClave(),
+    webhookValido: !secretoWebhook || secretoWebhook.startsWith('whsec_'),
     regimenFiscal: NOTA_EXENCION,
   });
 }

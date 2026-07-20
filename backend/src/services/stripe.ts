@@ -12,18 +12,54 @@ import Stripe from 'stripe';
 
 let cliente: Stripe | null = null;
 
+/**
+ * La clave, sin espacios ni saltos de línea.
+ *
+ * Al copiar una clave del panel de Stripe y pegarla en un formulario web es
+ * facilísimo arrastrar un espacio o un salto final. El resultado era
+ * desconcertante: la clave "parece" correcta a simple vista pero deja de
+ * empezar por sk_live_, así que la plataforma se declaraba en modo de pruebas
+ * sin explicar por qué. Se limpia aquí, en el único sitio que la lee.
+ */
+export function claveStripe(): string {
+  return (process.env.STRIPE_SECRET_KEY || '').trim();
+}
+
 export function stripeConfigurado(): boolean {
-  return !!process.env.STRIPE_SECRET_KEY;
+  return !!claveStripe();
 }
 
 /** True si la clave es de producción y, por tanto, mueve dinero real. */
 export function stripeEnProduccion(): boolean {
-  return (process.env.STRIPE_SECRET_KEY || '').startsWith('sk_live_');
+  return claveStripe().startsWith('sk_live_');
+}
+
+/**
+ * Qué clase de clave hay puesta, para poder diagnosticarlo sin exponerla.
+ * El prefijo de una clave de Stripe no es material secreto: solo dice de qué
+ * tipo es. Lo que nunca se devuelve es el cuerpo de la clave.
+ */
+export function diagnosticoClave(): { prefijo: string; tipo: string; teniaEspacios: boolean } {
+  const bruta = process.env.STRIPE_SECRET_KEY || '';
+  const clave = bruta.trim();
+  const prefijo = clave.slice(0, 8);
+  const tipo = !clave
+    ? 'sin clave'
+    : clave.startsWith('sk_live_')
+      ? 'secreta de producción (correcta)'
+      : clave.startsWith('sk_test_')
+        ? 'secreta de pruebas'
+        : clave.startsWith('pk_')
+          ? 'PUBLICABLE: es la clave que se muestra sin ocultar, no sirve para cobrar'
+          : clave.startsWith('rk_')
+            ? 'restringida: puede no tener permiso para cobrar'
+            : 'no reconocida';
+  return { prefijo, tipo, teniaEspacios: bruta !== clave };
 }
 
 export function stripe(): Stripe {
   if (!cliente) {
-    const clave = process.env.STRIPE_SECRET_KEY;
+    const clave = claveStripe();
     if (!clave) throw new Error('STRIPE_SECRET_KEY no está configurada');
     // Sin apiVersion explícita: se usa la que fija el propio SDK, que es la
     // que corresponde a sus tipos. Fijar otra a mano los desalinea.

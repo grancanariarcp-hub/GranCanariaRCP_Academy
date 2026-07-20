@@ -15,7 +15,11 @@ import { Ayuda } from '@/components/ayuda/Ayuda';
 
 interface Lead { id: string; email: string; interes: string | null; origen: string; consent_at: string; notified_at: string | null }
 interface Cuenta { subject_id: string; nombre: string | null; email: string | null; conexiones: number; dispositivos: number; sesiones: number; ultima: string }
-interface Stripe { configurado: boolean; webhookConfigurado: boolean; modo: string; cuenta: { id: string; chargesEnabled: boolean; pais: string | null } | null }
+interface Stripe {
+  configurado: boolean; webhookConfigurado: boolean; modo: string; webhookValido: boolean;
+  cuenta: { id: string; chargesEnabled: boolean; pais: string | null } | null;
+  clave: { prefijo: string; tipo: string; teniaEspacios: boolean };
+}
 
 export function AdminPendientes() {
   const [leads, setLeads] = useState<{ leads: Lead[]; totales: { total: number; esteMes: number } } | null>(null);
@@ -126,10 +130,42 @@ export function AdminPendientes() {
               <span>Cobros: {stripe.cuenta.chargesEnabled ? '✅ habilitados' : '⚠️ pendientes de activar en Stripe'}</span>
             )}
           </div>
+          {/* Cuando el modo no es el esperado, decir POR QUÉ ahorra probar a
+              ciegas: casi siempre es la clave publicable, un espacio pegado de
+              más o un despliegue que aún no ha recogido el cambio. */}
+          {stripe.modo !== 'produccion' && stripe.clave && (
+            <div className="alert alert-error" style={{ fontSize: 13, marginTop: 12 }}>
+              <div>
+                Clave puesta: <code>{stripe.clave.prefijo}…</code> — {stripe.clave.tipo}
+              </div>
+              {stripe.clave.teniaEspacios && (
+                <div style={{ marginTop: 6 }}>
+                  Se coló un espacio o un salto de línea al pegarla. Se ignora al usarla, pero conviene
+                  dejarla limpia en Render.
+                </div>
+              )}
+              {stripe.clave.prefijo.startsWith('sk_test_') && (
+                <div style={{ marginTop: 6 }}>
+                  Sigue siendo la de pruebas. Si ya pegaste la de producción, es que Render aún no ha
+                  terminado de desplegar: espera a que ponga <strong>Live</strong> y recarga.
+                </div>
+              )}
+              {stripe.clave.prefijo.startsWith('pk_') && (
+                <div style={{ marginTop: 6 }}>
+                  Esa es la clave <strong>publicable</strong>, la que Stripe enseña a la vista. La que hace
+                  falta está debajo, oculta tras <em>Revelar</em>, y empieza por <code>sk_live_</code>.
+                </div>
+              )}
+            </div>
+          )}
+          {stripe.webhookConfigurado && !stripe.webhookValido && (
+            <div className="alert alert-error" style={{ fontSize: 13, marginTop: 8 }}>
+              El secreto del webhook no empieza por <code>whsec_</code>: no es el secreto de firma.
+            </div>
+          )}
           {stripe.modo === 'pruebas' && (
             <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
-              En pruebas no se mueve dinero real. Para cobrar de verdad hay que sustituir las claves por las
-              de producción y crear allí el webhook.
+              En pruebas no se mueve dinero real.
             </p>
           )}
         </div>
