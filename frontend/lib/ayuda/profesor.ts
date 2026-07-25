@@ -571,4 +571,48 @@ export const PROFESOR: Articulo[] = [
     ],
     relacionados: ['profesor-acta', 'verificar', 'alumno-certificados'],
   },
+
+  {
+    id: 'pulsar-subgrupos',
+    titulo: 'Subgrupos y la práctica en PÚLSAR',
+    resumen: 'Repartir alumnos en subgrupos, exportar el curso e importar las notas prácticas.',
+    seccion: 'Dirigir un curso',
+    para: ['profesor', 'super_admin'],
+    cuerpo: [
+      {
+        tipo: 'texto',
+        texto:
+          'La parte práctica presencial de un curso se ejecuta en **PÚLSAR**, la plataforma de simulación clínica. La academia lleva la teoría y cierra el acta; PÚLSAR pone la nota práctica. Se comunican por archivos.',
+      },
+      { tipo: 'titulo', texto: 'Subgrupos' },
+      {
+        tipo: 'texto',
+        texto:
+          'Para la simulación, los alumnos se reparten en subgrupos, normalmente por colores. Puedes **repartirlos al azar** de forma equilibrada indicando en cuántos subgrupos, o crearlos a mano y asignar a cada alumno con el desplegable de su fila.',
+      },
+      { tipo: 'titulo', texto: 'Exportar para PÚLSAR' },
+      {
+        tipo: 'texto',
+        texto:
+          'El botón **Exportar** descarga un archivo con el curso, sus instructores y los alumnos por subgrupo. Ese archivo se carga en PÚLSAR para montar la sesión de simulación.',
+      },
+      {
+        tipo: 'aviso',
+        texto:
+          'No se puede exportar si algún alumno no tiene documento (DNI, NIE o pasaporte): es la llave con la que PÚLSAR devuelve después su nota. La pantalla te dice quién lo tiene en blanco.',
+      },
+      { tipo: 'titulo', texto: 'Importar los resultados' },
+      {
+        tipo: 'texto',
+        texto:
+          'Cuando termina la práctica, PÚLSAR genera un archivo de resultados. Al importarlo, la academia te muestra **primero** a quién va a actualizar y a quién no encuentra, para que lo revises antes de aplicar nada. Cada alumno se casa por su documento.',
+      },
+      {
+        tipo: 'texto',
+        texto:
+          'A partir de ahí, en un curso con práctica el **acta** exige aprobar la teoría y la práctica: quien no supere la simulación no sale apto aunque haya aprobado el examen.',
+      },
+    ],
+    relacionados: ['profesor-acta', 'profesor-alumnos'],
+  },
 ];

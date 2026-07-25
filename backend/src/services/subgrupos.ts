@@ -54,6 +54,25 @@ function barajarCon<T>(arr: T[], semilla: string): T[] {
   return a;
 }
 
+/** Alumnos del curso con su matrícula y el subgrupo que tienen (para asignar). */
+export async function roster(courseId: string): Promise<Array<{
+  enrollmentId: string; nombre: string; subgroupId: string | null; sinDocumento: boolean;
+}>> {
+  const { rows } = await query<{ enrollment_id: string; nombre: string; subgroup_id: string | null; dni: string | null }>(
+    `SELECT e.id AS enrollment_id,
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', st.nombre, st.apellidos)), ''), st.display_name) AS nombre,
+            e.subgroup_id, st.dni
+       FROM enrollments e JOIN students st ON st.id = e.student_id
+      WHERE e.course_id = $1 AND e.status <> 'pendiente_pago'
+      ORDER BY st.apellidos NULLS LAST, st.nombre NULLS LAST, st.display_name`,
+    [courseId],
+  );
+  return rows.map((r) => ({
+    enrollmentId: r.enrollment_id, nombre: r.nombre,
+    subgroupId: r.subgroup_id, sinDocumento: !r.dni,
+  }));
+}
+
 export async function listar(courseId: string): Promise<Subgrupo[]> {
   const { rows } = await query<Subgrupo>(
     `SELECT g.id, g.nombre, g.color, g.orden,

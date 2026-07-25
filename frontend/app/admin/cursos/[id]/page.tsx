@@ -16,6 +16,7 @@ import { ActaPanel } from '@/components/ActaPanel';
 import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 import { CourseSubscription } from '@/components/CourseSubscription';
 import { CoursePayments } from '@/components/CoursePayments';
+import { SubgruposPanel } from '@/components/SubgruposPanel';
 import { Ayuda } from '@/components/ayuda/Ayuda';
 
 interface Activity {
@@ -542,6 +543,9 @@ export default function CourseDetailPage() {
 
         {/* Asistencia presencial: no aplica a un curso OPE */}
         {!course.es_ope && <AttendancePanel courseId={courseId} />}
+
+        {/* Subgrupos + puente con PÚLSAR: solo para cursos con parte práctica */}
+        {!course.es_ope && <SubgruposPanel courseId={courseId} />}
 
         {/* Ficha del curso */}
           <div className="card" style={{ marginBottom: 24 }}>

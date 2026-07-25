@@ -8,7 +8,11 @@ import { badRequest } from '../utils/httpError.js';
 /** GET /api/courses/:id/subgrupos — subgrupos del curso y colores disponibles. */
 export const listarSubgrupos = asyncHandler(async (req: Request, res: Response) => {
   await assertEditor(req);
-  res.json({ subgrupos: await subgrupos.listar(req.params.id), colores: subgrupos.COLORES });
+  res.json({
+    subgrupos: await subgrupos.listar(req.params.id),
+    roster: await subgrupos.roster(req.params.id),
+    colores: subgrupos.COLORES,
+  });
 });
 
 const autoSchema = z.object({
