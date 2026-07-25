@@ -42,6 +42,8 @@ export interface ActaSnapshot {
     notaMedia: number | null;
     asistenciaMedia: number | null;
     jornadasPresenciales: number;
+    cursoConPractica: boolean;
+    sinNotaPractica: number;
   };
   encuesta: {
     respuestas: number;
@@ -130,14 +132,19 @@ export async function recopilarActa(courseId: string): Promise<ActaSnapshot> {
     [courseId],
   );
 
-  // Nota práctica traída de PÚLSAR (si el curso tiene parte práctica). Si hay
-  // algún resultado importado, el curso tuvo práctica y «apto» pasa a exigirla.
-  const practica = await query<{ student_id: string; nota_practica: number | null; apto_practica: boolean | null }>(
-    `SELECT student_id, nota_practica, apto_practica
-       FROM course_pulsar_results WHERE course_id = $1 AND student_id IS NOT NULL`,
+  // Nota práctica traída de PÚLSAR (si el curso tiene parte práctica). Si se
+  // importó CUALQUIER resultado —aunque sea huérfano por un documento que no
+  // casó—, el curso tuvo práctica y «apto» pasa a exigirla. Contar solo los
+  // casados haría que un archivo entero mal cruzado borrase el requisito y todos
+  // salieran aptos con la teoría sola.
+  const practica = await query<{ student_id: string | null; nota_practica: number | null; apto_practica: boolean | null; apto_global: boolean | null }>(
+    `SELECT student_id, nota_practica, apto_practica, apto_global
+       FROM course_pulsar_results WHERE course_id = $1`,
     [courseId],
   );
-  const practicaPorAlumno = new Map(practica.rows.map((p) => [p.student_id, p]));
+  const practicaPorAlumno = new Map(
+    practica.rows.filter((p) => p.student_id).map((p) => [p.student_id as string, p]),
+  );
   const cursoConPractica = practica.rows.length > 0;
 
   const filas = alumnos.rows.map((al) => {
@@ -159,9 +166,11 @@ export async function recopilarActa(courseId: string): Promise<ActaSnapshot> {
     const cumpleAsistencia = asistenciaPct === null || asistenciaPct >= c.min_attendance_pct;
 
     // En un curso con práctica, apto exige además superar la parte práctica de
-    // PÚLSAR. Sin resultado práctico importado, ese alumno aún no es apto.
+    // PÚLSAR. Sin resultado práctico importado, ese alumno aún no es apto. Si el
+    // resultado no trae apto_practica explícito, vale el apto_global.
     const prac = practicaPorAlumno.get(al.student_id);
-    const cumplePractica = !cursoConPractica || prac?.apto_practica === true;
+    const aptoPract = prac ? (prac.apto_practica ?? prac.apto_global ?? false) : false;
+    const cumplePractica = !cursoConPractica || aptoPract === true;
 
     return {
       nombre: al.apellidos ? `${al.apellidos}, ${al.nombre || ''}`.replace(/,\s*$/, '') : al.display_name,
@@ -169,7 +178,7 @@ export async function recopilarActa(courseId: string): Promise<ActaSnapshot> {
       asistenciaPct,
       notaFinal,
       notaPractica: prac?.nota_practica ?? null,
-      aptoPractica: cursoConPractica ? (prac?.apto_practica ?? false) : null,
+      aptoPractica: cursoConPractica ? aptoPract : null,
       apto: apruebaExamen && cumpleAsistencia && cumplePractica,
       porModulo,
     };
@@ -233,6 +242,11 @@ export async function recopilarActa(courseId: string): Promise<ActaSnapshot> {
         ? Math.round(conAsistencia.reduce((s, f) => s + (f.asistenciaPct ?? 0), 0) / conAsistencia.length)
         : null,
       jornadasPresenciales: totalJornadas,
+      // Curso con práctica: alumnos matriculados sin nota práctica cruzada. Se
+      // expone para avisar antes de congelar el acta —un documento que no casó
+      // deja al alumno como no-apto—, y vale 0 en cursos sin práctica.
+      cursoConPractica,
+      sinNotaPractica: cursoConPractica ? filas.filter((f) => f.notaPractica === null).length : 0,
     },
     encuesta: {
       respuestas,

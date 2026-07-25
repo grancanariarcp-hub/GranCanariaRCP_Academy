@@ -3,7 +3,7 @@ import PDFDocument from 'pdfkit';
 import { z } from 'zod';
 import { query } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
-import { documentoValido } from '../services/documento.js';
+import { documentoValido, normalizarDocumento } from '../services/documento.js';
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
@@ -49,7 +49,9 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
   const vals: unknown[] = [];
   if (d.headline !== undefined) { vals.push(d.headline || null); sets.push(`headline = $${vals.length}`); }
   if (d.profession !== undefined) { vals.push(d.profession || null); sets.push(`profession = $${vals.length}`); }
-  if (d.dni !== undefined) { vals.push(d.dni ? d.dni.trim().toUpperCase() : null); sets.push(`dni = $${vals.length}`); }
+  // Se normaliza igual que el del alumno (mayúsculas, sin espacios/guiones): si
+  // no, el documento del instructor no casaría en PÚLSAR como sí casa el suyo.
+  if (d.dni !== undefined) { vals.push(d.dni ? normalizarDocumento(d.dni) : null); sets.push(`dni = $${vals.length}`); }
   if (sets.length === 0) throw badRequest('Nada que actualizar');
   vals.push(req.auth!.sub);
   await query(`UPDATE users SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${vals.length}`, vals);
@@ -220,6 +222,14 @@ export async function deleteMyAccount(req: Request, res: Response): Promise<void
       WHERE id = $2`,
     [reason ?? null, sub],
   );
+  // El documento también es dato personal y, además, la llave del índice único:
+  // limpiarlo cumple con el borrado RGPD y deja ese documento libre para volver
+  // a registrarse. En el alumno se limpian también nombre y apellidos.
+  if (role === 'student') {
+    await query('UPDATE students SET dni = NULL, nombre = NULL, apellidos = NULL WHERE id = $1', [sub]);
+  } else {
+    await query('UPDATE users SET dni = NULL WHERE id = $1', [sub]);
+  }
   await audit({ actorId: sub, actorType: role, action: 'ACCOUNT_DELETE', ip: clientIp(req), metadata: { reason } });
   res.json({ ok: true });
 }

@@ -1,65 +1,67 @@
 # Prompt para PÚLSAR — integración con la academia (Gran Canaria RCP)
 
 > Pega esto en el asistente que trabaja el proyecto PÚLSAR (`C:/pulsar`).
-> Está redactado para no necesitar más contexto.
+> Está redactado para no necesitar más contexto, y **ya tiene en cuenta la
+> arquitectura real de PÚLSAR** (Personas/Matrículas, sesiones con subgrupos).
 
 ---
 
 Estoy integrando PÚLSAR (simulación clínica) con **Gran Canaria RCP Academy**, la
 plataforma online donde se lleva la parte teórica de los cursos y se cierran las
-actas. El reparto de responsabilidades es:
+actas. Reparto de responsabilidades:
 
 - **La academia** es la fuente de verdad de: cursos (ediciones con fechas),
   alumnos, profesores, matrículas, teoría, asistencia, actas y certificados.
 - **PÚLSAR** es la fuente de verdad de: la ejecución de la práctica presencial y
   sus calificaciones (escenarios, ítems, apto/no apto práctico).
 
-El intercambio es **por archivos JSON**, en dos sentidos:
+Intercambio **por archivos JSON**, en dos sentidos:
 
 1. La academia **exporta** un `curso-academia.json` → se importa en PÚLSAR para
-   montar la sesión práctica con sus alumnos y subgrupos.
+   tener a los alumnos y sus subgrupos listos para la práctica.
 2. PÚLSAR **exporta** un `resultados-pulsar.json` → se importa en la academia
    para incorporar la nota práctica y cerrar el acta.
 
-El curso se casa por **`idAcademia`** (y de apoyo, un `codigoVinculacion` corto y
-legible). Los alumnos se casan por **`documento`** (DNI/NIE/pasaporte). Los
-instructores, por email (y documento si lo tienen).
+Cruce: el curso por **`idAcademia`** (UUID) con apoyo de un `codigoVinculacion`
+corto (`RCP-XXXXXX`); los alumnos por **`documento`**; los instructores por email.
 
-La academia **ya está terminada y en producción** con su mitad. Necesito adaptar
-PÚLSAR para que encaje. Tienes tres tareas.
+La academia **ya está terminada y en producción** con su mitad. Hay que adaptar
+PÚLSAR. Antes, lo que YA tienes y encaja (lo he verificado en tu código):
 
----
+## Lo que PÚLSAR ya tiene y vamos a reutilizar (no reconstruir)
 
-## Contexto de lo que ya existe en PÚLSAR (para no romperlo)
+- **`servidor/matriculacion.js`** — `datos/personas.json` + `datos/matriculas.json`.
+  - **Persona**: `{ id, orgId, docTipo("DNI"|"NIE"|"Pasaporte"), docNum(normalizado),
+    nombre, apellidos, fechaNac, centro, profesion, consentido, creado }`.
+    Única por `(orgId, docNum)`. **Este es el registro de alumnos.**
+  - **Matrícula**: `{ id, orgId, cursoId, personaId, rol("alumno"|"instructor"),
+    estado("pendiente"|"confirmada"), fechaISO }`.
+- **`servidor/cursos.js`** — `datos/cursos.json`. Un **curso** en PÚLSAR es una
+  **plantilla reutilizable** (escenarios). NO tiene fechas ni alumnos.
+- **La sesión en vivo** (`motor/motor.js`, `estado.sesion`) ya tiene:
+  - `participantes[]`: `{ id, nombre, personaId?, subgrupoId? }`
+  - `subgrupos[]`: `{ id, nombre }` + `repartirSubgrupos` (reparto equilibrado)
+  - `curso { nombre, lugar, fecha, instructores, empresa, logo }` (cabecera del informe)
+  - evaluación por alumno y `historial.registrar(...)` archiva el resultado.
 
-He revisado el código. Ten en cuenta:
+Es decir: **el "curso" de la academia = en PÚLSAR una plantilla (los escenarios)
++ el conjunto de Matrículas de esa edición (los alumnos)**. La sesión en vivo es
+donde esos alumnos, repartidos en subgrupos, ejecutan la práctica.
 
-- `servidor/cursos.js`: un **curso** en PÚLSAR es hoy una **plantilla
-  reutilizable** (nombre + escenarios que referencian casos), sin fechas ni
-  alumnos. Persistencia en `datos/cursos.json`.
-- `servidor/evaluacion.js`: los `GRUPOS` que ya existen (`tecnica` /
-  `no_tecnica`) son categorías de ítems de evaluación. **No** son grupos de
-  alumnos. No los toques ni los confundas con lo de abajo.
-- El `importar(datos)` actual de `cursos.js` solo lee `nombre`, `descripcion`,
-  `duracionMin` y `escenarios`. Ignora alumnos, grupos e instructores.
+## Tarea 1 — Aclarar el vocabulario (sin renombrar a lo bruto)
 
-## Tarea 1 — Renombrar "curso" a "plantilla" para las plantillas reutilizables
+No hace falta renombrar `cursos.js` (está muy incrustado y sería arriesgado).
+Basta con dejar claro en la interfaz que:
+- **Plantilla** = el curso reutilizable de PÚLSAR (escenarios).
+- **Curso / edición** = lo que llega de la academia: alumnos + fechas. En PÚLSAR
+  se materializa como un conjunto de **Matrículas** sobre una plantilla.
 
-Para que los dos sistemas hablen el mismo idioma sin ambigüedad:
+Si en la UI hoy dices "curso" para la plantilla, cámbialo a "plantilla" ahí; deja
+"curso" para la edición con alumnos que viene de la academia.
 
-- Lo que hoy PÚLSAR llama **curso** (la plantilla con escenarios) pasa a llamarse
-  **plantilla** en la interfaz y, si es viable sin migración dolorosa, en el
-  código (`plantillas.js`, `datos/plantillas.json`, etc.).
-- El término **curso** queda libre para significar lo que la academia entiende
-  por curso: una **edición concreta con alumnos, fechas y subgrupos**. En PÚLSAR
-  eso es una **cohorte/sesión** que se basa en una plantilla.
+## Tarea 2 — IMPORTAR el `curso-academia.json`
 
-Si el renombrado de datos es costoso, al menos hazlo en la interfaz y deja
-`curso.js` como alias, pero deja claro el concepto.
-
-## Tarea 2 — IMPORTAR el `curso-academia.json` como cohorte con alumnos y subgrupos
-
-La academia genera **exactamente** este formato (te paso un ejemplo real):
+La academia genera **exactamente** este formato (ejemplo real):
 
 ```json
 {
@@ -79,68 +81,50 @@ La academia genera **exactamente** este formato (te paso un ejemplo real):
     ]
   },
   "grupos": [
-    {
-      "nombre": "Rojo",
-      "color": "#e23b3b",
-      "alumnos": [
-        { "documento": "11111111A", "nombre": "Ana", "apellidos": "García", "email": "ana@ejemplo.es", "profesion": "" }
-      ]
-    },
-    {
-      "nombre": "Azul",
-      "color": "#2f6fe0",
-      "alumnos": [ /* … */ ]
-    }
+    { "nombre": "Rojo", "color": "#e23b3b",
+      "alumnos": [ { "documento": "11111111A", "nombre": "Ana", "apellidos": "García", "email": "ana@ejemplo.es", "profesion": "" } ] },
+    { "nombre": "Azul", "color": "#2f6fe0", "alumnos": [ /* … */ ] }
   ]
 }
 ```
 
-Notas de campos:
-- `curso.modalidad` es el **tipo clínico**: `SVA` | `SVB` | `SVI` | `otro`. (En la
-  academia, "online/híbrido/presencial" es OTRO eje distinto que no se envía.)
-- `curso.idAcademia` es el identificador que hay que **guardar en la cohorte** y
-  devolver luego en los resultados: es el ancla del cruce.
-- Los **grupos son subgrupos de alumnos por color** (Rojo, Azul, Amarillo…). Este
-  es el concepto nuevo en PÚLSAR: NO es el `GRUPOS` de evaluación. Si el curso no
-  usa subgrupos, vendrá un único grupo llamado `"Todos"`.
-- `alumnos[].documento` es la llave. `profesion` puede venir vacío por ahora.
-
 **Qué debe hacer PÚLSAR al importarlo:**
-1. Crear una **cohorte/sesión** (no una plantilla) que guarde `idAcademia`,
-   `codigoVinculacion`, nombre, tipo, empresa, lugar y fechas.
-2. Dar de alta a los **alumnos** con su documento como identificador, repartidos
-   en los **subgrupos** por color que vienen en `grupos[]`.
+1. **Upsert de Personas** por `docNum` en la organización, una por cada
+   `grupos[].alumnos[]`. El `documento` viene como una sola cadena; deriva
+   `docTipo`/`docNum` (por defecto DNI; si no cumple patrón DNI/NIE, "Pasaporte").
+   Normaliza igual que la academia: MAYÚSCULAS, sin espacios ni guiones.
+2. **Crear Matrículas** (rol `alumno`) de esas Personas sobre una **plantilla**
+   que elija el instructor, en estado que decidas (p.ej. `confirmada`, ya que la
+   academia ya las validó). Guarda en la matrícula (o en una tabla puente) el
+   **`idAcademia`** y el **subgrupo por color** (`grupos[].nombre`/`color`) de
+   cada alumno, para poder sembrar los `subgrupos` de la sesión y para el
+   ida y vuelta.
 3. Registrar a los **instructores** por email/documento.
-4. Idealmente, permitir asociar esa cohorte a una **plantilla** existente (la que
-   tenga los escenarios que se van a correr).
+4. Guardar `empresa`, `lugar`, fechas y `modalidad`(SVA/SVB/SVI/otro) como datos
+   de la edición → alimentan la cabecera `curso {}` de la sesión.
 
-## Tarea 3 — EXPORTAR el `resultados-pulsar.json` con este formato exacto
+Cuando se lance la sesión en vivo, los `participantes` se crean desde esas
+Matrículas (con su `personaId`), y los `subgrupos` de la sesión se siembran con
+los colores que vinieron. Así el instructor no teclea a nadie a mano.
 
-Cuando termine la práctica, PÚLSAR debe generar un archivo que la academia sabe
-importar. El formato que la academia **espera** es:
+## Tarea 3 — EXPORTAR el `resultados-pulsar.json`
+
+Al terminar la práctica (tienes la calificación por alumno en el flujo de
+evaluación → `historial.registrar`), genera este formato **exacto**, que la
+academia sabe importar:
 
 ```json
 {
   "version": "1.0",
   "origen": "pulsar",
-  "cursoRef": {
-    "idAcademia": "47d499db-ce7d-4952-9326-a2b3a8170c30",
-    "idPulsar": "cur-abc123",
-    "nombre": "SVA para enfermería",
-    "fechaInicio": "2026-09-01",
-    "fechaFin": "2026-09-03",
-    "lugar": "Aula de Simulación"
-  },
+  "cursoRef": { "idAcademia": "47d499db-…", "idPulsar": "cur-abc123", "nombre": "SVA para enfermería", "fechaInicio": "2026-09-01", "fechaFin": "2026-09-03", "lugar": "Aula de Simulación" },
   "instructores": [ { "nombre": "Carlos", "email": "instructor@ejemplo.es" } ],
   "umbralApto": 70,
   "alumnos": [
     {
-      "documento": "11111111A",
-      "nombre": "Ana",
-      "apellidos": "García",
-      "grupo": "Rojo",
-      "asistencia": true,
-      "teorico":   { "nota": 78, "apto": true, "examenes": [ { "nombre": "Test final", "nota": 78 } ] },
+      "documento": "11111111A", "nombre": "Ana", "apellidos": "García",
+      "grupo": "Rojo", "asistencia": true,
+      "teorico":   { "nota": 78, "apto": true },
       "simulacion":{ "nota": 82, "apto": true, "escenarios": [ { "nombre": "PCR FV", "nota": 85, "apto": true, "itemsNoConseguidos": ["Desfibrila <2 min"] } ] },
       "global":    { "apto": true },
       "feedback":  { "mejorar": "…", "fortalecer": "…", "comentario": "…" }
@@ -149,35 +133,29 @@ importar. El formato que la academia **espera** es:
 }
 ```
 
-Lo que la academia realmente usa de cada alumno (lo demás lo guarda como detalle):
-- **`documento`** — imprescindible, es como casa al alumno. Debe ser el MISMO que
-  vino en el `curso-academia.json` (mismo formato, sin espacios ni guiones).
+Lo que la academia usa de cada alumno (lo demás lo guarda como detalle):
+- **`documento`** — imprescindible. El MISMO que vino, mismo formato normalizado.
 - **`simulacion.nota`** y **`simulacion.apto`** — la nota práctica y si superó.
-- `simulacion.escenarios[]` e `itemsNoConseguidos` — se guardan para el legajo.
-- `feedback` — se guarda para el alumno.
-- `cursoRef.idAcademia` — para verificar que el archivo es de este curso.
+- `simulacion.escenarios[]` + `itemsNoConseguidos` y `feedback` — para el legajo.
+- **`cursoRef.idAcademia`** — para casar con el curso correcto.
 
-**Importante sobre `apto`:** en un curso con práctica, la academia solo dará al
-alumno como **apto final** si aprueba la teoría (que la lleva ella) Y
-`simulacion.apto === true`. Así que ese booleano decide de verdad si el alumno
-obtiene el certificado.
+**Sobre `apto`:** en un curso con práctica, la academia solo da al alumno como
+**apto final** si aprueba la teoría (que lleva ella) Y `simulacion.apto === true`.
+Ese booleano decide si el alumno obtiene el certificado.
 
-## Identificación (resumen para PÚLSAR)
+## Identificación (resumen)
 
-- **Alumnos:** por `documento` (DNI/NIE/pasaporte), normalizado en MAYÚSCULAS y
-  sin espacios ni guiones. Es único por persona.
-- **Curso:** por `idAcademia` (UUID). El `codigoVinculacion` (p.ej. `RCP-GGM926`)
-  es un apoyo legible por humanos para no confundir ediciones.
+- **Alumnos:** por `documento` (DNI/NIE/pasaporte), normalizado MAYÚSCULAS sin
+  espacios ni guiones. En PÚLSAR corresponde a `Persona.docNum`.
+- **Curso/edición:** por `idAcademia` (UUID). `codigoVinculacion` como apoyo legible.
 - **Instructores:** por email (y documento si está).
 
 ## Por ahora NO hace falta API en vivo
 
-Empezamos solo con archivos: más robusto y auditable. Cuando esto funcione,
-valoraremos una API con token bearer contra
-`https://grancanaria-rcp-api.onrender.com`. No la construyas todavía.
+Empezamos solo con archivos: más robusto y auditable. Cuando funcione, valoramos
+una API con token bearer contra `https://grancanaria-rcp-api.onrender.com`.
 
 ---
 
-Cuando lo tengas, dime qué nombres de campo has usado en tu lado por si hay que
-ajustar algo, y generamos un par de archivos de ejemplo para probar el ida y
-vuelta completo.
+Cuando lo tengas, dime qué nombres de campo has usado por si hay que ajustar
+algo, y hacemos una prueba de ida y vuelta con un curso de 2-3 alumnos.

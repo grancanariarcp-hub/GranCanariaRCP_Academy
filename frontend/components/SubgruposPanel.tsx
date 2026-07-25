@@ -44,25 +44,42 @@ export function SubgruposPanel({ courseId }: { courseId: string }) {
     } finally { setCargando(false); }
   }
 
+  // Un fallo (permiso, red, validación) debe verse: si se tragara, el repintado
+  // dejaría el estado anterior y parecería que la acción "se deshizo sola".
   async function asignar(enrollmentId: string, subgroupId: string) {
-    await api(`/api/courses/${courseId}/subgrupos/asignar`, {
-      method: 'PATCH', auth: true, body: JSON.stringify({ enrollmentId, subgroupId: subgroupId || null }),
-    }).catch(() => {});
+    setMsg(null);
+    try {
+      await api(`/api/courses/${courseId}/subgrupos/asignar`, {
+        method: 'PATCH', auth: true, body: JSON.stringify({ enrollmentId, subgroupId: subgroupId || null }),
+      });
+    } catch (e) {
+      setMsg({ ok: false, texto: e instanceof ApiError ? e.message : 'No se pudo asignar' });
+    }
     cargar();
   }
 
   async function crearManual() {
+    setMsg(null);
     const usados = new Set(subgrupos.map((s) => s.nombre));
     const libre = colores.find((c) => !usados.has(c.nombre));
     if (!libre) { setMsg({ ok: false, texto: 'Ya has usado todos los colores.' }); return; }
-    await api(`/api/courses/${courseId}/subgrupos`, {
-      method: 'POST', auth: true, body: JSON.stringify({ nombre: libre.nombre, color: libre.color }),
-    }).catch(() => {});
+    try {
+      await api(`/api/courses/${courseId}/subgrupos`, {
+        method: 'POST', auth: true, body: JSON.stringify({ nombre: libre.nombre, color: libre.color }),
+      });
+    } catch (e) {
+      setMsg({ ok: false, texto: e instanceof ApiError ? e.message : 'No se pudo crear el subgrupo' });
+    }
     cargar();
   }
 
   async function borrar(id: string) {
-    await api(`/api/courses/${courseId}/subgrupos/${id}`, { method: 'DELETE', auth: true }).catch(() => {});
+    setMsg(null);
+    try {
+      await api(`/api/courses/${courseId}/subgrupos/${id}`, { method: 'DELETE', auth: true });
+    } catch (e) {
+      setMsg({ ok: false, texto: e instanceof ApiError ? e.message : 'No se pudo borrar' });
+    }
     cargar();
   }
 

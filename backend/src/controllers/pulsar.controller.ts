@@ -131,7 +131,9 @@ const resultadoSchema = z.object({
     idPulsar: z.string().optional().default(''),
     nombre: z.string().optional().default(''),
   }).partial().default({}),
-  umbralApto: z.number().optional(),
+  // Acotado: nota_practica y umbral_apto son SMALLINT en la base. Sin tope, un
+  // «nota: 100000» de PÚLSAR reventaría el INSERT y abortaría todo el import.
+  umbralApto: z.number().int().min(0).max(1000).optional(),
   alumnos: z.array(z.object({
     documento: z.string(),
     nombre: z.string().optional().default(''),
@@ -140,13 +142,15 @@ const resultadoSchema = z.object({
     asistencia: z.boolean().optional(),
     teorico: z.any().optional(),
     simulacion: z.object({
-      nota: z.number().optional(),
+      nota: z.number().min(0).max(1000).optional(),
       apto: z.boolean().optional(),
       escenarios: z.array(z.any()).optional(),
     }).partial().optional(),
     global: z.object({ apto: z.boolean().optional() }).partial().optional(),
     feedback: z.any().optional(),
-  })).default([]),
+    // Un curso presencial tiene decenas de alumnos; 2000 es un techo amplio que
+    // acota la transacción del import ante un archivo desmesurado o malformado.
+  })).max(2000, 'El archivo trae demasiados alumnos').default([]),
 });
 
 /**
@@ -184,11 +188,14 @@ export async function importarResultados(req: Request, res: Response): Promise<v
     const doc = documentoValido(a.documento);
     const encontrado = doc ? porDoc.get(doc) : undefined;
     const nota = a.simulacion?.nota ?? null;
-    const aptoPract = a.simulacion?.apto ?? null;
+    // Apto práctico: primero el de la simulación; si no viene, el global. Antes
+    // solo se miraba simulacion.apto, así que un alumno con global.apto=true pero
+    // sin ese campo quedaba sin apto práctico y salía no-apto en el acta.
+    const aptoPract = a.simulacion?.apto ?? a.global?.apto ?? null;
     const nombre = `${a.nombre} ${a.apellidos}`.trim();
     if (encontrado) casados.push({ documento: doc!, nombre, alumno: encontrado.display_name, nota, apto: aptoPract });
-    else huerfanos.push({ documento: a.documento, nombre });
-    return { a, doc, encontrado };
+    else if (doc) huerfanos.push({ documento: a.documento, nombre });
+    return { a, doc, encontrado, aptoPract };
   });
 
   if (soloVista) {
@@ -201,7 +208,7 @@ export async function importarResultados(req: Request, res: Response): Promise<v
     return;
   }
 
-  let aplicados = 0;
+  const casadosDocs = new Set<string>();
   await withTransaction(async (client) => {
     for (const f of filas) {
       if (!f.doc) continue;
@@ -219,20 +226,25 @@ export async function importarResultados(req: Request, res: Response): Promise<v
         [
           courseId, f.encontrado?.student_id ?? null, f.doc,
           `${f.a.nombre} ${f.a.apellidos}`.trim(),
-          f.a.simulacion?.nota ?? null, f.a.simulacion?.apto ?? null, f.a.global?.apto ?? null,
+          f.a.simulacion?.nota ?? null, f.aptoPract, f.a.global?.apto ?? null,
           f.a.asistencia ?? null, data.umbralApto ?? null,
           JSON.stringify(f.a.simulacion?.escenarios ?? []), JSON.stringify(f.a.feedback ?? {}),
           data.cursoRef?.idPulsar || null, req.auth!.sub,
         ],
       );
-      aplicados++;
+      // Solo cuentan como «aplicados a un alumno» los casados; los huérfanos se
+      // guardan como registro de lo que envió PÚLSAR, pero no afectan a nadie.
+      if (f.encontrado) casadosDocs.add(f.doc);
     }
   });
+  const aplicados = casadosDocs.size;
 
   res.json({
     ok: true, aplicados,
     huerfanos,
-    mensaje: `Se han cargado ${aplicados} resultados de la práctica.` +
-      (huerfanos.length > 0 ? ` ${huerfanos.length} no se encontraron por documento y no se han cargado.` : ''),
+    mensaje: `Se han cargado ${aplicados} resultados sobre alumnos del curso.` +
+      (huerfanos.length > 0
+        ? ` ${huerfanos.length} venían con un documento que no coincide con ningún alumno matriculado: revísalos, porque esos alumnos se quedarán sin nota práctica en el acta.`
+        : ''),
   });
 }
