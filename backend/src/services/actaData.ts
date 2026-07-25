@@ -130,6 +130,16 @@ export async function recopilarActa(courseId: string): Promise<ActaSnapshot> {
     [courseId],
   );
 
+  // Nota práctica traída de PÚLSAR (si el curso tiene parte práctica). Si hay
+  // algún resultado importado, el curso tuvo práctica y «apto» pasa a exigirla.
+  const practica = await query<{ student_id: string; nota_practica: number | null; apto_practica: boolean | null }>(
+    `SELECT student_id, nota_practica, apto_practica
+       FROM course_pulsar_results WHERE course_id = $1 AND student_id IS NOT NULL`,
+    [courseId],
+  );
+  const practicaPorAlumno = new Map(practica.rows.map((p) => [p.student_id, p]));
+  const cursoConPractica = practica.rows.length > 0;
+
   const filas = alumnos.rows.map((al) => {
     const suyas = notas.rows.filter((n) => n.student_id === al.student_id);
     const porModulo = suyas.map((n) => ({ modulo: n.modulo, nota: n.score }));
@@ -148,12 +158,19 @@ export async function recopilarActa(courseId: string): Promise<ActaSnapshot> {
     const apruebaExamen = (finales.length > 0 ? finales : suyas).some((n) => n.passed === true);
     const cumpleAsistencia = asistenciaPct === null || asistenciaPct >= c.min_attendance_pct;
 
+    // En un curso con práctica, apto exige además superar la parte práctica de
+    // PÚLSAR. Sin resultado práctico importado, ese alumno aún no es apto.
+    const prac = practicaPorAlumno.get(al.student_id);
+    const cumplePractica = !cursoConPractica || prac?.apto_practica === true;
+
     return {
       nombre: al.apellidos ? `${al.apellidos}, ${al.nombre || ''}`.replace(/,\s*$/, '') : al.display_name,
       dni: al.dni,
       asistenciaPct,
       notaFinal,
-      apto: apruebaExamen && cumpleAsistencia,
+      notaPractica: prac?.nota_practica ?? null,
+      aptoPractica: cursoConPractica ? (prac?.apto_practica ?? false) : null,
+      apto: apruebaExamen && cumpleAsistencia && cumplePractica,
       porModulo,
     };
   });

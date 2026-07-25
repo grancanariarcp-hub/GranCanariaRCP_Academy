@@ -8,6 +8,7 @@ import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { recordSignupConsents } from '../services/consent.js';
 import { abrirSesion } from '../services/sesiones.js';
+import { documentoValido } from '../services/documento.js';
 
 // ---------------------------------------------------------------------------
 // Schemas
@@ -424,7 +425,11 @@ export async function unifiedLogin(req: Request, res: Response): Promise<void> {
 // Public student registration (adult) — no institution required
 // ---------------------------------------------------------------------------
 const publicRegisterSchema = z.object({
-  name: z.string().min(2, 'El nombre es obligatorio').max(120),
+  nombre: z.string().min(1, 'El nombre es obligatorio').max(80),
+  apellidos: z.string().min(1, 'Los apellidos son obligatorios').max(120),
+  // El documento es la llave que identifica al alumno en el acta, el
+  // certificado y el cruce con PÚLSAR: por eso es obligatorio.
+  documento: z.string().min(5, 'Documento no válido').max(30),
   email: z.string().email('Email no válido'),
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres'),
   institutionId: z.string().uuid().optional(), // institución a la que representa (opcional)
@@ -435,12 +440,21 @@ const publicRegisterSchema = z.object({
 });
 
 export async function studentRegisterPublic(req: Request, res: Response): Promise<void> {
-  const { name, email, password, institutionId, rankingConsent, marketingConsent } = publicRegisterSchema.parse(req.body);
+  const { nombre, apellidos, documento, email, password, institutionId, rankingConsent, marketingConsent } =
+    publicRegisterSchema.parse(req.body);
   const ip = clientIp(req);
   const lower = email.toLowerCase();
 
+  const doc = documentoValido(documento);
+  if (!doc) throw badRequest('El documento (DNI, NIE o pasaporte) no tiene un formato válido', 'BAD_DOCUMENT');
+  const name = `${nombre.trim()} ${apellidos.trim()}`.trim();
+
   const taken = await query('SELECT 1 FROM students WHERE email = $1 UNION SELECT 1 FROM users WHERE email = $1', [lower]);
   if (taken.rows.length > 0) throw conflict('Ya existe una cuenta con ese email', 'EMAIL_TAKEN');
+  // El documento también identifica de forma única: dos cuentas con el mismo
+  // documento romperían el cruce con PÚLSAR (¿a cuál pertenece la nota?).
+  const docTaken = await query('SELECT 1 FROM students WHERE dni = $1 AND deleted_at IS NULL', [doc]);
+  if (docTaken.rows.length > 0) throw conflict('Ya existe una cuenta con ese documento', 'DOCUMENT_TAKEN');
 
   // Si elige representar a una institución, debe existir y estar activa.
   let instId: string | null = null;
@@ -453,9 +467,9 @@ export async function studentRegisterPublic(req: Request, res: Response): Promis
   const passwordHash = await hashPassword(password);
   const accessCode = generateAccessCode();
   const { rows } = await query<{ id: string }>(
-    `INSERT INTO students (institution_id, display_name, access_code, is_minor, email, password_hash, identity_hash)
-     VALUES ($1, $2, $3, FALSE, $4, $5, NULL) RETURNING id`,
-    [instId, name, accessCode, lower, passwordHash],
+    `INSERT INTO students (institution_id, display_name, nombre, apellidos, dni, access_code, is_minor, email, password_hash, identity_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7, $8, NULL) RETURNING id`,
+    [instId, name, nombre.trim(), apellidos.trim(), doc, accessCode, lower, passwordHash],
   );
   const studentId = rows[0].id;
   await recordSignupConsents(studentId, 'student', { ranking: rankingConsent, marketing: marketingConsent }, ip);

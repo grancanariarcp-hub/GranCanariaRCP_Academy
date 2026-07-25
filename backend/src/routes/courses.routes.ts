@@ -21,6 +21,8 @@ import {
 } from '../controllers/attendance.controller.js';
 import { coursePayments } from '../controllers/payment.controller.js';
 import { previewActa, cerrarActa, listActas, actaPdf } from '../controllers/acta.controller.js';
+import { listarSubgrupos, repartirSubgrupos, crearSubgrupo, asignarAlumno, eliminarSubgrupo } from '../controllers/subgrupo.controller.js';
+import { exportarCurso, importarResultados } from '../controllers/pulsar.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -93,6 +95,17 @@ router.delete('/:id/attendance/sessions/:sessionId', asyncHandler(deleteAttendan
 router.get('/:id/attendance/sessions/:sessionId/qr', asyncHandler(attendanceQrToken));
 router.get('/:id/attendance/sessions/:sessionId/records', asyncHandler(listAttendanceRecords));
 router.post('/:id/attendance/sessions/:sessionId/records/:studentId', asyncHandler(markAttendanceManually));
+
+// Subgrupos de alumnos (para la práctica en PÚLSAR)
+router.get('/:id/subgrupos', listarSubgrupos);
+router.post('/:id/subgrupos/auto', repartirSubgrupos);
+router.post('/:id/subgrupos', crearSubgrupo);
+router.patch('/:id/subgrupos/asignar', asignarAlumno);
+router.delete('/:id/subgrupos/:subgroupId', eliminarSubgrupo);
+
+// Puente con PÚLSAR (simulación clínica)
+router.get('/:id/pulsar/export', asyncHandler(exportarCurso));
+router.post('/:id/pulsar/import', asyncHandler(importarResultados));
 
 // Certificado (director / super_admin)
 router.get('/:id/certificate/preview', asyncHandler(previewCertificate));

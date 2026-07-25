@@ -78,7 +78,11 @@ async function main(): Promise<void> {
   console.log('\n— Alumno');
   const email = `humo${Date.now()}@prueba.local`;
   await call('/api/auth/student/register-public', {
-    method: 'POST', body: { name: 'Prueba de Humo', email, password: 'Alumno123!', acceptTerms: true },
+    method: 'POST',
+    body: {
+      nombre: 'Prueba', apellidos: 'De Humo', documento: `HUMO${Date.now()}`,
+      email, password: 'Alumno123!', acceptTerms: true,
+    },
   });
   const alumno = (await call('/api/auth/login', { method: 'POST', body: { email, password: 'Alumno123!' } })).json.token as string | undefined;
   ok('alta y acceso de un alumno', !!alumno);

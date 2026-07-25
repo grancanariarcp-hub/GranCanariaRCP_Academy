@@ -19,6 +19,11 @@ export default function RegistroPage() {
 
   // comunes
   const [name, setName] = useState('');
+  // El alumno se registra con nombre, apellidos y documento por separado: son
+  // los datos que van al acta, al certificado y al cruce con PÚLSAR.
+  const [nombre, setNombre] = useState('');
+  const [apellidos, setApellidos] = useState('');
+  const [documento, setDocumento] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // profesor
@@ -66,7 +71,7 @@ export default function RegistroPage() {
       } else {
         const res = await api<{ token: string; user: SessionUser }>('/api/auth/student/register-public', {
           method: 'POST',
-          body: JSON.stringify({ name, email, password, institutionId: institutionId || undefined, acceptTerms, rankingConsent, marketingConsent }),
+          body: JSON.stringify({ nombre, apellidos, documento, email, password, institutionId: institutionId || undefined, acceptTerms, rankingConsent, marketingConsent }),
         });
         saveSession(res.token, res.user);
       // Cierra el círculo de la práctica libre: permite medir cuántos de los
@@ -133,10 +138,30 @@ export default function RegistroPage() {
               </>
             )}
 
-            <div className="form-group">
-              <label className="form-label">{role === 'institucion' ? 'Nombre del administrador' : 'Nombre y apellidos'}</label>
-              <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
+            {role === 'alumno' ? (
+              <>
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Nombre</label>
+                    <input className="form-input" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Apellidos</label>
+                    <input className="form-input" value={apellidos} onChange={(e) => setApellidos(e.target.value)} required />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Documento (DNI, NIE o pasaporte)</label>
+                  <input className="form-input" value={documento} onChange={(e) => setDocumento(e.target.value)} required
+                    placeholder="El que figurará en tu certificado" />
+                </div>
+              </>
+            ) : (
+              <div className="form-group">
+                <label className="form-label">{role === 'institucion' ? 'Nombre del administrador' : 'Nombre y apellidos'}</label>
+                <input className="form-input" value={name} onChange={(e) => setName(e.target.value)} required />
+              </div>
+            )}
 
             {role === 'profesor' && (
               <div className="form-group">
