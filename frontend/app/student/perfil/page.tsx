@@ -6,6 +6,7 @@ import { ProfilePanel } from '@/components/ProfilePanel';
 import { MyRecognitions } from '@/components/MyRecognitions';
 import { MySessions } from '@/components/MySessions';
 import { MisDatos } from '@/components/MisDatos';
+import { MisDatosPersonales } from '@/components/MisDatosPersonales';
 
 export default function StudentProfilePage() {
   const user = useSession(['student'], '/login/menor');
@@ -21,6 +22,7 @@ export default function StudentProfilePage() {
       ]}
     >
       <ProfilePanel user={user} />
+      <MisDatosPersonales />
       <MisDatos esAlumno={true} />
       <MyRecognitions />
       <MySessions />

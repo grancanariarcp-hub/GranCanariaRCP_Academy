@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getProfile, updateMyProfile, estadoDocente, changePassword, changeEmail, getConsents, updateConsents, deleteMyAccount, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
+import { getProfile, updateMyProfile, updateStudentProfile, estadoDocente, changePassword, changeEmail, getConsents, updateConsents, deleteMyAccount, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
 import { myPendingGroups, markJoined } from '../controllers/whatsapp.controller.js';
 import { heartbeat, myLearningTime } from '../controllers/learningTime.controller.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -15,6 +15,7 @@ router.use(requireAuth); // any authenticated role
 
 router.get('/', asyncHandler(getProfile));
 router.patch('/', asyncHandler(updateMyProfile));
+router.patch('/student', asyncHandler(updateStudentProfile));
 router.get('/docente', asyncHandler(estadoDocente));
 router.get('/sessions', asyncHandler(listarSesiones));
 router.delete('/sessions/:id', asyncHandler(revocarSesion));

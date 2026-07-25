@@ -42,6 +42,10 @@ const updateCourseSchema = z.object({
   // Cursos por suscripción: se paga por periodos mientras se prepara.
   billingType: z.enum(['unico', 'suscripcion']).optional(),
   esOpe: z.boolean().optional(),
+  // Datos de la parte práctica (PÚLSAR): tipo clínico, empresa y lugar.
+  tipoClinico: z.enum(['SVA', 'SVB', 'SVI', 'otro']).or(z.literal('')).nullish(),
+  empresa: z.string().max(160).or(z.literal('')).nullish(),
+  lugar: z.string().max(160).or(z.literal('')).nullish(),
   priceMensualCents: z.number().int().min(0).max(10_000_00).nullish(),
   priceTrimestralCents: z.number().int().min(0).max(10_000_00).nullish(),
   priceSemestralCents: z.number().int().min(0).max(10_000_00).nullish(),
@@ -105,6 +109,7 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     min_per_page: d.minPerPage, words_per_min: d.wordsPerMin, min_per_question: d.minPerQuestion,
     price_cents: d.priceCents, early_bird_until: d.earlyBirdUntil, late_surcharge_pct: d.lateSurchargePct,
     billing_type: d.billingType, es_ope: d.esOpe,
+    tipo_clinico: d.tipoClinico, empresa: d.empresa, lugar: d.lugar,
     price_mensual_cents: d.priceMensualCents,
     price_trimestral_cents: d.priceTrimestralCents,
     price_semestral_cents: d.priceSemestralCents,
@@ -294,9 +299,11 @@ export async function deleteActivity(req: Request, res: Response): Promise<void>
 // ---------------------------------------------------------------------------
 export async function inviteStaff(req: Request, res: Response): Promise<void> {
   await assertDirector(req);
-  const { email, role } = z.object({
+  const { email, role, parte } = z.object({
     email: z.string().email(),
     role: z.enum(['director', 'instructor']).default('instructor'),
+    // En qué parte participa: teórica (academia), práctica (PÚLSAR) o ambas.
+    parte: z.enum(['teorica', 'practica', 'ambas']).default('ambas'),
   }).parse(req.body);
 
   const u = await query<{ id: string; name: string; status: string }>(
@@ -307,9 +314,9 @@ export async function inviteStaff(req: Request, res: Response): Promise<void> {
   if (u.rows[0].status !== 'active') throw badRequest('Ese profesor aún no está activo/validado', 'NOT_ACTIVE');
 
   await query(
-    `INSERT INTO course_staff (course_id, user_id, role) VALUES ($1, $2, $3)
-     ON CONFLICT (course_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
-    [req.params.id, u.rows[0].id, role],
+    `INSERT INTO course_staff (course_id, user_id, role, parte) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (course_id, user_id) DO UPDATE SET role = EXCLUDED.role, parte = EXCLUDED.parte`,
+    [req.params.id, u.rows[0].id, role, parte],
   );
   const ct = await query<{ title: string }>('SELECT title FROM courses WHERE id = $1', [req.params.id]);
   await notify({ id: u.rows[0].id, type: 'user' }, 'Te han añadido a un curso',

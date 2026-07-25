@@ -14,14 +14,16 @@ import { Ayuda } from '@/components/ayuda/Ayuda';
 export function PerfilDocenteEditor({ onGuardado }: { onGuardado?: () => void }) {
   const [headline, setHeadline] = useState('');
   const [profession, setProfession] = useState('');
+  const [dni, setDni] = useState('');
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
-    api<{ profile?: { headline: string | null; profession: string | null } }>('/api/profile', { auth: true })
+    api<{ profile?: { headline: string | null; profession: string | null; dni: string | null } }>('/api/profile', { auth: true })
       .then((r) => {
         setHeadline(r.profile?.headline ?? '');
         setProfession(r.profile?.profession ?? '');
+        setDni(r.profile?.dni ?? '');
       })
       .catch(() => {});
   }, []);
@@ -31,7 +33,7 @@ export function PerfilDocenteEditor({ onGuardado }: { onGuardado?: () => void })
     setMsg(null);
     setGuardando(true);
     try {
-      await api('/api/profile', { method: 'PATCH', auth: true, body: JSON.stringify({ headline, profession }) });
+      await api('/api/profile', { method: 'PATCH', auth: true, body: JSON.stringify({ headline, profession, dni }) });
       setMsg({ ok: true, text: '✅ Perfil actualizado' });
       onGuardado?.();
     } catch (err) {
@@ -66,6 +68,15 @@ export function PerfilDocenteEditor({ onGuardado }: { onGuardado?: () => void })
           <input id="pd-prof" className="form-input" maxLength={120} value={profession}
             onChange={(e) => setProfession(e.target.value)}
             placeholder="Médico · Enfermero · Técnico de emergencias" />
+        </div>
+
+        <div className="form-group">
+          <label className="form-label" htmlFor="pd-dni">Documento (DNI, NIE o pasaporte)</label>
+          <input id="pd-dni" className="form-input" maxLength={30} value={dni}
+            onChange={(e) => setDni(e.target.value)} placeholder="Figura en las actas que firmas" />
+          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            Se usa en las actas y, en cursos con práctica, para identificarte en PÚLSAR.
+          </p>
         </div>
 
         <button className="btn btn-primary btn-small" disabled={guardando}>

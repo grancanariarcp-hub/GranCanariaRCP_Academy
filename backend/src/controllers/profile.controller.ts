@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit';
 import { z } from 'zod';
 import { query } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
+import { documentoValido } from '../services/documento.js';
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
@@ -41,12 +42,14 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
   const d = z.object({
     headline: z.string().max(160).nullish(),
     profession: z.string().max(120).nullish(),
+    dni: z.string().max(30).nullish(),
   }).parse(req.body);
 
   const sets: string[] = [];
   const vals: unknown[] = [];
   if (d.headline !== undefined) { vals.push(d.headline || null); sets.push(`headline = $${vals.length}`); }
   if (d.profession !== undefined) { vals.push(d.profession || null); sets.push(`profession = $${vals.length}`); }
+  if (d.dni !== undefined) { vals.push(d.dni ? d.dni.trim().toUpperCase() : null); sets.push(`dni = $${vals.length}`); }
   if (sets.length === 0) throw badRequest('Nada que actualizar');
   vals.push(req.auth!.sub);
   await query(`UPDATE users SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${vals.length}`, vals);
@@ -58,14 +61,47 @@ export async function estadoDocente(req: Request, res: Response): Promise<void> 
   res.json(await estadoPerfilDocente(req.auth!.sub));
 }
 
+/**
+ * PATCH /api/profile/student — datos personales del alumno.
+ *
+ * Nombre, apellidos y documento son los que van al acta, al certificado y al
+ * cruce con PÚLSAR. Los nuevos los dan al registrarse; esto deja a los ya
+ * existentes completarlos, y a cualquiera corregir una errata antes de que se
+ * imprima en su certificado.
+ */
+export async function updateStudentProfile(req: Request, res: Response): Promise<void> {
+  if (req.auth!.role !== 'student') throw badRequest('Solo para alumnos');
+  const d = z.object({
+    nombre: z.string().min(1).max(80),
+    apellidos: z.string().min(1).max(120),
+    documento: z.string().min(5).max(30),
+  }).parse(req.body);
+
+  const doc = documentoValido(d.documento);
+  if (!doc) throw badRequest('El documento (DNI, NIE o pasaporte) no tiene un formato válido', 'BAD_DOCUMENT');
+
+  // El documento identifica de forma única: no puede chocar con otra cuenta.
+  const choca = await query('SELECT 1 FROM students WHERE dni = $1 AND id <> $2 AND deleted_at IS NULL', [doc, req.auth!.sub]);
+  if (choca.rows.length > 0) throw badRequest('Ya existe otra cuenta con ese documento', 'DOCUMENT_TAKEN');
+
+  const nombre = d.nombre.trim();
+  const apellidos = d.apellidos.trim();
+  await query(
+    `UPDATE students SET nombre = $1, apellidos = $2, dni = $3,
+            display_name = $4, updated_at = NOW() WHERE id = $5`,
+    [nombre, apellidos, doc, `${nombre} ${apellidos}`.trim(), req.auth!.sub],
+  );
+  res.json({ ok: true });
+}
+
 export async function getProfile(req: Request, res: Response): Promise<void> {
   const { sub, role } = req.auth!;
   if (role === 'student') {
-    const u = await query('SELECT id, display_name AS name, email, age, is_minor, access_code FROM students WHERE id = $1', [sub]);
+    const u = await query('SELECT id, display_name AS name, nombre, apellidos, dni, email, age, is_minor, access_code FROM students WHERE id = $1', [sub]);
     res.json({ profile: { ...u.rows[0], role: 'student' }, taught: [], received: await receivedCourses(sub) });
     return;
   }
-  const u = await query<{ photo_key: string | null }>('SELECT id, name, email, headline, profession, role, photo_key FROM users WHERE id = $1', [sub]);
+  const u = await query<{ photo_key: string | null }>('SELECT id, name, headline, profession, dni, email, role, photo_key FROM users WHERE id = $1', [sub]);
   const photoUrl = u.rows[0]?.photo_key && r2Configured() ? await presignedGetUrl(u.rows[0].photo_key, 3600) : null;
   res.json({ profile: { ...u.rows[0], photo_url: photoUrl }, taught: await taughtCourses(sub), received: [] });
 }

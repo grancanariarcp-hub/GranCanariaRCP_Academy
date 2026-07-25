@@ -41,7 +41,10 @@ interface Staff {
   name: string;
   email: string;
   role: 'director' | 'instructor';
+  parte?: 'teorica' | 'practica' | 'ambas';
 }
+
+const PARTE_LABEL: Record<string, string> = { teorica: 'Teoría', practica: 'Práctica', ambas: 'Teoría y práctica' };
 interface Course {
   id: string;
   created_by: string | null;
@@ -68,6 +71,9 @@ interface Course {
   late_surcharge_pct: number | string | null;
   billing_type: string;
   es_ope: boolean;
+  tipo_clinico: string | null;
+  empresa: string | null;
+  lugar: string | null;
   price_mensual_cents: number | null;
   price_trimestral_cents: number | null;
   price_semestral_cents: number | null;
@@ -123,6 +129,10 @@ export default function CourseDetailPage() {
   const [fAcred, setFAcred] = useState('');
   const [fCfc, setFCfc] = useState('');
   const [fWhats, setFWhats] = useState('');
+  // Datos de la parte práctica (para PÚLSAR)
+  const [fTipoClinico, setFTipoClinico] = useState('');
+  const [fEmpresa, setFEmpresa] = useState('');
+  const [fLugar, setFLugar] = useState('');
   const [fichaMsg, setFichaMsg] = useState<string | null>(null);
 
   // Certificado
@@ -145,6 +155,7 @@ export default function CourseDetailPage() {
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'director' | 'instructor'>('instructor');
+  const [inviteParte, setInviteParte] = useState<'teorica' | 'practica' | 'ambas'>('ambas');
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function load() {
@@ -169,6 +180,9 @@ export default function CourseDetailPage() {
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
       setFWhats(c.course.whatsapp_url ?? '');
+      setFTipoClinico(c.course.tipo_clinico ?? '');
+      setFEmpresa(c.course.empresa ?? '');
+      setFLugar(c.course.lugar ?? '');
       setCertifica(c.course.certifica ?? '');
       setF1n(c.course.firmante1_nombre ?? '');
       setF1c(c.course.firmante1_cargo ?? '');
@@ -219,7 +233,7 @@ export default function CourseDetailPage() {
   async function saveFicha() {
     setFichaMsg(null);
     try {
-      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats }) });
+      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats, tipoClinico: fTipoClinico, empresa: fEmpresa, lugar: fLugar }) });
       setFichaMsg('Ficha guardada ✅');
       load();
     } catch (err) {
@@ -395,7 +409,7 @@ export default function CourseDetailPage() {
     e.preventDefault();
     setInviteMsg(null);
     try {
-      await api(`/api/courses/${courseId}/staff`, { method: 'POST', auth: true, body: JSON.stringify({ email: inviteEmail, role: inviteRole }) });
+      await api(`/api/courses/${courseId}/staff`, { method: 'POST', auth: true, body: JSON.stringify({ email: inviteEmail, role: inviteRole, parte: inviteParte }) });
       setInviteMsg({ ok: true, text: 'Profesor añadido ✅' });
       setInviteEmail('');
       load();
@@ -589,6 +603,34 @@ export default function CourseDetailPage() {
                   <input className="form-input" placeholder="https://chat.whatsapp.com/..." value={fWhats} onChange={(e) => setFWhats(e.target.value)} />
                   <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>Se ofrecerá a los alumnos al entrar. Unirse es voluntario.</p>
                 </div>
+                {!course.es_ope && (
+                  <>
+                    <div style={{ borderTop: '1px solid var(--gray-200)', margin: '4px 0 12px' }} />
+                    <p className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
+                      Datos de la parte práctica (se envían a PÚLSAR al exportar el curso):
+                    </p>
+                    <div className="grid grid-2" style={{ gap: 12 }}>
+                      <div className="form-group">
+                        <label className="form-label">Tipo clínico</label>
+                        <select className="form-input" value={fTipoClinico} onChange={(e) => setFTipoClinico(e.target.value)}>
+                          <option value="">— sin especificar —</option>
+                          <option value="SVA">SVA · Soporte Vital Avanzado</option>
+                          <option value="SVB">SVB · Soporte Vital Básico</option>
+                          <option value="SVI">SVI · Soporte Vital Intermedio</option>
+                          <option value="otro">Otro</option>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Empresa / entidad</label>
+                        <input className="form-input" value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Lugar de la práctica</label>
+                      <input className="form-input" placeholder="Aula de simulación, hospital…" value={fLugar} onChange={(e) => setFLugar(e.target.value)} />
+                    </div>
+                  </>
+                )}
                 <button className="btn btn-primary btn-small" onClick={saveFicha}>Guardar ficha</button>
               </div>
             </div>
@@ -949,12 +991,13 @@ export default function CourseDetailPage() {
               </div>
               <div className="table-responsive" style={{ marginBottom: 16 }}>
                 <table>
-                  <thead><tr><th>Nombre</th><th>Rol</th></tr></thead>
+                  <thead><tr><th>Nombre</th><th>Rol</th><th>Participa en</th></tr></thead>
                   <tbody>
                     {staff.map((s) => (
                       <tr key={s.id}>
                         <td>{s.name}<div className="muted" style={{ fontSize: 12 }}>{s.email}</div></td>
                         <td><span className={`badge ${s.role === 'director' ? 'badge-primary' : 'badge-success'}`}>{s.role}</span></td>
+                        <td className="muted" style={{ fontSize: 12.5 }}>{PARTE_LABEL[s.parte ?? 'ambas']}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -970,12 +1013,22 @@ export default function CourseDetailPage() {
                   <label className="form-label">Email del profesor</label>
                   <input className="form-input" type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Rol</label>
-                  <select className="form-select" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as 'director' | 'instructor')}>
-                    <option value="instructor">Instructor</option>
-                    <option value="director">Director</option>
-                  </select>
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Rol</label>
+                    <select className="form-select" value={inviteRole} onChange={(e) => setInviteRole(e.target.value as 'director' | 'instructor')}>
+                      <option value="instructor">Instructor</option>
+                      <option value="director">Director</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Participa en</label>
+                    <select className="form-select" value={inviteParte} onChange={(e) => setInviteParte(e.target.value as 'teorica' | 'practica' | 'ambas')}>
+                      <option value="ambas">Teoría y práctica</option>
+                      <option value="teorica">Solo teoría</option>
+                      <option value="practica">Solo práctica (PÚLSAR)</option>
+                    </select>
+                  </div>
                 </div>
                 <button className="btn btn-primary btn-full">Añadir al curso</button>
               </form>

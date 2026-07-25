@@ -306,7 +306,7 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
   const [modules, staff, activities] = await Promise.all([
     query<{ id: string }>('SELECT id, title, sort_order, is_mandatory, starts_at, ends_at FROM modules WHERE course_id = $1 ORDER BY sort_order', [id]),
     query(
-      `SELECT u.id, u.name, u.email, cs.role
+      `SELECT u.id, u.name, u.email, cs.role, cs.parte
        FROM course_staff cs JOIN users u ON u.id = cs.user_id
        WHERE cs.course_id = $1`,
       [id],
