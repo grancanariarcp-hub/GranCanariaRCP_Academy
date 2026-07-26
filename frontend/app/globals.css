@@ -1158,3 +1158,65 @@ summary:focus-visible,
   .tour-fondo, .tour-globo { animation: none; }
   .tour-foco { transition: none; }
 }
+
+/* ==========================================================================
+   Guías paso a paso (panel acoplado, NO bloqueante: el usuario pulsa de verdad)
+   ========================================================================== */
+.guia-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 150;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  padding: 14px 16px 12px;
+  background: #fff;
+  border: 1px solid var(--gray-300);
+  border-top: 4px solid #2c7;
+  border-radius: 14px;
+  box-shadow: var(--shadow-xl);
+  animation: fadeInUp 0.3s ease both;
+}
+.guia-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.guia-tit { font-size: 13px; font-weight: 700; color: var(--primary-dark); }
+.guia-paso { font-size: 11.5px; color: var(--text-secondary); margin-top: 1px; }
+.guia-x { font-size: 22px; line-height: 1; color: var(--gray-500); background: none; border: none; cursor: pointer; }
+.guia-x:hover { color: var(--gray-800); }
+.guia-h { margin: 10px 0 5px; font-size: 15px; color: var(--primary-dark); }
+.guia-txt { margin: 0 0 12px; font-size: 13.8px; line-height: 1.55; color: var(--gray-800); }
+.guia-aviso {
+  margin: 0 0 12px; padding: 9px 11px; font-size: 13px;
+  background: #fffaf0; color: #6b4708; border-radius: 8px; border-left: 3px solid var(--warning);
+}
+.guia-acciones { display: flex; justify-content: space-between; gap: 8px; }
+
+/* Foco no bloqueante: solo un anillo que late alrededor del elemento. */
+.guia-foco {
+  position: fixed;
+  z-index: 149;
+  border-radius: 10px;
+  outline: 3px solid #2c7;
+  box-shadow: 0 0 0 3px rgba(34, 204, 119, 0.25);
+  pointer-events: none;                 /* el usuario puede pulsar lo que hay debajo */
+  transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
+  animation: guiaLatido 1.6s ease-in-out infinite;
+}
+@keyframes guiaLatido {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(34, 204, 119, 0.18); }
+  50% { box-shadow: 0 0 0 7px rgba(34, 204, 119, 0.30); }
+}
+
+/* Ítem del lanzador de guías */
+.guia-item {
+  display: block; width: 100%; padding: 11px 13px; text-align: left; cursor: pointer;
+  background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: 9px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.guia-item:hover { background: #fff; border-color: #2c7; }
+.guia-item-t { display: block; font-size: 14.5px; font-weight: 600; color: var(--primary-dark); }
+.guia-item-r { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-secondary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .guia-panel { animation: none; }
+  .guia-foco { animation: none; transition: none; }
+}

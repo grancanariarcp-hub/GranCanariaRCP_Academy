@@ -443,7 +443,7 @@ export default function CourseDetailPage() {
                   {[course.tema, course.subtema, course.modality].filter(Boolean).join(' · ')}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} data-tour="estado">
                 <span className={`badge ${course.status === 'publicado' ? 'badge-success' : 'badge-warning'}`}>{course.status}</span>
                 {course.status === 'publicado' && (
                   <span className="badge badge-primary">{course.enrollment_open ? 'matrícula abierta' : 'próximamente'}</span>
@@ -526,7 +526,7 @@ export default function CourseDetailPage() {
           )}
 
           {/* Acta: un curso OPE no titula, así que no la necesita */}
-        {!course.es_ope && <ActaPanel courseId={courseId} />}
+        {!course.es_ope && <div data-tour="acta"><ActaPanel courseId={courseId} /></div>}
 
         {/* Tipo de curso: un curso OPE es un generador de exámenes y no
             necesita profesorado, encuesta, certificado ni acta. */}
@@ -559,10 +559,10 @@ export default function CourseDetailPage() {
         {!course.es_ope && <AttendancePanel courseId={courseId} />}
 
         {/* Subgrupos + puente con PÚLSAR: solo para cursos con parte práctica */}
-        {!course.es_ope && <SubgruposPanel courseId={courseId} />}
+        {!course.es_ope && <div data-tour="pulsar"><SubgruposPanel courseId={courseId} /></div>}
 
         {/* Ficha del curso */}
-          <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card" data-tour="ficha" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <div className="card-title">Ficha del curso <Ayuda tema="profesor-curso-crear" /></div>
               <div className="card-subtitle">Se muestra a los alumnos antes de matricularse</div>
@@ -832,7 +832,7 @@ export default function CourseDetailPage() {
 
           <div className="grid grid-2">
             {/* Módulos + actividades */}
-            <div className="card">
+            <div className="card" data-tour="contenido">
               <div className="card-header">
                 <div className="card-title">Contenido del curso <Ayuda tema="profesor-curso-modulos" /></div>
                 <div className="card-subtitle">{modules.length} módulos</div>

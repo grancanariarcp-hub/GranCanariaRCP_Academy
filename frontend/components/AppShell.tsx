@@ -8,6 +8,7 @@ import { AppVersion } from '@/components/AppVersion';
 import { NotificationBell } from '@/components/NotificationBell';
 import { Ayuda } from '@/components/ayuda/Ayuda';
 import { Tour } from '@/components/Tour';
+import { GuiaPanel } from '@/components/GuiaPanel';
 
 interface NavItem {
   label: string;
@@ -66,6 +67,16 @@ export function AppShell({
           >
             🧭 Visita guiada
           </button>
+          {/* Guías paso a paso de tareas (crear curso, acta, PÚLSAR): solo staff. */}
+          {(user.role === 'profesor' || user.role === 'super_admin') && (
+            <button
+              type="button"
+              className="tour-lanzar"
+              onClick={() => { setMenuOpen(false); window.dispatchEvent(new Event('abrir-guias')); }}
+            >
+              📋 Guías paso a paso
+            </button>
+          )}
         </nav>
         <div style={{ marginTop: 24, paddingLeft: 12 }}>
           <AppVersion style={{ color: 'rgba(255,255,255,0.6)' }} />
@@ -93,6 +104,7 @@ export function AppShell({
         <div className="container">{children}</div>
       </div>
       <Tour />
+      <GuiaPanel />
     </div>
   );
 }

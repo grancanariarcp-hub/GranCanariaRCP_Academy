@@ -79,6 +79,23 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
     await api(`/api/profile/cv/${id}`, { method: 'DELETE', auth: true });
     loadCv();
   }
+  /** Mueve un ítem dentro de su categoría y guarda el nuevo orden. */
+  async function moverCv(cat: CvCat, idx: number, dir: -1 | 1) {
+    if (!cv) return;
+    const lista = cv[cat];
+    const destino = idx + dir;
+    if (destino < 0 || destino >= lista.length) return;
+    const nuevo = [...lista];
+    [nuevo[idx], nuevo[destino]] = [nuevo[destino], nuevo[idx]];
+    setCv({ ...cv, [cat]: nuevo }); // pinta el cambio al instante
+    try {
+      await api('/api/profile/cv/reorder', {
+        method: 'PATCH', auth: true, body: JSON.stringify({ category: cat, orden: nuevo.map((x) => x.id) }),
+      });
+    } catch {
+      loadCv(); // si falla, recarga el orden real del servidor
+    }
+  }
 
   async function changePw(e: React.FormEvent) {
     e.preventDefault();
@@ -254,10 +271,16 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
               {cv[cat].length === 0 ? (
                 <div className="muted" style={{ fontSize: 13 }}>—</div>
               ) : (
-                cv[cat].map((it) => (
-                  <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '3px 0', fontSize: 14 }}>
-                    <span>• {it.text}</span>
-                    <button className="btn btn-outline btn-small" onClick={() => delCv(it.id)}>✕</button>
+                cv[cat].map((it, idx) => (
+                  <div key={it.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '3px 0', fontSize: 14 }}>
+                    <span style={{ flex: 1 }}>• {it.text}</span>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button className="btn btn-outline btn-small" title="Subir" disabled={idx === 0}
+                        onClick={() => moverCv(cat, idx, -1)} style={{ opacity: idx === 0 ? 0.35 : 1 }}>↑</button>
+                      <button className="btn btn-outline btn-small" title="Bajar" disabled={idx === cv[cat].length - 1}
+                        onClick={() => moverCv(cat, idx, 1)} style={{ opacity: idx === cv[cat].length - 1 ? 0.35 : 1 }}>↓</button>
+                      <button className="btn btn-outline btn-small" title="Eliminar" onClick={() => delCv(it.id)}>✕</button>
+                    </div>
                   </div>
                 ))
               )}

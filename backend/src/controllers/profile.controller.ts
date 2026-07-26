@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import PDFDocument from 'pdfkit';
 import { z } from 'zod';
-import { query } from '../config/database.js';
+import { query, withTransaction } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { documentoValido, normalizarDocumento } from '../services/documento.js';
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
@@ -324,6 +324,32 @@ export async function addCvItem(req: Request, res: Response): Promise<void> {
 
 export async function deleteCvItem(req: Request, res: Response): Promise<void> {
   await query('DELETE FROM cv_items WHERE id = $1 AND user_id = $2', [req.params.itemId, req.auth!.sub]);
+  res.json({ ok: true });
+}
+
+const reordenarSchema = z.object({
+  category: z.enum(CV_CATEGORIES),
+  orden: z.array(z.string().uuid()).max(200),
+});
+
+/**
+ * PATCH /api/profile/cv/reorder — reordena los puntos de una categoría.
+ *
+ * El frontend envía los ids en el orden deseado; se numeran 0,1,2… Solo se tocan
+ * los del propio docente y los de esa categoría (el filtro por user_id evita
+ * reordenar el CV de otro colando ids ajenos).
+ */
+export async function reorderCv(req: Request, res: Response): Promise<void> {
+  if (req.auth!.role === 'student') throw badRequest('No disponible', 'NOT_ALLOWED');
+  const { category, orden } = reordenarSchema.parse(req.body);
+  await withTransaction(async (client) => {
+    for (let i = 0; i < orden.length; i++) {
+      await client.query(
+        'UPDATE cv_items SET sort_order = $1 WHERE id = $2 AND user_id = $3 AND category = $4::varchar',
+        [i, orden[i], req.auth!.sub, category],
+      );
+    }
+  });
   res.json({ ok: true });
 }
 

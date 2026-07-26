@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { getProfile, updateMyProfile, updateStudentProfile, estadoDocente, changePassword, changeEmail, getConsents, updateConsents, deleteMyAccount, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem } from '../controllers/profile.controller.js';
+import { getProfile, updateMyProfile, updateStudentProfile, estadoDocente, changePassword, changeEmail, getConsents, updateConsents, deleteMyAccount, uploadProfilePhoto, generateLegajo, getCv, addCvItem, deleteCvItem, reorderCv } from '../controllers/profile.controller.js';
 import { myPendingGroups, markJoined } from '../controllers/whatsapp.controller.js';
 import { heartbeat, myLearningTime } from '../controllers/learningTime.controller.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -34,6 +34,7 @@ router.get('/legajo', asyncHandler(generateLegajo));
 // CV del profesor
 router.get('/cv', asyncHandler(getCv));
 router.post('/cv', asyncHandler(addCvItem));
+router.patch('/cv/reorder', asyncHandler(reorderCv));
 router.delete('/cv/:itemId', asyncHandler(deleteCvItem));
 
 router.get('/recognitions', asyncHandler(myRecognitions));
