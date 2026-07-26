@@ -21,6 +21,7 @@ import { createBank, updateBank, deleteBank, exportBank, listBanks, getBankTemas
 import { setInstitutionStatus } from '../controllers/institution.controller.js';
 import { adminResetPassword } from '../controllers/credentials.controller.js';
 import { getGlobalWhatsapp, setGlobalWhatsapp } from '../controllers/whatsapp.controller.js';
+import { getPartnerBannerAdmin, setPartnerBanner, listReferrals } from '../controllers/partner.controller.js';
 import { adminDashboard } from '../controllers/dashboard.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
@@ -99,6 +100,11 @@ router.post('/challenges/:id/thumbnail', upload.single('file'), asyncHandler(upl
 router.post('/reset-password/:type/:id', asyncHandler(adminResetPassword));
 router.get('/whatsapp', asyncHandler(getGlobalWhatsapp));
 router.post('/whatsapp', asyncHandler(setGlobalWhatsapp));
+
+// Venta cruzada con PÚLSAR: editar la tarjeta partner y ver los referidos
+router.get('/partner-banner', asyncHandler(getPartnerBannerAdmin));
+router.post('/partner-banner', asyncHandler(setPartnerBanner));
+router.get('/referidos', asyncHandler(listReferrals));
 
 router.get('/audit-logs', asyncHandler(listAuditLogs));
 

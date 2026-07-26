@@ -8,6 +8,7 @@ import { listPublicInstitutions } from '../controllers/institution.controller.js
 import { qrImage } from '../controllers/qr.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { subscribeLead, unsubscribeLead } from '../controllers/lead.controller.js';
+import { getPartnerBanner, recordReferral } from '../controllers/partner.controller.js';
 import { verificarActa } from '../controllers/acta.controller.js';
 import { verifyRecognition, recognitionPdf } from '../controllers/recognition.controller.js';
 import { anonStatus, anonStart, anonSubmit, anonConverted } from '../controllers/anonPractice.controller.js';
@@ -38,6 +39,10 @@ router.post('/practice/converted', asyncHandler(anonConverted));
 // Aviso de apertura de matrícula
 router.post('/leads', asyncHandler(subscribeLead));
 router.delete('/leads/:email', asyncHandler(unsubscribeLead));
+
+// Venta cruzada con PÚLSAR: tarjeta partner + medición de referidos entrantes
+router.get('/partner-banner', asyncHandler(getPartnerBanner));
+router.post('/referido', asyncHandler(recordReferral));
 router.get('/actas/:code', asyncHandler(verificarActa));
 router.get('/recognitions/:code', asyncHandler(verifyRecognition));
 router.get('/recognitions/:code/pdf', asyncHandler(recognitionPdf));

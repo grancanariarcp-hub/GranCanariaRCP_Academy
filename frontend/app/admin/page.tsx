@@ -7,6 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
 import { AnonPracticeStats } from '@/components/AnonPracticeStats';
 import { AdminPendientes } from '@/components/AdminPendientes';
+import { PartnerBannerEditor } from '@/components/PartnerBannerEditor';
 
 interface Stats {
   students: number;
@@ -144,6 +145,9 @@ export default function AdminDashboard() {
       {/* Lo que la plataforma recoge y hay que mirar: interesados, indicios de
           uso compartido y estado de la pasarela. */}
       <AdminPendientes />
+
+      {/* Venta cruzada con PÚLSAR (marketing, no toca cursos ni matrículas). */}
+      <PartnerBannerEditor />
 
       {/* KPIs */}
       <div className="grid grid-4" style={{ marginBottom: 16 }}>

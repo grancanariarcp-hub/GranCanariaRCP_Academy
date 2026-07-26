@@ -10,6 +10,8 @@ import { PageNav } from '@/components/PageNav';
 import { LeadCapture } from '@/components/LeadCapture';
 import { Faq, type ItemFaq } from '@/components/Faq';
 import { Contacto } from '@/components/Contacto';
+import { PartnerBanner } from '@/components/PartnerBanner';
+import { useReferido } from '@/lib/useReferido';
 
 interface OpenCourse {
   id: string;
@@ -118,6 +120,7 @@ const FAQ: ItemFaq[] = [
 
 /** Campus de formación: página de captación de la oferta acreditada. */
 export default function CampusPage() {
+  useReferido(); // registra las llegadas con ?ref=... (p.ej. desde PÚLSAR)
   const [courses, setCourses] = useState<OpenCourse[]>([]);
   const [profes, setProfes] = useState<Array<{ id: string; name: string; headline: string | null; photo_url: string | null }>>([]);
   const [fMatricula, setFMatricula] = useState<'todas' | 'abierta' | 'proximamente'>('todas');
@@ -265,6 +268,10 @@ export default function CampusPage() {
               </div>
             </div>
           )}
+        </Reveal>
+
+        <Reveal>
+          <PartnerBanner />
         </Reveal>
 
         {courses.length === 0 ? (

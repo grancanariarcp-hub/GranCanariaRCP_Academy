@@ -7,6 +7,7 @@ import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
 import { temaPalette } from '@/lib/temaColors';
 import { WhatsAppPrompt } from '@/components/WhatsAppPrompt';
+import { PartnerBanner } from '@/components/PartnerBanner';
 
 interface MyCourse {
   id: string;
@@ -68,6 +69,8 @@ export default function StudentDashboard() {
       <WhatsAppPrompt />
       {error && <div className="alert alert-error">{error}</div>}
       {msg && <div className="alert alert-success">{msg}</div>}
+
+      <PartnerBanner />
 
       {/* Mis cursos */}
       <div className="card animate-in" style={{ marginBottom: 24 }}>

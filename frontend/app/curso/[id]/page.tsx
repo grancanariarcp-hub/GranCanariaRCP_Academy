@@ -10,6 +10,7 @@ import { Carousel } from '@/components/Carousel';
 import { temaPalette } from '@/lib/temaColors';
 import { PageNav } from '@/components/PageNav';
 import { Contacto } from '@/components/Contacto';
+import { PartnerBanner } from '@/components/PartnerBanner';
 import { SubscriptionPlans } from '@/components/SubscriptionPlans';
 
 interface Course {
@@ -26,6 +27,7 @@ interface Course {
   resumen: string | null;
   acreditacion: string | null;
   cfc: string | null;
+  tipo_clinico: string | null;
   thumbnail_url?: string;
   enrollment_open: boolean;
   /** Precio vigente calculado en el servidor (tramo anticipado o recargado). */
@@ -253,6 +255,11 @@ export default function PublicCoursePage() {
             )}
             </div>
           </div>
+        )}
+        {/* En cursos de soporte vital, la parte práctica se hace con PÚLSAR:
+            aquí la venta cruzada tiene todo el sentido. */}
+        {course && ['SVA', 'SVB', 'SVI'].includes(course.tipo_clinico ?? '') && (
+          <div style={{ marginTop: 20 }}><PartnerBanner /></div>
         )}
         <div style={{ marginTop: 26 }}><Contacto /></div>
         <p style={{ textAlign: 'center', marginTop: 24 }}><AppVersion /></p>
