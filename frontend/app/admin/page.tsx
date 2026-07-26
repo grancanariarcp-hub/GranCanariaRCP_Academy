@@ -150,7 +150,7 @@ export default function AdminDashboard() {
       <PartnerBannerEditor />
 
       {/* KPIs */}
-      <div className="grid grid-4" style={{ marginBottom: 16 }}>
+      <div className="grid grid-4" data-tour="resumen" style={{ marginBottom: 16 }}>
         <Kpi value={dash?.personasRegistradas.total ?? '—'} label="Personas registradas" />
         <Kpi value={dash?.actividad.alumnos_con_curso ?? '—'} label="Alumnos matriculados" />
         <Kpi value={dash?.instituciones.total ?? '—'} label="Instituciones" />

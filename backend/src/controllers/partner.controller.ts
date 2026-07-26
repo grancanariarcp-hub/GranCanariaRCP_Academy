@@ -28,13 +28,14 @@ interface Banner {
 
 const POR_DEFECTO: Banner = {
   activo: true,
-  titulo: 'La fase práctica se hace con PÚLSAR',
+  titulo: 'La fase práctica presencial se realiza con PÚLSAR',
   texto:
-    'Simulación clínica avanzada: monitor de paciente, desfibrilador y evaluación por '
-    + 'competencias. 100 % web, sin hardware. La teoría aquí, la práctica presencial con PÚLSAR.',
+    'Simulación clínica avanzada, 100 % web y sin hardware: monitor de paciente, desfibrilador '
+    + 'y evaluación por competencias. Aquí la teoría acreditada; la práctica, con PÚLSAR. '
+    + 'Juntos, el curso de soporte vital completo.',
   imagenUrl: '',
   enlace: 'https://pulsar.astormanager.com/presupuesto/',
-  textoBoton: 'Solicitar presupuesto',
+  textoBoton: 'Pedir presupuesto',
 };
 
 /** Añade ?ref=academia al enlace de salida para poder medir el origen del lead. */

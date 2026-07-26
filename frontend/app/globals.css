@@ -1061,3 +1061,100 @@ summary:focus-visible,
 
 /* Sobre cabeceras oscuras, el enlace de ayuda tiene que verse. */
 .ayuda-enlace-claro .ayuda-enlace { color: rgba(255, 255, 255, 0.9); }
+
+/* ==========================================================================
+   Visita guiada (tour de primera vez)
+   Un foco ilumina el elemento del paso oscureciendo el resto, y un globo lo
+   explica. Sin librerías: el "hueco" es la sombra enorme de .tour-foco.
+   ========================================================================== */
+.tour-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 200;               /* por encima de modales (120) y ayuda (140) */
+  animation: fadeIn 0.2s ease;
+}
+.tour-foco {
+  position: fixed;
+  border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.62);
+  outline: 2px solid #7c3aed;
+  transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
+  pointer-events: none;
+}
+/* Sin objetivo (bienvenida/cierre): un velo plano sobre toda la pantalla. */
+.tour-fondo:not(:has(.tour-foco))::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.62);
+}
+.tour-globo {
+  position: fixed;
+  z-index: 201;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  padding: 18px 18px 14px;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: var(--shadow-xl);
+  animation: popIn 0.2s ease;
+}
+.tour-paso {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #7c3aed;
+}
+.tour-titulo {
+  margin: 3px 0 6px;
+  font-size: 17px;
+  color: var(--primary-dark);
+}
+.tour-texto {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--gray-800);
+}
+.tour-acciones {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.tour-saltar {
+  padding: 0;
+  min-width: 48px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.tour-saltar:hover { text-decoration: underline; }
+
+/* El acceso a la visita en el menú lateral. */
+.tour-lanzar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.82);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+.tour-lanzar:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-fondo, .tour-globo { animation: none; }
+  .tour-foco { transition: none; }
+}

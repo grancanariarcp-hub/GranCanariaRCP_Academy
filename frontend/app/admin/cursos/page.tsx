@@ -204,7 +204,7 @@ export default function CursosPage() {
         </div>
 
         {/* Listado */}
-        <div className="card">
+        <div className="card" data-tour="lista-cursos">
           <div className="card-header">
             <div className="card-title">Mis cursos</div>
             <div className="card-subtitle">{courses.length} cursos</div>

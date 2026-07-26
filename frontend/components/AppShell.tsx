@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
 import { NotificationBell } from '@/components/NotificationBell';
 import { Ayuda } from '@/components/ayuda/Ayuda';
+import { Tour } from '@/components/Tour';
 
 interface NavItem {
   label: string;
@@ -46,7 +47,7 @@ export function AppShell({
           <img src="/logo-emblem.png" alt="" />
           Gran Canaria RCP
         </div>
-        <nav>
+        <nav data-tour="nav">
           {nav.map((item) => (
             <a key={item.href} href={item.href} className={item.active ? 'active' : ''} onClick={() => setMenuOpen(false)}>
               {item.label}
@@ -57,6 +58,14 @@ export function AppShell({
           <a href="/ayuda" onClick={() => setMenuOpen(false)} style={{ marginTop: 10, opacity: 0.85 }}>
             Manual de uso
           </a>
+          {/* Repite la visita guiada de primera vez cuando se quiera. */}
+          <button
+            type="button"
+            className="tour-lanzar"
+            onClick={() => { setMenuOpen(false); window.dispatchEvent(new Event('iniciar-tour')); }}
+          >
+            🧭 Visita guiada
+          </button>
         </nav>
         <div style={{ marginTop: 24, paddingLeft: 12 }}>
           <AppVersion style={{ color: 'rgba(255,255,255,0.6)' }} />
@@ -71,7 +80,7 @@ export function AppShell({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Ayuda de la pantalla actual: se resuelve sola por la ruta. */}
-            <Ayuda variante="boton" />
+            <span data-tour="ayuda"><Ayuda variante="boton" /></span>
             <NotificationBell />
             <span className="muted" style={{ fontSize: 13 }}>
               {user.name} · <span className="badge badge-primary">{roleLabel(user.role)}</span>
@@ -83,6 +92,7 @@ export function AppShell({
         </div>
         <div className="container">{children}</div>
       </div>
+      <Tour />
     </div>
   );
 }

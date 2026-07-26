@@ -73,7 +73,7 @@ export default function StudentDashboard() {
       <PartnerBanner />
 
       {/* Mis cursos */}
-      <div className="card animate-in" style={{ marginBottom: 24 }}>
+      <div className="card animate-in" data-tour="mis-cursos" style={{ marginBottom: 24 }}>
         <div className="card-header">
           <div className="card-title">Mis cursos</div>
           <div className="card-subtitle">Cursos en los que estás matriculado</div>
@@ -109,7 +109,7 @@ export default function StudentDashboard() {
       </div>
 
       {/* Cursos disponibles */}
-      <div className="card animate-in">
+      <div className="card animate-in" data-tour="cursos-disponibles">
         <div className="card-header">
           <div className="card-title">Cursos disponibles</div>
           <div className="card-subtitle">Con matrícula abierta</div>
