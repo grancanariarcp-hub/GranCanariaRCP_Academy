@@ -19,7 +19,7 @@ import { getTemplate, importQuestions } from '../controllers/questionImport.cont
 import { createChallenge, listAllChallenges, updateChallenge, deleteChallenge, exportChallenge, uploadChallengeThumbnail } from '../controllers/challenge.controller.js';
 import { createBank, updateBank, deleteBank, exportBank, listBanks, getBankTemas, importBankQuestions, globalFailedStats } from '../controllers/bank.controller.js';
 import { setInstitutionStatus } from '../controllers/institution.controller.js';
-import { adminResetPassword } from '../controllers/credentials.controller.js';
+import { adminResetPassword, listAccounts } from '../controllers/credentials.controller.js';
 import { getGlobalWhatsapp, setGlobalWhatsapp } from '../controllers/whatsapp.controller.js';
 import { getPartnerBannerAdmin, setPartnerBanner, listReferrals } from '../controllers/partner.controller.js';
 import { adminDashboard } from '../controllers/dashboard.controller.js';
@@ -97,6 +97,7 @@ router.post('/challenges/:id/thumbnail', upload.single('file'), asyncHandler(upl
 // los llamaba —el frontend usa siempre la ruta canónica— y eran superficie de
 // ataque gratis: dos puertas a la misma habitación, y la de atrás sin revisar.
 
+router.get('/accounts', asyncHandler(listAccounts));
 router.post('/reset-password/:type/:id', asyncHandler(adminResetPassword));
 router.get('/whatsapp', asyncHandler(getGlobalWhatsapp));
 router.post('/whatsapp', asyncHandler(setGlobalWhatsapp));

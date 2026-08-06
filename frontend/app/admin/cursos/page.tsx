@@ -17,6 +17,18 @@ interface Course {
   modality: string;
   modules: string;
   enrollment_open: boolean;
+  ends_at: string | null;
+  acta_closed_at: string | null;
+  es_ope: boolean;
+}
+
+/** Un curso «pasado»: archivado o cuya fecha de fin ya quedó atrás. */
+function esPasado(c: Course): boolean {
+  return c.status === 'archivado' || (!!c.ends_at && c.ends_at < new Date().toISOString().slice(0, 10));
+}
+/** Terminó pero aún no se ha cerrado el acta: requiere acción del profesor. */
+function pendienteActa(c: Course): boolean {
+  return !c.es_ope && !c.acta_closed_at && esPasado(c);
 }
 interface Tax {
   id: string;
@@ -43,9 +55,20 @@ export default function CursosPage() {
   const [resumen, setResumen] = useState('');
   const [acreditacion, setAcreditacion] = useState('');
   const [cfc, setCfc] = useState('');
+  const [cfcEnTramite, setCfcEnTramite] = useState(false);
 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [vista, setVista] = useState<'activos' | 'pasados' | 'todos'>('activos');
+
+  // Por defecto se ven los activos, pero los pendientes de acta se cuelan
+  // siempre: son los que reclaman acción y no deben esconderse en «pasados».
+  const cursosVisibles = courses.filter((c) => {
+    if (vista === 'todos') return true;
+    if (vista === 'pasados') return esPasado(c);
+    return !esPasado(c) || pendienteActa(c);
+  });
+  const nPendientes = courses.filter(pendienteActa).length;
 
   async function load() {
     try {
@@ -90,6 +113,7 @@ export default function CursosPage() {
           resumen: resumen || undefined,
           acreditacion: acreditacion || undefined,
           cfc: cfc || undefined,
+          cfcEnTramite,
         }),
       });
       // Ir directo a la edición: allí se sube la miniatura, se añaden imágenes y
@@ -196,6 +220,14 @@ export default function CursosPage() {
               </div>
             </div>
 
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, marginBottom: 12, cursor: 'pointer' }}>
+              <input type="checkbox" checked={cfcEnTramite} onChange={(e) => setCfcEnTramite(e.target.checked)} style={{ marginTop: 3 }} />
+              <span>
+                <strong>Tramitar CFC</strong> — permite que la Comisión CFC vea este curso aunque aún no esté
+                publicado. Déjalo sin marcar si no está en trámite de acreditación.
+              </span>
+            </label>
+
             <button className="btn btn-primary btn-full" disabled={saving}>
               {saving ? 'Creando…' : 'Crear curso'}
             </button>
@@ -207,28 +239,53 @@ export default function CursosPage() {
         <div className="card" data-tour="lista-cursos">
           <div className="card-header">
             <div className="card-title">Mis cursos</div>
-            <div className="card-subtitle">{courses.length} cursos</div>
+            <div className="card-subtitle">{cursosVisibles.length} cursos</div>
           </div>
+
+          {nPendientes > 0 && (
+            <div className="alert alert-error" style={{ fontSize: 13 }}>
+              {nPendientes === 1 ? 'Hay 1 curso terminado sin cerrar el acta.' : `Hay ${nPendientes} cursos terminados sin cerrar el acta.`}
+              {' '}Aparecen en rojo abajo.
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {([['activos', 'Activos'], ['pasados', 'Pasados'], ['todos', 'Todos']] as const).map(([v, label]) => (
+              <button key={v} type="button" onClick={() => setVista(v)}
+                className={`tab ${vista === v ? 'active' : ''}`} style={{ flex: 'unset', padding: '6px 14px' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+
           <div className="table-responsive">
             <table>
               <thead>
                 <tr><th>Curso</th><th>Tema</th><th>Módulos</th><th>Estado</th></tr>
               </thead>
               <tbody>
-                {courses.map((c) => (
-                  <tr key={c.id}>
-                    <td><Link href={`/admin/cursos/${c.id}`}>{c.title}</Link></td>
-                    <td style={{ fontSize: 12 }}>{[c.tema, c.subtema].filter(Boolean).join(' · ') || '—'}</td>
-                    <td>{c.modules}</td>
-                    <td>
-                      <span className={`badge ${c.status === 'publicado' ? 'badge-success' : 'badge-warning'}`}>
-                        {c.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {courses.length === 0 && (
-                  <tr><td colSpan={4} className="muted">Aún no hay cursos</td></tr>
+                {cursosVisibles.map((c) => {
+                  const rojo = pendienteActa(c);
+                  return (
+                    <tr key={c.id} style={rojo ? { background: '#fff5f5' } : undefined}>
+                      <td style={rojo ? { borderLeft: '3px solid var(--danger)' } : undefined}>
+                        <Link href={`/admin/cursos/${c.id}`}>{c.title}</Link>
+                        {rojo && <span className="badge badge-danger" style={{ marginLeft: 8, fontSize: 10.5 }}>Falta el acta</span>}
+                      </td>
+                      <td style={{ fontSize: 12 }}>{[c.tema, c.subtema].filter(Boolean).join(' · ') || '—'}</td>
+                      <td>{c.modules}</td>
+                      <td>
+                        <span className={`badge ${c.status === 'publicado' ? 'badge-success' : c.status === 'archivado' ? '' : 'badge-warning'}`}>
+                          {c.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {cursosVisibles.length === 0 && (
+                  <tr><td colSpan={4} className="muted">
+                    {courses.length === 0 ? 'Aún no hay cursos' : 'No hay cursos en esta vista'}
+                  </td></tr>
                 )}
               </tbody>
             </table>

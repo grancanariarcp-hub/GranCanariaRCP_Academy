@@ -32,6 +32,7 @@ export function adminNav(role: Role, activeHref?: string) {
           { label: 'Desafíos', href: '/admin/desafios' },
           { label: 'Diplomas', href: '/admin/reconocimientos' },
           { label: 'Profesores', href: '/admin/profesores' },
+          { label: 'Usuarios', href: '/admin/usuarios' },
           { label: 'Comisión CFC', href: '/admin/auditores' },
           { label: 'Perfil', href: '/admin/perfil' },
         ]

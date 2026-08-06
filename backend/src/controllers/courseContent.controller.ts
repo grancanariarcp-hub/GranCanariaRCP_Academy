@@ -42,6 +42,8 @@ const updateCourseSchema = z.object({
   // Cursos por suscripción: se paga por periodos mientras se prepara.
   billingType: z.enum(['unico', 'suscripcion']).optional(),
   esOpe: z.boolean().optional(),
+  // Que la Comisión CFC pueda ver el curso antes de publicarse (en trámite).
+  cfcEnTramite: z.boolean().optional(),
   // Datos de la parte práctica (PÚLSAR): tipo clínico, empresa y lugar.
   tipoClinico: z.enum(['SVA', 'SVB', 'SVI', 'otro']).or(z.literal('')).nullish(),
   empresa: z.string().max(160).or(z.literal('')).nullish(),
@@ -108,7 +110,7 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     whatsapp_url: d.whatsappUrl,
     min_per_page: d.minPerPage, words_per_min: d.wordsPerMin, min_per_question: d.minPerQuestion,
     price_cents: d.priceCents, early_bird_until: d.earlyBirdUntil, late_surcharge_pct: d.lateSurchargePct,
-    billing_type: d.billingType, es_ope: d.esOpe,
+    billing_type: d.billingType, es_ope: d.esOpe, cfc_en_tramite: d.cfcEnTramite,
     tipo_clinico: d.tipoClinico, empresa: d.empresa, lugar: d.lugar,
     price_mensual_cents: d.priceMensualCents,
     price_trimestral_cents: d.priceTrimestralCents,

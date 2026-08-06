@@ -109,6 +109,7 @@ const RUTAS: Array<[RegExp, string]> = [
   [/^\/admin\/desafios/, 'admin-desafios'],
   [/^\/admin\/reconocimientos/, 'admin-diplomas'],
   [/^\/admin\/profesores/, 'admin-profesores'],
+  [/^\/admin\/usuarios/, 'admin-usuarios'],
   [/^\/admin\/auditores/, 'admin-cfc'],
   [/^\/admin\/perfil/, 'profesor-perfil'],
   [/^\/admin$/, 'admin-resumen'],

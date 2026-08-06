@@ -30,6 +30,7 @@ interface AvailableCourse {
 export default function StudentDashboard() {
   const user = useSession(['student'], '/login/student');
   const [mine, setMine] = useState<MyCourse[]>([]);
+  const [vistaMios, setVistaMios] = useState<'activos' | 'finalizados' | 'todos'>('activos');
   const [available, setAvailable] = useState<AvailableCourse[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -78,11 +79,24 @@ export default function StudentDashboard() {
           <div className="card-title">Mis cursos</div>
           <div className="card-subtitle">Cursos en los que estás matriculado</div>
         </div>
+        {mine.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            {([['activos', 'En curso'], ['finalizados', 'Finalizados'], ['todos', 'Todos']] as const).map(([v, label]) => (
+              <button key={v} type="button" onClick={() => setVistaMios(v)}
+                className={`tab ${vistaMios === v ? 'active' : ''}`} style={{ flex: 'unset', padding: '6px 14px' }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         {mine.length === 0 ? (
           <div className="muted">Aún no estás matriculado en ningún curso. ¡Explora los disponibles abajo!</div>
         ) : (
           <div className="grid grid-2">
-            {mine.map((c, i) => (
+            {mine
+              .filter((c) => vistaMios === 'todos'
+                || (vistaMios === 'finalizados' ? c.status === 'completado' : c.status !== 'completado'))
+              .map((c, i) => (
               <div key={c.id} className="press animate-in" style={{ border: '1px solid var(--gray-200)', borderLeft: `4px solid ${temaPalette(c.tema).main}`, borderRadius: 8, padding: 16, animationDelay: `${Math.min(i, 8) * 50}ms` }}>
                 <div style={{ fontWeight: 600 }}>{c.title}</div>
                 <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>

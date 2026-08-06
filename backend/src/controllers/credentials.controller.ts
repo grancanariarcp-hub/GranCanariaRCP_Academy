@@ -35,6 +35,39 @@ async function resetFor(table: 'users' | 'students', id: string, req: Request): 
   return { name: row.rows[0].name, email: row.rows[0].email, tempPassword };
 }
 
+/**
+ * GET /api/admin/accounts?q=... — buscador de cuentas para el super admin.
+ *
+ * Une staff (users) y alumnos (students) en una sola lista para poder llegar al
+ * perfil de cualquiera que se registre y, desde ahí, restablecerle la clave.
+ * Busca por nombre, correo o documento. Los menores se marcan aparte porque su
+ * contraseña no se resetea (entran con el código de su maestro).
+ */
+export async function listAccounts(req: Request, res: Response): Promise<void> {
+  const q = String(req.query.q ?? '').trim().toLowerCase();
+  if (q.length < 2) { res.json({ accounts: [] }); return; }
+  const like = `%${q}%`;
+  const { rows } = await query<{
+    id: string; tipo: string; nombre: string; email: string | null; detalle: string | null; es_menor: boolean;
+  }>(
+    `SELECT id, 'user' AS tipo, name AS nombre, email, role AS detalle, FALSE AS es_menor
+       FROM users
+      WHERE deleted_at IS NULL
+        AND (LOWER(name) LIKE $1 OR LOWER(email) LIKE $1 OR LOWER(COALESCE(dni,'')) LIKE $1)
+     UNION ALL
+     SELECT id, 'student' AS tipo, display_name AS nombre, email,
+            NULLIF(TRIM(CONCAT_WS(' · ', dni, CASE WHEN is_minor THEN 'menor' END)), '') AS detalle,
+            is_minor AS es_menor
+       FROM students
+      WHERE deleted_at IS NULL
+        AND (LOWER(display_name) LIKE $1 OR LOWER(COALESCE(email,'')) LIKE $1 OR LOWER(COALESCE(dni,'')) LIKE $1)
+     ORDER BY nombre
+     LIMIT 50`,
+    [like],
+  );
+  res.json({ accounts: rows });
+}
+
 /** super_admin: resetea la contraseña de cualquier cuenta de staff o alumno. */
 export async function adminResetPassword(req: Request, res: Response): Promise<void> {
   const { type, id } = req.params as { type: string; id: string };

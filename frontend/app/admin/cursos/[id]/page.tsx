@@ -71,6 +71,7 @@ interface Course {
   late_surcharge_pct: number | string | null;
   billing_type: string;
   es_ope: boolean;
+  cfc_en_tramite: boolean;
   tipo_clinico: string | null;
   empresa: string | null;
   lugar: string | null;
@@ -545,6 +546,23 @@ export default function CourseDetailPage() {
             </span>
           </label>
         </div>
+
+        {/* Visibilidad para la Comisión CFC (curso en trámite de acreditación) */}
+        {!course.es_ope && (
+          <div className="card" style={{ marginBottom: 24 }}>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14.5, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!course.cfc_en_tramite} style={{ marginTop: 3 }}
+                onChange={(e) => patchCourse({ cfcEnTramite: e.target.checked })} />
+              <span>
+                <strong>En trámite de CFC</strong>
+                <span className="muted" style={{ display: 'block', fontSize: 12.5, marginTop: 2 }}>
+                  Permite que la Comisión CFC vea este curso aunque todavía no esté publicado. Márcalo mientras
+                  dure el trámite de acreditación.
+                </span>
+              </span>
+            </label>
+          </div>
+        )}
 
         {/* Precio de matrícula, con matrícula anticipada */}
         <CoursePricing courseId={courseId} course={course} onSaved={load} />

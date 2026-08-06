@@ -103,6 +103,43 @@ export const ADMIN: Articulo[] = [
   },
 
   {
+    id: 'admin-usuarios',
+    titulo: 'Buscar cuentas y restablecer contraseñas',
+    resumen: 'Llegar a cualquiera que se registre y darle una clave temporal.',
+    seccion: 'Administración',
+    para: ['super_admin'],
+    cuerpo: [
+      {
+        tipo: 'texto',
+        texto:
+          'En **Usuarios** encuentras a cualquier persona registrada —profesor, alumno o institución— buscando por '
+          + 'nombre, correo o documento. Es lo que usas cuando alguien no puede entrar y te pide ayuda.',
+      },
+      { tipo: 'titulo', texto: 'Restablecer una contraseña' },
+      {
+        tipo: 'pasos',
+        pasos: [
+          'Busca a la persona y pulsa **Restablecer contraseña**.',
+          'Aparece una **clave temporal de un solo uso**. Cópiala y dásela (por teléfono, en persona…).',
+          'Al entrar con ella, la persona tendrá que definir su contraseña definitiva.',
+        ],
+      },
+      {
+        tipo: 'aviso',
+        texto:
+          'La clave temporal solo se muestra **una vez**. Si la pierdes, vuelve a restablecer. El envío automático '
+          + 'por correo se activará cuando el email de la plataforma esté configurado.',
+      },
+      {
+        tipo: 'texto',
+        texto:
+          'Los **menores** no aparecen con opción de restablecer: entran con el código de su maestro, no con contraseña.',
+      },
+    ],
+    relacionados: ['admin-profesores', 'acceder'],
+  },
+
+  {
     id: 'admin-convocatorias',
     titulo: 'Crear una convocatoria de oposición',
     resumen: 'El flujo completo: convocatoria, bancos, ficha y publicación.',

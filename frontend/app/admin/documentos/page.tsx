@@ -39,6 +39,16 @@ export default function DocumentosPage() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [cuota, setCuota] = useState<{ usadoBytes: number; limiteMb: number; ilimitada: boolean; pct: number } | null>(null);
+  // Filtros del listado: serán muchos documentos en poco tiempo.
+  const [q, setQ] = useState('');
+  const [fKind, setFKind] = useState<'' | 'erc' | 'pnrcp' | 'otro'>('');
+  const [soloMios, setSoloMios] = useState(false);
+
+  const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const docsFiltrados = docs.filter((d) =>
+    (fKind === '' || d.kind === fKind)
+    && (!soloMios || d.mio)
+    && (q.trim() === '' || norm(d.title).includes(norm(q))));
 
   async function borrar(d: DocRow) {
     if (!confirm(`¿Borrar «${d.title}»? Se liberará el espacio que ocupa.`)) return;
@@ -147,7 +157,24 @@ export default function DocumentosPage() {
         <div className="card">
           <div className="card-header">
             <div className="card-title">Documentos subidos</div>
-            <div className="card-subtitle">{docs.length} documentos</div>
+            <div className="card-subtitle">
+              {docsFiltrados.length === docs.length ? `${docs.length} documentos` : `${docsFiltrados.length} de ${docs.length}`}
+            </div>
+          </div>
+
+          {/* Filtros: el listado crecerá rápido y sin ellos deja de ser manejable. */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <input className="form-input" style={{ flex: 1, minWidth: 180 }} placeholder="Buscar por título…"
+              value={q} onChange={(e) => setQ(e.target.value)} />
+            <select className="form-select" style={{ width: 'auto' }} value={fKind} onChange={(e) => setFKind(e.target.value as typeof fKind)}>
+              <option value="">Todos los tipos</option>
+              <option value="erc">{KIND_LABEL.erc}</option>
+              <option value="pnrcp">{KIND_LABEL.pnrcp}</option>
+              <option value="otro">{KIND_LABEL.otro}</option>
+            </select>
+            <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+              <input type="checkbox" checked={soloMios} onChange={(e) => setSoloMios(e.target.checked)} /> Solo los míos
+            </label>
           </div>
 
           {/* Espacio consumido: el almacenamiento tiene coste real, así que
@@ -184,7 +211,7 @@ export default function DocumentosPage() {
                 </tr>
               </thead>
               <tbody>
-                {docs.map((d) => (
+                {docsFiltrados.map((d) => (
                   <tr key={d.id}>
                     <td style={{ fontSize: 13 }}>{d.title}</td>
                     <td>
@@ -199,7 +226,7 @@ export default function DocumentosPage() {
                     </td>
                   </tr>
                 ))}
-                {docs.length === 0 && (
+                {docsFiltrados.length === 0 && (
                   <tr>
                     <td colSpan={4}>
                       <div style={{ padding: '14px 4px' }}>

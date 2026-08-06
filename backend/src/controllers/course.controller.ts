@@ -25,6 +25,9 @@ const createSchema = z.object({
   resumen: z.string().optional(),
   acreditacion: z.string().max(200).optional(),
   cfc: z.string().max(120).optional(),
+  // Marca que el curso está en trámite de acreditación: hace que la Comisión CFC
+  // pueda verlo antes de publicarse.
+  cfcEnTramite: z.boolean().optional().default(false),
 });
 
 export async function createCourse(req: Request, res: Response): Promise<void> {
@@ -35,13 +38,13 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
     const { rows } = await client.query(
       `INSERT INTO courses
          (title, tema, subtema, duration_hours, modality, objetivo_general,
-          objetivos_especificos, publico_objetivo, price_cents, resumen, acreditacion, cfc, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          objetivos_especificos, publico_objetivo, price_cents, resumen, acreditacion, cfc, cfc_en_tramite, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING id, title, tema, subtema, status, created_at`,
       [
         data.title, data.tema ?? null, data.subtema ?? null, data.durationHours ?? null,
         data.modality, data.objetivoGeneral ?? null, data.objetivosEspecificos ?? null,
-        data.publicoObjetivo, data.priceCents, data.resumen ?? null, data.acreditacion ?? null, data.cfc ?? null, userId,
+        data.publicoObjetivo, data.priceCents, data.resumen ?? null, data.acreditacion ?? null, data.cfc ?? null, data.cfcEnTramite, userId,
       ],
     );
     const created = rows[0];
@@ -150,19 +153,32 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
 }
 
 export async function listCourses(req: Request, res: Response): Promise<void> {
-  // El auditor de la comisión revisa la plataforma entera, igual que el super
-  // admin, pero sin poder tocar nada (lo impide requireAuth).
-  const isSuper = req.auth!.role === 'super_admin' || req.auth!.role === 'auditor';
+  const rol = req.auth!.role;
+  // El auditor de la comisión revisa, pero solo lo que le compete: cursos ya
+  // publicados o marcados «en trámite de CFC». No los borradores a medio montar.
+  if (rol === 'auditor') {
+    const { rows } = await query(
+      `SELECT c.id, c.title, c.tema, c.subtema, c.status, c.enrollment_open, c.modality,
+              c.price_cents, c.created_at, c.cfc_en_tramite,
+              (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.id) AS modules
+         FROM courses c
+        WHERE c.status = 'publicado' OR c.cfc_en_tramite
+        ORDER BY c.created_at DESC`,
+    );
+    res.json({ courses: rows });
+    return;
+  }
+  const isSuper = rol === 'super_admin';
   const { rows } = isSuper
     ? await query(
         `SELECT c.id, c.title, c.tema, c.subtema, c.status, c.enrollment_open, c.modality,
-                c.price_cents, c.created_at,
+                c.price_cents, c.created_at, c.cfc_en_tramite, c.ends_at, c.acta_closed_at, c.es_ope,
                 (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.id) AS modules
          FROM courses c ORDER BY c.created_at DESC`,
       )
     : await query(
         `SELECT c.id, c.title, c.tema, c.subtema, c.status, c.enrollment_open, c.modality,
-                c.price_cents, c.created_at,
+                c.price_cents, c.created_at, c.ends_at, c.acta_closed_at, c.es_ope,
                 (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.id) AS modules,
                 cs.role AS my_role
          FROM courses c
@@ -289,8 +305,23 @@ export async function listCourseStudents(req: Request, res: Response): Promise<v
   res.json({ students: rows, totalActivities });
 }
 
-async function assertCanAccess(courseId: string, req: Request): Promise<void> {
-  if (req.auth!.role === 'super_admin' || req.auth!.role === 'auditor') return;
+async function assertCanAccess(courseId: string, req: Request, course?: { status: string; cfc_en_tramite?: boolean }): Promise<void> {
+  if (req.auth!.role === 'super_admin') return;
+  // El auditor solo entra a lo que le compete: publicado o en trámite de CFC.
+  // Si no, un borrador ajeno sería accesible tecleando su URL. Se carga el curso
+  // aquí cuando el llamador no lo pasa, para que la regla valga en todas las
+  // sub-pantallas del curso (duración, alumnos…) sin repetir la comprobación.
+  if (req.auth!.role === 'auditor') {
+    let c = course;
+    if (!c) {
+      const r = await query<{ status: string; cfc_en_tramite: boolean }>(
+        'SELECT status, cfc_en_tramite FROM courses WHERE id = $1', [courseId],
+      );
+      c = r.rows[0];
+    }
+    if (c && (c.status === 'publicado' || c.cfc_en_tramite)) return;
+    throw forbidden('La comisión solo puede consultar cursos publicados o en trámite de CFC');
+  }
   const { rows } = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [
     courseId, req.auth!.sub,
   ]);
@@ -301,7 +332,7 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
   const course = await query('SELECT * FROM courses WHERE id = $1', [id]);
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
-  await assertCanAccess(id, req);
+  await assertCanAccess(id, req, course.rows[0] as { status: string; cfc_en_tramite?: boolean });
 
   const [modules, staff, activities] = await Promise.all([
     query<{ id: string }>('SELECT id, title, sort_order, is_mandatory, starts_at, ends_at FROM modules WHERE course_id = $1 ORDER BY sort_order', [id]),
