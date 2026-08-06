@@ -6,17 +6,39 @@ name: Keep API warm
 #
 # Solo en horario activo (06:00-22:00 UTC ≈ 07:00-23:00 en Canarias) para no
 # agotar las 750 horas/mes de instancia del plan gratuito.
+#
+# IMPORTANTE: que este workflow "falle" casi nunca significa que la API esté
+# caída. Lo habitual es que GitHub no consiga una máquina para el trabajo
+# ("job was not acquired by Runner"): es un problema de la infraestructura
+# gratuita de GitHub, no de la plataforma, y un ping perdido es inofensivo
+# porque el siguiente (10 min después) despierta igual el servicio. El arreglo
+# de fondo —un monitor de uptime externo que solo avisa si la API está
+# realmente caída— está en docs/UPTIME.md.
 on:
   schedule:
     - cron: '*/10 6-22 * * *'
   workflow_dispatch: {}
 
+# Si un ping se solapa con el siguiente, se cancela el viejo en vez de acumular.
+concurrency:
+  group: keepalive
+  cancel-in-progress: true
+
 jobs:
   ping:
     runs-on: ubuntu-latest
+    # Un ping no debería tardar más de un par de minutos ni con arranque en frío.
+    timeout-minutes: 5
     steps:
-      - name: Ping API (health + una consulta a BD)
+      - name: Ping API (health + una consulta a BD), con reintentos
         run: |
-          curl -fsS -m 60 https://grancanaria-rcp-api.onrender.com/api/health > /dev/null
-          curl -fsS -m 60 https://grancanaria-rcp-api.onrender.com/api/public/courses > /dev/null
+          set -u
+          # El servicio puede estar arrancando en frío (502/503 durante ~50 s).
+          # Reintentar con espera evita marcar como fallo lo que solo es un
+          # despertar lento. --retry cubre errores de conexión y 5xx.
+          espera() {
+            curl -fsS -m 60 --retry 5 --retry-delay 15 --retry-all-errors "$1" > /dev/null
+          }
+          espera https://grancanaria-rcp-api.onrender.com/api/health
+          espera https://grancanaria-rcp-api.onrender.com/api/public/courses
           echo "API despierta"
