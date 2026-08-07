@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { query } from '../config/database.js';
+import { query, withTransaction } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
@@ -42,7 +42,8 @@ const updateCourseSchema = z.object({
   lateSurchargePct: z.number().min(0).max(500).optional(),
   // Cursos por suscripción: se paga por periodos mientras se prepara.
   billingType: z.enum(['unico', 'suscripcion']).optional(),
-  esOpe: z.boolean().optional(),
+  // El tipo (curso/OPE) NO se cambia aquí: se elige al crear y solo el super
+  // admin puede cambiarlo, y solo antes de la primera matrícula (cambiarTipo).
   // Que la Comisión CFC pueda ver el curso antes de publicarse (en trámite).
   cfcEnTramite: z.boolean().optional(),
   // Datos de la parte práctica (PÚLSAR): tipo clínico, empresa y lugar.
@@ -111,7 +112,7 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     whatsapp_url: d.whatsappUrl, telegram_url: d.telegramUrl,
     min_per_page: d.minPerPage, words_per_min: d.wordsPerMin, min_per_question: d.minPerQuestion,
     price_cents: d.priceCents, early_bird_until: d.earlyBirdUntil, late_surcharge_pct: d.lateSurchargePct,
-    billing_type: d.billingType, es_ope: d.esOpe, cfc_en_tramite: d.cfcEnTramite,
+    billing_type: d.billingType, cfc_en_tramite: d.cfcEnTramite,
     tipo_clinico: d.tipoClinico, empresa: d.empresa, lugar: d.lugar,
     price_mensual_cents: d.priceMensualCents,
     price_trimestral_cents: d.priceTrimestralCents,
@@ -368,6 +369,70 @@ export async function removeStaff(req: Request, res: Response): Promise<void> {
  *
  * Para esos casos está archivar, que lo retira de circulación sin destruir nada.
  */
+/**
+ * PATCH /api/courses/:id/tipo — cambiar entre Curso y OPE.
+ *
+ * El tipo se elige al crear y es, de hecho, irreversible: un Curso y una OPE no
+ * comparten campos suficientes como para convertir uno en otro sin dejar un
+ * registro a medias. La única marcha atrás es para el SUPER ADMIN y solo
+ * mientras el curso siga siendo un borrador virgen —sin matrículas, cobros,
+ * certificados ni actas—: ahí todavía no hay nada de nadie que proteger.
+ *
+ * Al cambiar se descarta el contenido que no aplica al nuevo tipo (los módulos
+ * de un Curso, o los bancos asignados de una OPE): quien lo pide ya sabe que
+ * empieza esa parte de cero.
+ */
+export async function cambiarTipoCurso(req: Request, res: Response): Promise<void> {
+  if (req.auth!.role !== 'super_admin') {
+    throw forbidden('Solo el super admin puede cambiar el tipo de un curso');
+  }
+  const { tipo } = z.object({ tipo: z.enum(['curso', 'ope']) }).parse(req.body);
+  const esOpe = tipo === 'ope';
+
+  const cur = await query<{ es_ope: boolean; status: string }>('SELECT es_ope, status FROM courses WHERE id = $1', [req.params.id]);
+  if (cur.rows.length === 0) throw notFound('Curso no encontrado');
+  if (cur.rows[0].es_ope === esOpe) { res.json({ ok: true, sinCambios: true }); return; }
+
+  // Mismo listón que el borrado: en cuanto hay rastro de alguien, el tipo queda fijo.
+  const { rows } = await query<{ matriculas: string; pagos: string; certificados: string; actas: string }>(
+    `SELECT (SELECT COUNT(*) FROM enrollments        WHERE course_id = $1)::text AS matriculas,
+            (SELECT COUNT(*) FROM payments           WHERE course_id = $1)::text AS pagos,
+            (SELECT COUNT(*) FROM issued_certificates WHERE course_id = $1)::text AS certificados,
+            (SELECT COUNT(*) FROM course_actas       WHERE course_id = $1)::text AS actas`,
+    [req.params.id],
+  );
+  const r = rows[0];
+  if (Number(r.matriculas) + Number(r.pagos) + Number(r.certificados) + Number(r.actas) > 0) {
+    throw badRequest(
+      'Este curso ya tiene actividad (matrículas, cobros, certificados o actas): su tipo no puede cambiarse. '
+      + 'Si de verdad necesitas el otro tipo, créalo nuevo.',
+      'CURSO_CON_HISTORIAL',
+    );
+  }
+
+  await withTransaction(async (c) => {
+    if (esOpe) {
+      // Curso → OPE: se van los módulos (y con ellos sus actividades y exámenes).
+      await c.query('DELETE FROM modules WHERE course_id = $1', [req.params.id]);
+    } else {
+      // OPE → Curso: se deshace su vínculo con los bancos; y vuelve a nacer con
+      // un módulo de Bienvenida, como cualquier curso recién creado.
+      await c.query('DELETE FROM ope_convocatorias WHERE course_id = $1', [req.params.id]);
+      await c.query(
+        `INSERT INTO modules (course_id, title, sort_order) VALUES ($1, 'Bienvenida', 0)`,
+        [req.params.id],
+      );
+    }
+    await c.query('UPDATE courses SET es_ope = $1, updated_at = NOW() WHERE id = $2', [esOpe, req.params.id]);
+  });
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role, action: 'COURSE_TYPE_CHANGED',
+    entity: 'course', entityId: req.params.id, ip: clientIp(req), metadata: { tipo },
+  }).catch(() => { /* el cambio no debe fallar por el registro */ });
+  res.json({ ok: true, esOpe });
+}
+
 export async function deleteCourse(req: Request, res: Response): Promise<void> {
   const rel = await relacionConCurso(req.params.id, req.auth!.sub);
   if (!rel.existe) throw notFound('Curso no encontrado');

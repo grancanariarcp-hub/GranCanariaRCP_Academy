@@ -213,6 +213,23 @@ export default function CourseDetailPage() {
     }
   }
 
+  // Cambiar entre Curso y OPE (solo super admin, solo sin matrículas). Descarta
+  // el contenido incompatible del nuevo tipo, así que se avisa antes.
+  async function cambiarTipo() {
+    if (!course) return;
+    const aOpe = !course.es_ope;
+    const msg = aOpe
+      ? '¿Convertir este curso en una OPE? Se borrarán sus módulos y actividades (una OPE no los tiene). No se puede deshacer una vez haya alumnos.'
+      : '¿Convertir esta OPE en un curso? Se desvincularán sus bancos de preguntas y volverá a empezar con un módulo de Bienvenida.';
+    if (!confirm(msg)) return;
+    try {
+      await api(`/api/courses/${courseId}/tipo`, { method: 'PATCH', auth: true, body: JSON.stringify({ tipo: aOpe ? 'ope' : 'curso' }) });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo cambiar el tipo');
+    }
+  }
+
   // Ocultar retira el curso de la portada sin destruir nada: los matriculados
   // conservan su acceso y el histórico queda intacto.
   async function ocultar() {
@@ -532,22 +549,25 @@ export default function CourseDetailPage() {
           {/* Acta: un curso OPE no titula, así que no la necesita */}
         {!course.es_ope && <div data-tour="acta"><ActaPanel courseId={courseId} /></div>}
 
-        {/* Tipo de curso: un curso OPE es un generador de exámenes y no
-            necesita profesorado, encuesta, certificado ni acta. */}
+        {/* Tipo (Curso u OPE): se elige al crear. El super admin puede cambiarlo
+            solo mientras no haya ninguna matrícula; después queda fijo. */}
         <div className="card" style={{ marginBottom: 24 }}>
-          <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14.5, cursor: 'pointer' }}>
-            <input type="checkbox" checked={!!course.es_ope} style={{ marginTop: 3 }}
-              onChange={(e) => patchCourse({ esOpe: e.target.checked })} />
-            <span>
-              <strong>Curso de preparación de oposiciones (OPE)</strong>
-              <span className="muted" style={{ display: 'block', fontSize: 12.5, marginTop: 2 }}>
-                Es un generador de exámenes con seguimiento del avance: no imparte docencia, no evalúa ni
-                titula. Al marcarlo se ocultan los bloques que no le aplican —profesorado, encuesta de
-                satisfacción, acreditación CFC, certificado, asistencia y acta— y quedan la ficha, el precio
-                y sus bancos de preguntas.
-              </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 14.5 }}>
+              Tipo: <strong>{course.es_ope ? 'OPE (generador de exámenes)' : 'Curso'}</strong>
             </span>
-          </label>
+            {user.role === 'super_admin' && students.length === 0 && (
+              <button className="btn btn-outline btn-small" onClick={cambiarTipo}>
+                Cambiar a {course.es_ope ? 'Curso' : 'OPE'}
+              </button>
+            )}
+          </div>
+          <p className="muted" style={{ fontSize: 12.5, marginTop: 6, marginBottom: 0 }}>
+            {course.es_ope
+              ? 'Una OPE es un generador de exámenes: no tiene profesorado, temario, acta ni certificado.'
+              : 'Un curso imparte docencia, con temario, exámenes y certificado.'}
+            {user.role === 'super_admin' && students.length > 0 && ' El tipo ya no puede cambiarse: hay alumnos matriculados.'}
+          </p>
         </div>
 
         {/* Visibilidad para la Comisión CFC (curso en trámite de acreditación) */}
