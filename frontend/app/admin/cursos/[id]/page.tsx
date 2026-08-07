@@ -86,6 +86,17 @@ interface Course {
 
 const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
 
+// Fila del panel de Resumen: verde si está listo, ámbar si falta.
+function ResumenItem({ ok, label, hint }: { ok: boolean; label: string; hint: string }) {
+  return (
+    <div className="resumen-item">
+      <span className={`ficha-dot ficha-dot-${ok ? 'ok' : 'falta'}`} />
+      <span className="resumen-label">{label}</span>
+      <span className="muted" style={{ fontSize: 12.5 }}>{hint}</span>
+    </div>
+  );
+}
+
 export default function CourseDetailPage() {
   const params = useParams();
   const courseId = params.id as string;
@@ -125,6 +136,7 @@ export default function CourseDetailPage() {
   const [tempPw, setTempPw] = useState<{ name: string; pw: string } | null>(null);
   const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pestana, setPestana] = useState('resumen'); // pestaña visible de la ficha
 
   const [newModule, setNewModule] = useState('');
 
@@ -206,6 +218,17 @@ export default function CourseDetailPage() {
     if (user) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  // Las guías paso a paso resaltan elementos que ahora viven en pestañas: cuando
+  // una guía necesita una, la pide por evento y aquí la abrimos.
+  useEffect(() => {
+    const abrirPestana = (e: Event) => {
+      const tab = (e as CustomEvent<string>).detail;
+      if (typeof tab === 'string') setPestana(tab);
+    };
+    window.addEventListener('curso-pestana', abrirPestana);
+    return () => window.removeEventListener('curso-pestana', abrirPestana);
+  }, []);
 
   async function patchCourse(body: object) {
     try {
@@ -465,6 +488,19 @@ export default function CourseDetailPage() {
   // docente es de quien lo firma.
   const esMio = !course?.created_by || course.created_by === user.id;
 
+  // Pestañas de la ficha. Una OPE no tiene temario, profesorado ni cierre, así
+  // que muestra menos pestañas. El punto verde/rojo señala de un vistazo qué
+  // secciones están completas sin tener que entrar en cada una.
+  const esOpe = !!course?.es_ope;
+  const TABS: Array<[string, string]> = esOpe
+    ? [['resumen', 'Resumen'], ['ficha', 'Ficha'], ['precio', 'Precio'], ['alumnos', 'Alumnos']]
+    : [['resumen', 'Resumen'], ['ficha', 'Ficha'], ['contenido', 'Contenido'], ['precio', 'Precio'], ['alumnos', 'Alumnos'], ['profesorado', 'Profesorado'], ['cierre', 'Cierre'], ['foro', 'Foro']];
+  const tabEstado: Record<string, 'ok' | 'falta' | undefined> = {
+    contenido: modules.length ? 'ok' : 'falta',
+    profesorado: staff.some((s) => s.status === 'pendiente') ? 'falta' : (staff.length ? 'ok' : 'falta'),
+    cierre: cfc ? (cfc.resumen.faltan === 0 ? 'ok' : 'falta') : undefined,
+  };
+
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={nav}>
       <PageNav backHref="/admin/cursos" backLabel="Volver a cursos" />
@@ -522,8 +558,55 @@ export default function CourseDetailPage() {
             )}
           </div>
 
+          {/* Barra de pestañas: divide la ficha por bloques para no abrumar */}
+          <div className="ficha-tabs">
+            {TABS.map(([id, label]) => (
+              <button
+                key={id}
+                className={`ficha-tab ${pestana === id ? 'ficha-tab-on' : ''}`}
+                onClick={() => setPestana(id)}
+              >
+                {label}
+                {tabEstado[id] && <span className={`ficha-dot ficha-dot-${tabEstado[id]}`} />}
+              </button>
+            ))}
+          </div>
+
+          {/* Resumen: estado del curso de un vistazo */}
+          {pestana === 'resumen' && (
+            <div className="card" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <div className="card-title">Situación del curso</div>
+                <div className="card-subtitle">De un vistazo: qué está listo y qué falta</div>
+              </div>
+              <div className="resumen-checklist">
+                <ResumenItem ok={course.status === 'publicado'}
+                  label={course.status === 'publicado' ? 'Publicado' : 'En borrador'}
+                  hint={course.status === 'publicado' ? (course.enrollment_open ? 'matrícula abierta' : 'próximamente') : 'no visible en la portada'} />
+                <ResumenItem ok={!!course.resumen}
+                  label="Ficha" hint={course.resumen ? 'resumen y datos rellenados' : 'falta el resumen'} />
+                {!esOpe && (
+                  <ResumenItem ok={modules.length > 0}
+                    label="Contenido" hint={`${modules.length} módulo(s)`} />
+                )}
+                <ResumenItem ok={course.price_cents > 0 || !!course.price_mensual_cents}
+                  label="Precio" hint={course.price_cents > 0 ? `${(course.price_cents / 100).toFixed(2)} €` : (course.price_mensual_cents ? 'suscripción' : 'gratuito / sin definir')} />
+                <ResumenItem ok={students.length > 0}
+                  label="Alumnos" hint={`${students.length} matriculado(s)`} />
+                {!esOpe && (
+                  <ResumenItem ok={staff.length > 0 && !staff.some((s) => s.status === 'pendiente')}
+                    label="Profesorado" hint={staff.some((s) => s.status === 'pendiente') ? 'hay invitaciones sin aceptar' : `${staff.length} profesor(es)`} />
+                )}
+                {!esOpe && (
+                  <ResumenItem ok={!!course.cfc_solicitado_at}
+                    label="CFC" hint={course.cfc_solicitado_at ? 'solicitud registrada' : 'sin solicitar'} />
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Panel del curso */}
-          {cdash && (
+          {pestana === 'resumen' && cdash && (
             <div className="card animate-in" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Panel del curso</div>
@@ -566,10 +649,11 @@ export default function CourseDetailPage() {
           )}
 
           {/* Acta: un curso OPE no titula, así que no la necesita */}
-        {!course.es_ope && <div data-tour="acta"><ActaPanel courseId={courseId} /></div>}
+        {pestana === 'cierre' && !course.es_ope && <div data-tour="acta"><ActaPanel courseId={courseId} /></div>}
 
         {/* Tipo (Curso u OPE): se elige al crear. El super admin puede cambiarlo
             solo mientras no haya ninguna matrícula; después queda fijo. */}
+        {pestana === 'ficha' && (
         <div className="card" style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 14.5 }}>
@@ -588,9 +672,10 @@ export default function CourseDetailPage() {
             {user.role === 'super_admin' && students.length > 0 && ' El tipo ya no puede cambiarse: hay alumnos matriculados.'}
           </p>
         </div>
+        )}
 
         {/* Acreditación CFC: solicitud y bloqueo de campos acreditables */}
-        {!course.es_ope && (
+        {pestana === 'ficha' && !course.es_ope && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <div className="card-title">Acreditación CFC</div>
@@ -623,6 +708,8 @@ export default function CourseDetailPage() {
           </div>
         )}
 
+        {pestana === 'precio' && (
+        <>
         {/* Precio de matrícula, con matrícula anticipada */}
         <CoursePricing courseId={courseId} course={course} onSaved={load} />
 
@@ -631,14 +718,17 @@ export default function CourseDetailPage() {
 
         {/* Cobro recurrente por periodos */}
         <CourseSubscription courseId={courseId} course={course} onSaved={load} />
+        </>
+        )}
 
         {/* Asistencia presencial: no aplica a un curso OPE */}
-        {!course.es_ope && <AttendancePanel courseId={courseId} />}
+        {pestana === 'alumnos' && !course.es_ope && <AttendancePanel courseId={courseId} />}
 
         {/* Subgrupos + puente con PÚLSAR: solo para cursos con parte práctica */}
-        {!course.es_ope && <div data-tour="pulsar"><SubgruposPanel courseId={courseId} /></div>}
+        {pestana === 'alumnos' && !course.es_ope && <div data-tour="pulsar"><SubgruposPanel courseId={courseId} /></div>}
 
         {/* Ficha del curso */}
+          {pestana === 'ficha' && (<>
           <div className="card" data-tour="ficha" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <div className="card-title">Ficha del curso <Ayuda tema="profesor-curso-crear" /></div>
@@ -745,9 +835,10 @@ export default function CourseDetailPage() {
             </div>
             {gallery.length === 0 && <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>Sin imágenes. Si no añades ninguna, la ficha usa la miniatura.</p>}
           </div>
+          </>)}
 
           {/* Duración lectiva (CFC) */}
-          {dur && (
+          {pestana === 'contenido' && dur && (
             <div className="card animate-in" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Duración lectiva estimada</div>
@@ -794,7 +885,7 @@ export default function CourseDetailPage() {
           )}
 
           {/* Resultados de la encuesta: un curso OPE no evalúa docencia */}
-          {surv && !course.es_ope && (
+          {pestana === 'cierre' && surv && !course.es_ope && (
             <div className="card animate-in" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Encuesta de satisfacción</div>
@@ -843,7 +934,7 @@ export default function CourseDetailPage() {
           )}
 
           {/* Asistente CFC: un curso OPE no se acredita */}
-          {cfc && !course.es_ope && (
+          {pestana === 'cierre' && cfc && !course.es_ope && (
             <div className="card animate-in" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Asistente de acreditación (CFC)</div>
@@ -871,7 +962,7 @@ export default function CourseDetailPage() {
           )}
 
           {/* Certificado: un curso OPE no titula, así que no lo emite */}
-          {!course.es_ope && (
+          {pestana === 'cierre' && !course.es_ope && (
           <div className="card" style={{ marginBottom: 24 }}>
             <div className="card-header">
               <div className="card-title">Certificado <Ayuda tema="profesor-certificados" /></div>
@@ -914,9 +1005,9 @@ export default function CourseDetailPage() {
           </div>
           )}
 
-          <div className="grid grid-2">
-            {/* Módulos + actividades */}
-            <div className="card" data-tour="contenido">
+          {/* Módulos + actividades */}
+          {pestana === 'contenido' && (
+            <div className="card" data-tour="contenido" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Contenido del curso <Ayuda tema="profesor-curso-modulos" /></div>
                 <div className="card-subtitle">{modules.length} módulos</div>
@@ -1024,9 +1115,11 @@ export default function CourseDetailPage() {
                 <button className="btn btn-primary btn-small" onClick={addModule}>+ Módulo</button>
               </div>
             </div>
+          )}
 
-            {/* Alumnos matriculados */}
-            <div className="card animate-in">
+          {/* Alumnos matriculados */}
+          {pestana === 'alumnos' && (
+            <div className="card animate-in" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Alumnos matriculados <Ayuda tema="profesor-alumnos" /></div>
                 <div className="card-subtitle">{students.length}</div>
@@ -1074,10 +1167,11 @@ export default function CourseDetailPage() {
                 </div>
               )}
             </div>
+          )}
 
-            {/* Staff */}
-            {!course.es_ope && (
-            <div className="card">
+          {/* Staff */}
+          {pestana === 'profesorado' && !course.es_ope && (
+            <div className="card" style={{ marginBottom: 24 }}>
               <div className="card-header">
                 <div className="card-title">Profesores del curso</div>
                 <div className="card-subtitle">Directores e instructores</div>
@@ -1132,13 +1226,14 @@ export default function CourseDetailPage() {
               </form>
             </div>
             )}
-          </div>
         </>
       )}
 
-      <div className="card" style={{ marginTop: 24 }}>
-        <CourseForum courseId={courseId} />
-      </div>
+      {course && pestana === 'foro' && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <CourseForum courseId={courseId} />
+        </div>
+      )}
     </AppShell>
   );
 }

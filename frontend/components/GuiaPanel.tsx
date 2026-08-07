@@ -78,6 +78,9 @@ export function GuiaPanel() {
   useEffect(() => {
     if (!paso?.target || !enPantalla) { setRect(null); return; }
     let cancelado = false;
+    // Si el elemento vive dentro de una pestaña de la ficha, pídele a la página
+    // que la abra antes de intentar resaltarlo.
+    if (paso.tab) window.dispatchEvent(new CustomEvent('curso-pestana', { detail: paso.tab }));
     const situar = () => {
       const el = document.querySelector(paso.target!) as HTMLElement | null;
       if (!el) { setRect(null); return; }

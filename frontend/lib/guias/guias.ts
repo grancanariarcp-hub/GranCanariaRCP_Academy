@@ -23,6 +23,11 @@ export interface PasoGuia {
   irA?: string;
   /** Elemento a resaltar en esa pantalla (por su atributo data-tour). */
   target?: string;
+  /**
+   * En la ficha de un curso el contenido va por pestañas. Si el elemento a
+   * resaltar vive dentro de una, se indica aquí para que la guía la abra sola.
+   */
+  tab?: string;
 }
 
 export interface Guia {
@@ -71,6 +76,7 @@ export const GUIAS: Guia[] = [
           + 'clínico** (SVA/SVB/SVI) para PÚLSAR.',
         ruta: '/admin/cursos/',
         target: '[data-tour="ficha"]',
+        tab: 'ficha',
       },
       {
         titulo: 'Publica y abre matrícula',
@@ -114,6 +120,7 @@ export const GUIAS: Guia[] = [
           + '«Examen final»). Los módulos ordenan el curso.',
         ruta: '/admin/cursos/',
         target: '[data-tour="contenido"]',
+        tab: 'contenido',
       },
       {
         titulo: 'Añade actividades a cada módulo',
@@ -122,6 +129,7 @@ export const GUIAS: Guia[] = [
           + '**test** de repaso o **examen**. Para un documento, elígelo del desplegable con tus archivos ya subidos.',
         ruta: '/admin/cursos/',
         target: '[data-tour="contenido"]',
+        tab: 'contenido',
       },
       {
         titulo: 'Monta el examen final',
@@ -130,6 +138,7 @@ export const GUIAS: Guia[] = [
           + 'Cada alumno recibe una combinación distinta. Configura la nota de corte y, si quieres, el tiempo.',
         ruta: '/admin/cursos/',
         target: '[data-tour="contenido"]',
+        tab: 'contenido',
       },
       {
         titulo: 'Listo',
@@ -150,6 +159,7 @@ export const GUIAS: Guia[] = [
           + 'así que conviene que ya no vayan a cambiar.',
         ruta: '/admin/cursos/',
         target: '[data-tour="acta"]',
+        tab: 'cierre',
       },
       {
         titulo: 'Revisa el borrador del acta',
@@ -158,6 +168,7 @@ export const GUIAS: Guia[] = [
           + 'Comprueba aptos, no aptos y asistencia.',
         ruta: '/admin/cursos/',
         target: '[data-tour="acta"]',
+        tab: 'cierre',
       },
       {
         titulo: 'Si el curso tiene práctica, impórtala antes',
@@ -166,6 +177,7 @@ export const GUIAS: Guia[] = [
           + 'importar con PÚLSAR»): el acta necesita la nota práctica para decidir quién es apto.',
         ruta: '/admin/cursos/',
         target: '[data-tour="pulsar"]',
+        tab: 'alumnos',
       },
       {
         titulo: 'Cierra el acta',
@@ -174,6 +186,7 @@ export const GUIAS: Guia[] = [
           + 'detecta cualquier alteración posterior. Un acta cerrada no se modifica; si hay error, se emite otra versión.',
         ruta: '/admin/cursos/',
         target: '[data-tour="acta"]',
+        tab: 'cierre',
       },
       {
         titulo: 'Los certificados salen solos',
@@ -196,6 +209,7 @@ export const GUIAS: Guia[] = [
           + 'exportarlo. El panel te avisa de quién falta.',
         ruta: '/admin/cursos/',
         target: '[data-tour="pulsar"]',
+        tab: 'alumnos',
       },
       {
         titulo: 'Forma los subgrupos (opcional)',
@@ -204,6 +218,7 @@ export const GUIAS: Guia[] = [
           + '(reparto equilibrado) o manuales. Viajarán en el archivo.',
         ruta: '/admin/cursos/',
         target: '[data-tour="pulsar"]',
+        tab: 'alumnos',
       },
       {
         titulo: 'Exporta el curso',
@@ -212,6 +227,7 @@ export const GUIAS: Guia[] = [
           + 'los subgrupos. Ese archivo se importa en PÚLSAR para la práctica.',
         ruta: '/admin/cursos/',
         target: '[data-tour="pulsar"]',
+        tab: 'alumnos',
       },
       {
         titulo: 'Tras la práctica, importa los resultados',
@@ -220,6 +236,7 @@ export const GUIAS: Guia[] = [
           + 'casa por documento y a quién no, antes de aplicar nada.',
         ruta: '/admin/cursos/',
         target: '[data-tour="pulsar"]',
+        tab: 'alumnos',
       },
       {
         titulo: 'Y a cerrar el acta',

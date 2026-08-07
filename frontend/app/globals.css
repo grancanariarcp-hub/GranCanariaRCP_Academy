@@ -1293,3 +1293,58 @@ summary:focus-visible,
 .wiz-opc .wiz-punto { background: var(--gray-500); }
 /* Bloque seleccionado: se resalta con un anillo, conservando su color de estado. */
 .wiz-tab.sel { box-shadow: 0 0 0 2px var(--secondary-dark) inset; }
+
+/* Pestañas de la ficha de un curso (Resumen · Ficha · Contenido · …). */
+.ficha-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  border-bottom: 2px solid var(--gray-200);
+}
+.ficha-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  background: transparent;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.ficha-tab:hover { color: var(--primary-dark); }
+.ficha-tab-on {
+  color: var(--primary-dark);
+  border-bottom-color: var(--primary-dark);
+}
+.ficha-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ficha-dot-ok { background: var(--success); }
+.ficha-dot-falta { background: var(--danger); }
+
+/* Panel de Resumen: lista de estado del curso. */
+.resumen-checklist { display: flex; flex-direction: column; gap: 2px; }
+.resumen-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--gray-200);
+}
+.resumen-item:last-child { border-bottom: none; }
+.resumen-label { font-weight: 600; font-size: 14px; min-width: 110px; }
+
+@media (max-width: 640px) {
+  .ficha-tabs { gap: 0; }
+  .ficha-tab { padding: 8px 11px; font-size: 12.5px; }
+}
