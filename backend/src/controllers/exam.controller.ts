@@ -266,7 +266,9 @@ export async function addExamQuestionsFromBank(req: Request, res: Response): Pro
   );
   if (bank.rows.length === 0) throw notFound('Banco no encontrado');
   if (req.auth!.role !== 'super_admin' && bank.rows[0].visibility !== 'publico' && bank.rows[0].created_by !== req.auth!.sub) {
-    throw forbidden('No puedes usar ese banco');
+    // Puede ser un banco restringido compartido con este profesor.
+    const acc = await query('SELECT 1 FROM bank_access WHERE bank_id = $1 AND user_id = $2', [bankId, req.auth!.sub]);
+    if (acc.rows.length === 0) throw forbidden('No puedes usar ese banco');
   }
 
   const qs = await query<{ text: string; options: string[]; correct_index: number }>(
@@ -310,7 +312,8 @@ export async function bankAvailability(req: Request, res: Response): Promise<voi
   // Solo bancos propios o públicos (el super_admin ve todos).
   const allowed = await query<{ id: string }>(
     `SELECT id FROM question_banks
-      WHERE id = ANY($1) AND ($2::boolean OR visibility = 'publico' OR created_by = $3)`,
+      WHERE id = ANY($1) AND ($2::boolean OR visibility = 'publico' OR created_by = $3
+        OR EXISTS (SELECT 1 FROM bank_access ba WHERE ba.bank_id = question_banks.id AND ba.user_id = $3))`,
     [bankIds, req.auth!.role === 'super_admin', req.auth!.sub],
   );
   const ids = allowed.rows.map((r) => r.id);
@@ -360,7 +363,8 @@ export async function createExamWizard(req: Request, res: Response): Promise<voi
   // Bancos permitidos (propios o públicos).
   const allowed = await query<{ id: string }>(
     `SELECT id FROM question_banks
-      WHERE id = ANY($1) AND ($2::boolean OR visibility = 'publico' OR created_by = $3)`,
+      WHERE id = ANY($1) AND ($2::boolean OR visibility = 'publico' OR created_by = $3
+        OR EXISTS (SELECT 1 FROM bank_access ba WHERE ba.bank_id = question_banks.id AND ba.user_id = $3))`,
     [d.bankIds, req.auth!.role === 'super_admin', req.auth!.sub],
   );
   const ids = allowed.rows.map((r) => r.id);

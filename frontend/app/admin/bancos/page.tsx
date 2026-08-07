@@ -22,7 +22,7 @@ interface Bank {
   sim_questions: number | null;
   sim_minutes: number | null;
   sim_pass_pct: number | null;
-  visibility: 'privado' | 'publico';
+  visibility: 'privado' | 'publico' | 'restringido';
   mine: boolean;
   canManage: boolean;
 }
@@ -63,7 +63,11 @@ export default function BancosPage() {
   const [dim1, setDim1] = useState('');
   const [dim2, setDim2] = useState('');
   const [official, setOfficial] = useState(false);
-  const [visibility, setVisibility] = useState<'privado' | 'publico'>('privado');
+  const [visibility, setVisibility] = useState<'privado' | 'publico' | 'restringido'>('privado');
+  // Lista de acceso de un banco restringido (solo al editar uno que ya existe).
+  const [accesoPersonas, setAccesoPersonas] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [accesoEmail, setAccesoEmail] = useState('');
+  const [accesoMsg, setAccesoMsg] = useState<string | null>(null);
   const [simQ, setSimQ] = useState('');
   const [simMin, setSimMin] = useState('');
   const [simPass, setSimPass] = useState('');
@@ -106,6 +110,7 @@ export default function BancosPage() {
   function resetForm() {
     setEditingId(null); setName(''); setKind('rcp'); setAnio('');
     setDim1(''); setDim2(''); setOfficial(false); setSimQ(''); setSimMin(''); setSimPass('');
+    setVisibility('privado'); setAccesoPersonas([]); setAccesoEmail(''); setAccesoMsg(null);
   }
 
   function startEdit(b: Bank) {
@@ -114,8 +119,35 @@ export default function BancosPage() {
     setDim1(b.comunidad_autonoma ?? ''); setDim2(b.categoria_profesional ?? '');
     setOfficial(b.official);
     setSimQ(b.sim_questions?.toString() ?? ''); setSimMin(b.sim_minutes?.toString() ?? ''); setSimPass(b.sim_pass_pct?.toString() ?? '');
-    setMsg(null);
+    setMsg(null); setAccesoMsg(null); setAccesoEmail('');
+    if (b.visibility === 'restringido') cargarAcceso(b.id); else setAccesoPersonas([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // --- Lista de acceso de un banco restringido ---
+  async function cargarAcceso(bankId: string) {
+    try {
+      const r = await api<{ personas: Array<{ id: string; name: string; email: string }> }>(`/api/banks/${bankId}/acceso`, { auth: true });
+      setAccesoPersonas(r.personas);
+    } catch { setAccesoPersonas([]); }
+  }
+  async function agregarAcceso() {
+    if (!editingId || !accesoEmail.trim()) return;
+    setAccesoMsg(null);
+    try {
+      await api(`/api/banks/${editingId}/acceso`, { method: 'POST', auth: true, body: JSON.stringify({ email: accesoEmail.trim() }) });
+      setAccesoEmail('');
+      cargarAcceso(editingId);
+    } catch (err) {
+      setAccesoMsg(err instanceof ApiError ? err.message : 'No se pudo añadir');
+    }
+  }
+  async function quitarAcceso(userId: string) {
+    if (!editingId) return;
+    try {
+      await api(`/api/banks/${editingId}/acceso/${userId}`, { method: 'DELETE', auth: true });
+      cargarAcceso(editingId);
+    } catch { /* ignore */ }
   }
 
   async function submitForm(e: React.FormEvent) {
@@ -135,6 +167,7 @@ export default function BancosPage() {
       simQuestions: s.sim && simQ ? Number(simQ) : null,
       simMinutes: s.sim && simMin ? Number(simMin) : null,
       simPassPct: s.sim && simPass ? Number(simPass) : null,
+      visibility,
     };
     try {
       if (editingId) {
@@ -307,11 +340,46 @@ export default function BancosPage() {
 
             <div className="form-group">
               <label className="form-label">Visibilidad</label>
-              <select className="form-select" value={visibility} onChange={(e) => setVisibility(e.target.value as 'privado' | 'publico')}>
+              <select className="form-select" value={visibility} onChange={(e) => setVisibility(e.target.value as typeof visibility)}>
                 <option value="privado">Privado — solo yo</option>
-                <option value="publico">Público — otros profesores pueden usarlo como fuente (no descargarlo)</option>
+                <option value="publico">Público — cualquier profesor puede usarlo como fuente (no descargarlo)</option>
+                <option value="restringido">Restringido — solo los profesores que yo elija</option>
               </select>
             </div>
+
+            {/* Lista de acceso: solo tiene sentido sobre un banco que ya existe. */}
+            {visibility === 'restringido' && (
+              <div className="info-box" style={{ marginBottom: 12 }}>
+                {!editingId ? (
+                  <p className="muted" style={{ fontSize: 13, margin: 0 }}>
+                    Guarda primero el banco y vuelve a abrirlo para elegir a qué profesores das acceso.
+                  </p>
+                ) : (
+                  <>
+                    <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>Profesores con acceso</div>
+                    {accesoPersonas.length === 0 ? (
+                      <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Aún no has dado acceso a nadie. Solo tú lo ves.</p>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                        {accesoPersonas.map((p) => (
+                          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                            <span>{p.name} <span className="muted">· {p.email}</span></span>
+                            <button type="button" className="link-action danger" onClick={() => quitarAcceso(p.id)}>Quitar</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {accesoMsg && <div className="alert alert-error" style={{ fontSize: 13 }}>{accesoMsg}</div>}
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input className="form-input" style={{ flex: 1 }} type="email" placeholder="email del profesor"
+                        value={accesoEmail} onChange={(e) => setAccesoEmail(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregarAcceso(); } }} />
+                      <button type="button" className="btn btn-outline btn-small" onClick={agregarAcceso}>Añadir</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {shape.official && (
               <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, marginBottom: 12 }}>
@@ -353,8 +421,10 @@ export default function BancosPage() {
                           b.anio || null,
                           b.comunidad_autonoma,
                           b.categoria_profesional,
-                          b.mine ? 'mío' : 'público',
-                          b.visibility === 'privado' ? 'privado' : null,
+                          b.mine ? 'mío' : null,
+                          b.mine
+                            ? (b.visibility === 'privado' ? 'privado' : b.visibility === 'restringido' ? 'restringido' : 'público')
+                            : (b.visibility === 'restringido' ? 'compartido conmigo' : 'público'),
                           b.official ? 'oficial' : null,
                           b.sim_questions ? `sim ${b.sim_questions}p/${b.sim_minutes ?? '∞'}min` : null,
                         ].filter(Boolean).join(' · ')}

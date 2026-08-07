@@ -46,7 +46,7 @@ const createSchema = z.object({
   simQuestions: z.number().int().min(1).max(300).nullable().optional(),
   simMinutes: z.number().int().min(1).max(600).nullable().optional(),
   simPassPct: z.number().int().min(0).max(100).nullable().optional(),
-  visibility: z.enum(['privado', 'publico']).optional(),
+  visibility: z.enum(['privado', 'publico', 'restringido']).optional(),
 });
 
 export async function createBank(req: Request, res: Response): Promise<void> {
@@ -78,6 +78,7 @@ export async function updateBank(req: Request, res: Response): Promise<void> {
     sim_questions: d.simQuestions,
     sim_minutes: d.simMinutes,
     sim_pass_pct: d.simPassPct,
+    visibility: d.visibility,
   };
   const fields: string[] = [];
   const params: unknown[] = [];
@@ -88,7 +89,7 @@ export async function updateBank(req: Request, res: Response): Promise<void> {
   params.push(req.params.id);
   const { rows } = await query(
     `UPDATE question_banks SET ${fields.join(', ')} WHERE id = $${params.length}
-     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct`,
+     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct, visibility`,
     params,
   );
   if (rows.length === 0) throw notFound('Banco no encontrado');
@@ -102,6 +103,49 @@ export async function deleteBank(req: Request, res: Response): Promise<void> {
   if (bank.rows.length === 0) throw notFound('Banco no encontrado');
   await query('DELETE FROM questions WHERE bank_id = $1', [req.params.id]);
   await query('DELETE FROM question_banks WHERE id = $1', [req.params.id]);
+  res.json({ ok: true });
+}
+
+/**
+ * Lista de profesores con acceso a un banco «restringido». Solo el dueño (o el
+ * super admin) gestiona esta lista. Se busca por email para añadir; el dueño no
+ * figura porque siempre ve lo suyo.
+ */
+export async function listBankAccess(req: Request, res: Response): Promise<void> {
+  await assertBankOwner(req, req.params.id);
+  const { rows } = await query(
+    `SELECT u.id, u.name, u.email
+       FROM bank_access ba JOIN users u ON u.id = ba.user_id
+      WHERE ba.bank_id = $1 ORDER BY u.name`,
+    [req.params.id],
+  );
+  res.json({ personas: rows });
+}
+
+export async function addBankAccess(req: Request, res: Response): Promise<void> {
+  await assertBankOwner(req, req.params.id);
+  const { email } = z.object({ email: z.string().email() }).parse(req.body);
+  // Solo profesorado/administración: el material para montar cursos no se
+  // comparte con alumnos (ellos acceden a los cursos, no a los bancos).
+  const u = await query<{ id: string; name: string; email: string; role: string }>(
+    'SELECT id, name, email, role FROM users WHERE lower(email) = lower($1)', [email],
+  );
+  if (u.rows.length === 0) throw notFound('No hay ningún usuario con ese email');
+  if (!['profesor', 'super_admin', 'institution_admin', 'institution_teacher'].includes(u.rows[0].role)) {
+    throw badRequest('Solo puedes compartir un banco con profesorado o administración', 'NO_PROFESOR');
+  }
+  if (u.rows[0].id === req.auth!.sub) throw badRequest('El banco ya es tuyo', 'ES_DUENO');
+  await query(
+    `INSERT INTO bank_access (bank_id, user_id, granted_by) VALUES ($1, $2, $3)
+     ON CONFLICT (bank_id, user_id) DO NOTHING`,
+    [req.params.id, u.rows[0].id, req.auth!.sub],
+  );
+  res.status(201).json({ persona: { id: u.rows[0].id, name: u.rows[0].name, email: u.rows[0].email } });
+}
+
+export async function removeBankAccess(req: Request, res: Response): Promise<void> {
+  await assertBankOwner(req, req.params.id);
+  await query('DELETE FROM bank_access WHERE bank_id = $1 AND user_id = $2', [req.params.id, req.params.userId]);
   res.json({ ok: true });
 }
 
@@ -150,7 +194,10 @@ export async function listBanks(req: Request, res: Response): Promise<void> {
   const uid = req.auth?.sub ?? null;
   const f = req.query as Record<string, string | undefined>;
 
-  const visibles = "($1::boolean OR b.visibility = 'publico' OR b.created_by = $2)";
+  // Un profesor ve un banco si es suyo, si es público, o si es «restringido» y
+  // está en su lista de acceso (bank_access). El super admin/auditor lo ven todo.
+  const visibles = "($1::boolean OR b.visibility = 'publico' OR b.created_by = $2"
+    + " OR EXISTS (SELECT 1 FROM bank_access ba WHERE ba.bank_id = b.id AND ba.user_id = $2))";
   const conds = [visibles];
   const params: unknown[] = [isSuper, uid];
 
