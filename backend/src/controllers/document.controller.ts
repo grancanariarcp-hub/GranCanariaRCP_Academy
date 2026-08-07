@@ -30,6 +30,7 @@ const metaSchema = z.object({
   title: z.string().min(2).max(200),
   kind: z.enum(['erc', 'pnrcp', 'otro']).default('otro'),
   pages: z.coerce.number().int().positive().optional(),
+  validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).optional(),
 });
 
 /**
@@ -63,7 +64,7 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
     throw badRequest('El archivo debe ser un PDF', 'NOT_PDF');
   }
 
-  const { title, kind, pages } = metaSchema.parse(req.body);
+  const { title, kind, pages, validUntil } = metaSchema.parse(req.body);
   // Si el profesor no indica las páginas, se cuentan del propio PDF: es el dato
   // que alimenta el cómputo de horas CFC (minutos por página × páginas).
   const paginas = pages ?? contarPaginasPdf(file.buffer);
@@ -85,10 +86,10 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
   await uploadObject(key, file.buffer, file.mimetype);
 
   const { rows } = await query(
-    `INSERT INTO documents (title, kind, storage_key, content_type, size_bytes, pages, uploaded_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING id, title, kind, size_bytes, pages, created_at`,
-    [title, kind, key, file.mimetype, file.size, paginas, req.auth!.sub],
+    `INSERT INTO documents (title, kind, storage_key, content_type, size_bytes, pages, uploaded_by, valid_until)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING id, title, kind, size_bytes, pages, created_at, to_char(valid_until, 'YYYY-MM-DD') AS valid_until`,
+    [title, kind, key, file.mimetype, file.size, paginas, req.auth!.sub, validUntil || null],
   );
 
   await audit({
@@ -109,13 +110,20 @@ export async function listDocuments(req: Request, res: Response): Promise<void> 
   const esSuper = req.auth!.role === 'super_admin';
   // El profesorado ve SUS documentos y los que publica la plataforma; no los
   // de otros profesores, que son material propio de sus cursos.
+  // El nº de cursos que usan el documento (por sus actividades) sirve para saber
+  // qué material está en circulación y cuál se puede retirar sin romper nada.
+  const usos = `(SELECT COUNT(DISTINCT m.course_id) FROM activities a
+                   JOIN modules m ON m.id = a.module_id
+                  WHERE a.document_id = d.id)`;
   const { rows } = await query(
     esSuper
       ? `SELECT d.id, d.title, d.kind, d.size_bytes, d.pages, (d.storage_key IS NOT NULL) AS has_file,
-                d.created_at, d.uploaded_by, TRUE AS mio
-           FROM documents d WHERE d.is_active = TRUE ORDER BY d.created_at DESC`
+                d.created_at, d.uploaded_by, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, TRUE AS mio
+           FROM documents d
+           LEFT JOIN users u ON u.id = d.uploaded_by
+          WHERE d.is_active = TRUE ORDER BY d.created_at DESC`
       : `SELECT d.id, d.title, d.kind, d.size_bytes, d.pages, (d.storage_key IS NOT NULL) AS has_file,
-                d.created_at, d.uploaded_by, (d.uploaded_by = $1) AS mio
+                d.created_at, d.uploaded_by, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, (d.uploaded_by = $1) AS mio
            FROM documents d
            LEFT JOIN users u ON u.id = d.uploaded_by
           WHERE d.is_active = TRUE AND (d.uploaded_by = $1 OR u.role = 'super_admin')
@@ -155,6 +163,48 @@ export async function deleteDocument(req: Request, res: Response): Promise<void>
   await query('UPDATE documents SET is_active = FALSE WHERE id = $1', [req.params.id]);
   if (rows[0].storage_key) await deleteObject(rows[0].storage_key).catch(() => { /* ya borrado */ });
   res.json({ ok: true });
+}
+
+const updateDocSchema = z.object({
+  title: z.string().min(2).max(200).optional(),
+  kind: z.enum(['erc', 'pnrcp', 'otro']).optional(),
+  pages: z.coerce.number().int().positive().nullish(),
+  validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).nullish(),
+});
+
+/**
+ * PATCH /api/documents/:id — editar los metadatos de un documento (título,
+ * tipo, páginas y caducidad). No cambia el archivo. Solo el autor o el super
+ * admin. Sirve, sobre todo, para marcar cuándo caduca una guía.
+ */
+export async function updateDocument(req: Request, res: Response): Promise<void> {
+  const esSuper = req.auth!.role === 'super_admin';
+  const d = updateDocSchema.parse(req.body);
+  const { rows: dueno } = await query<{ uploaded_by: string | null }>(
+    'SELECT uploaded_by FROM documents WHERE id = $1 AND is_active = TRUE', [req.params.id],
+  );
+  if (dueno.length === 0) throw notFound('Documento no encontrado');
+  if (!esSuper && dueno[0].uploaded_by !== req.auth!.sub) {
+    throw badRequest('Solo puedes editar los documentos que has subido tú', 'NOT_OWNER');
+  }
+  const map: Record<string, unknown> = {
+    title: d.title, kind: d.kind, pages: d.pages,
+    valid_until: d.validUntil === undefined ? undefined : (d.validUntil || null),
+  };
+  const cambios = Object.entries(map).filter(([, v]) => v !== undefined);
+  if (cambios.length === 0) throw badRequest('Nada que actualizar');
+  const fields = cambios.map(([col], i) => `${col} = $${i + 1}`);
+  const params = [...cambios.map(([, v]) => v), req.params.id];
+  const { rows } = await query(
+    `UPDATE documents SET ${fields.join(', ')} WHERE id = $${params.length}
+     RETURNING id, title, kind, pages, to_char(valid_until, 'YYYY-MM-DD') AS valid_until`,
+    params,
+  );
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role, action: 'DOCUMENT_UPDATE',
+    entity: 'document', entityId: req.params.id, ip: clientIp(req), metadata: d,
+  }).catch(() => { /* el registro no debe impedir la edición */ });
+  res.json({ document: rows[0] });
 }
 
 /**

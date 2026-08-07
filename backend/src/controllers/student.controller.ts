@@ -122,7 +122,7 @@ export async function enrollCourse(req: Request, res: Response): Promise<void> {
 /** "Mis cursos": los cursos en los que está matriculado. */
 export async function listMyCourses(req: Request, res: Response): Promise<void> {
   const { rows } = await query(
-    `SELECT c.id, c.title, c.tema, c.subtema, c.modality, e.status, e.enrolled_at
+    `SELECT c.id, c.title, c.tema, c.subtema, c.modality, c.es_ope, e.status, e.enrolled_at
      FROM enrollments e JOIN courses c ON c.id = e.course_id
      WHERE e.student_id = $1
      ORDER BY e.enrolled_at DESC`,

@@ -16,6 +16,7 @@ interface MyCourse {
   subtema: string | null;
   modality: string;
   status: string;
+  es_ope: boolean;
 }
 interface AvailableCourse {
   id: string;
@@ -91,35 +92,49 @@ export default function StudentDashboard() {
         )}
         {mine.length === 0 ? (
           <div className="muted">Aún no estás matriculado en ningún curso. ¡Explora los disponibles abajo!</div>
-        ) : (
-          <div className="grid grid-2">
-            {mine
-              .filter((c) => vistaMios === 'todos'
-                || (vistaMios === 'finalizados' ? c.status === 'completado' : c.status !== 'completado'))
-              .map((c, i) => (
-              <div key={c.id} className="press animate-in" style={{ border: '1px solid var(--gray-200)', borderLeft: `4px solid ${temaPalette(c.tema).main}`, borderRadius: 8, padding: 16, animationDelay: `${Math.min(i, 8) * 50}ms` }}>
-                <div style={{ fontWeight: 600 }}>{c.title}</div>
-                <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>
-                  {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')} ·{' '}
-                  <span className={`badge ${c.status === 'completado' ? 'badge-success' : c.status === 'pendiente_pago' ? 'badge-warning' : 'badge-primary'}`}>
-                    {c.status === 'pendiente_pago' ? 'pendiente de pago' : c.status}
-                  </span>
-                </div>
-                {/* Sin pagar no se entra al curso: el botón lleva a completar el pago. */}
-                {c.status === 'pendiente_pago' ? (
-                  <>
-                    <Link className="btn btn-primary btn-small" href={`/student/curso/${c.id}`}>Completar el pago</Link>
-                    <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                      El contenido se abre al confirmarse el pago.
-                    </p>
-                  </>
-                ) : (
-                  <Link className="btn btn-primary btn-small" href={`/student/curso/${c.id}`}>Entrar al curso</Link>
-                )}
+        ) : (() => {
+          const visibles = mine.filter((c) => vistaMios === 'todos'
+            || (vistaMios === 'finalizados' ? c.status === 'completado' : c.status !== 'completado'));
+          const cursos = visibles.filter((c) => !c.es_ope);
+          const opes = visibles.filter((c) => c.es_ope);
+          // Cursos y OPE se separan visualmente: son cosas distintas (docencia vs
+          // preparación de oposición). Solo se ponen títulos de sección cuando hay
+          // de los dos; con un único tipo, la lista va sin epígrafe redundante.
+          const conEpigrafes = cursos.length > 0 && opes.length > 0;
+          const grupo = (titulo: string, lista: MyCourse[]) => lista.length === 0 ? null : (
+            <div style={{ marginBottom: opes.length && cursos.length ? 18 : 0 }}>
+              {conEpigrafes && <div style={{ fontWeight: 700, fontSize: 14, margin: '4px 0 10px' }}>{titulo}</div>}
+              <div className="grid grid-2">
+                {lista.map((c, i) => (
+                  <div key={c.id} className="press animate-in" style={{ border: '1px solid var(--gray-200)', borderLeft: `4px solid ${temaPalette(c.tema).main}`, borderRadius: 8, padding: 16, animationDelay: `${Math.min(i, 8) * 50}ms` }}>
+                    <div style={{ fontWeight: 600 }}>
+                      {c.es_ope && <span className="badge" style={{ marginRight: 6, fontSize: 10.5, background: 'var(--secondary-dark)', color: '#fff' }}>OPE</span>}
+                      {c.title}
+                    </div>
+                    <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>
+                      {[c.tema, c.subtema, c.modality].filter(Boolean).join(' · ')} ·{' '}
+                      <span className={`badge ${c.status === 'completado' ? 'badge-success' : c.status === 'pendiente_pago' ? 'badge-warning' : 'badge-primary'}`}>
+                        {c.status === 'pendiente_pago' ? 'pendiente de pago' : c.status}
+                      </span>
+                    </div>
+                    {/* Sin pagar no se entra al curso: el botón lleva a completar el pago. */}
+                    {c.status === 'pendiente_pago' ? (
+                      <>
+                        <Link className="btn btn-primary btn-small" href={`/student/curso/${c.id}`}>Completar el pago</Link>
+                        <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                          El contenido se abre al confirmarse el pago.
+                        </p>
+                      </>
+                    ) : (
+                      <Link className="btn btn-primary btn-small" href={`/student/curso/${c.id}`}>{c.es_ope ? 'Entrar a la OPE' : 'Entrar al curso'}</Link>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          );
+          return <>{grupo('Cursos', cursos)}{grupo('OPE / Simulacros', opes)}</>;
+        })()}
       </div>
 
       {/* Cursos disponibles */}
