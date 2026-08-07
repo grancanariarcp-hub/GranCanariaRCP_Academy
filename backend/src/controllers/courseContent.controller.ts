@@ -316,6 +316,20 @@ export async function addActivity(req: Request, res: Response): Promise<void> {
   if ((d.type === 'video' || d.type === 'enlace') && !d.url) throw badRequest('Falta la URL', 'NO_URL');
   if (d.type === 'texto' && (!d.body || d.body.trim().length === 0)) throw badRequest('Escribe el texto', 'NO_BODY');
 
+  // No basta con no ver un documento en la lista: hay que impedir enlazar uno al
+  // que no se tiene acceso aunque se conozca su id (mismo criterio que la
+  // biblioteca: propio, público o restringido con permiso).
+  if (d.type === 'documento' && d.documentId && req.auth!.role !== 'super_admin') {
+    const acc = await query(
+      `SELECT 1 FROM documents d WHERE d.id = $1 AND d.is_active = TRUE
+         AND (d.uploaded_by = $2 OR d.visibility = 'publico'
+              OR (d.visibility = 'restringido'
+                  AND EXISTS (SELECT 1 FROM document_access da WHERE da.document_id = d.id AND da.user_id = $2)))`,
+      [d.documentId, req.auth!.sub],
+    );
+    if (acc.rows.length === 0) throw forbidden('No tienes acceso a ese documento');
+  }
+
   const { rows } = await query(
     `INSERT INTO activities (module_id, type, title, document_id, url, body, is_mandatory, duration_min, sort_order)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE((SELECT MAX(sort_order) + 1 FROM activities WHERE module_id = $1), 0))

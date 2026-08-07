@@ -31,7 +31,19 @@ const metaSchema = z.object({
   kind: z.enum(['erc', 'pnrcp', 'otro']).default('otro'),
   pages: z.coerce.number().int().positive().optional(),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).optional(),
+  visibility: z.enum(['privado', 'publico', 'restringido']).optional(),
 });
+
+/**
+ * Predicado SQL «este usuario puede ver el documento»: propio, público, o
+ * restringido y en su lista de acceso. El super admin/auditor ven todo.
+ * Alias por defecto `d`; superParam y userParam son placeholders ($1, $2…).
+ */
+function docVisible(alias: string, superParam: string, userParam: string): string {
+  const p = alias ? `${alias}.` : '';
+  return `(${superParam}::boolean OR ${p}uploaded_by = ${userParam} OR ${p}visibility = 'publico'`
+    + ` OR (${p}visibility = 'restringido' AND EXISTS (SELECT 1 FROM document_access da WHERE da.document_id = ${p}id AND da.user_id = ${userParam})))`;
+}
 
 /**
  * Cuenta las páginas de un PDF sin librerías: cada página es un objeto
@@ -64,7 +76,10 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
     throw badRequest('El archivo debe ser un PDF', 'NOT_PDF');
   }
 
-  const { title, kind, pages, validUntil } = metaSchema.parse(req.body);
+  const { title, kind, pages, validUntil, visibility } = metaSchema.parse(req.body);
+  // Un profesor sube en privado salvo que indique otra cosa; la plataforma
+  // (super admin) sube en público, como hasta ahora.
+  const vis = visibility ?? (req.auth!.role === 'super_admin' ? 'publico' : 'privado');
   // Si el profesor no indica las páginas, se cuentan del propio PDF: es el dato
   // que alimenta el cómputo de horas CFC (minutos por página × páginas).
   const paginas = pages ?? contarPaginasPdf(file.buffer);
@@ -86,10 +101,10 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
   await uploadObject(key, file.buffer, file.mimetype);
 
   const { rows } = await query(
-    `INSERT INTO documents (title, kind, storage_key, content_type, size_bytes, pages, uploaded_by, valid_until)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING id, title, kind, size_bytes, pages, created_at, to_char(valid_until, 'YYYY-MM-DD') AS valid_until`,
-    [title, kind, key, file.mimetype, file.size, paginas, req.auth!.sub, validUntil || null],
+    `INSERT INTO documents (title, kind, storage_key, content_type, size_bytes, pages, uploaded_by, valid_until, visibility)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, title, kind, size_bytes, pages, created_at, to_char(valid_until, 'YYYY-MM-DD') AS valid_until, visibility`,
+    [title, kind, key, file.mimetype, file.size, paginas, req.auth!.sub, validUntil || null, vis],
   );
 
   await audit({
@@ -118,17 +133,17 @@ export async function listDocuments(req: Request, res: Response): Promise<void> 
   const { rows } = await query(
     esSuper
       ? `SELECT d.id, d.title, d.kind, d.size_bytes, d.pages, (d.storage_key IS NOT NULL) AS has_file,
-                d.created_at, d.uploaded_by, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, TRUE AS mio
+                d.created_at, d.uploaded_by, d.visibility, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, TRUE AS mio
            FROM documents d
            LEFT JOIN users u ON u.id = d.uploaded_by
           WHERE d.is_active = TRUE ORDER BY d.created_at DESC`
       : `SELECT d.id, d.title, d.kind, d.size_bytes, d.pages, (d.storage_key IS NOT NULL) AS has_file,
-                d.created_at, d.uploaded_by, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, (d.uploaded_by = $1) AS mio
+                d.created_at, d.uploaded_by, d.visibility, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, (d.uploaded_by = $2) AS mio
            FROM documents d
            LEFT JOIN users u ON u.id = d.uploaded_by
-          WHERE d.is_active = TRUE AND (d.uploaded_by = $1 OR u.role = 'super_admin')
+          WHERE d.is_active = TRUE AND ${docVisible('d', '$1', '$2')}
           ORDER BY d.created_at DESC`,
-    esSuper ? [] : [req.auth!.sub],
+    esSuper ? [] : [false, req.auth!.sub],
   );
   const cuota = await cuotaDe(req.auth!.sub);
   res.json({
@@ -170,6 +185,7 @@ const updateDocSchema = z.object({
   kind: z.enum(['erc', 'pnrcp', 'otro']).optional(),
   pages: z.coerce.number().int().positive().nullish(),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).nullish(),
+  visibility: z.enum(['privado', 'publico', 'restringido']).optional(),
 });
 
 /**
@@ -188,7 +204,7 @@ export async function updateDocument(req: Request, res: Response): Promise<void>
     throw badRequest('Solo puedes editar los documentos que has subido tú', 'NOT_OWNER');
   }
   const map: Record<string, unknown> = {
-    title: d.title, kind: d.kind, pages: d.pages,
+    title: d.title, kind: d.kind, pages: d.pages, visibility: d.visibility,
     valid_until: d.validUntil === undefined ? undefined : (d.validUntil || null),
   };
   const cambios = Object.entries(map).filter(([, v]) => v !== undefined);
@@ -197,7 +213,7 @@ export async function updateDocument(req: Request, res: Response): Promise<void>
   const params = [...cambios.map(([, v]) => v), req.params.id];
   const { rows } = await query(
     `UPDATE documents SET ${fields.join(', ')} WHERE id = $${params.length}
-     RETURNING id, title, kind, pages, to_char(valid_until, 'YYYY-MM-DD') AS valid_until`,
+     RETURNING id, title, kind, pages, visibility, to_char(valid_until, 'YYYY-MM-DD') AS valid_until`,
     params,
   );
   await audit({
@@ -205,6 +221,52 @@ export async function updateDocument(req: Request, res: Response): Promise<void>
     entity: 'document', entityId: req.params.id, ip: clientIp(req), metadata: d,
   }).catch(() => { /* el registro no debe impedir la edición */ });
   res.json({ document: rows[0] });
+}
+
+/** Comprueba que el usuario es el autor del documento (o super admin). */
+async function assertDocOwner(req: Request): Promise<void> {
+  if (req.auth!.role === 'super_admin') return;
+  const { rows } = await query<{ uploaded_by: string | null }>(
+    'SELECT uploaded_by FROM documents WHERE id = $1 AND is_active = TRUE', [req.params.id],
+  );
+  if (rows.length === 0) throw notFound('Documento no encontrado');
+  if (rows[0].uploaded_by !== req.auth!.sub) throw badRequest('Solo el autor gestiona el acceso', 'NOT_OWNER');
+}
+
+/** Lista de profesores con acceso a un documento «restringido». */
+export async function listDocAccess(req: Request, res: Response): Promise<void> {
+  await assertDocOwner(req);
+  const { rows } = await query(
+    `SELECT u.id, u.name, u.email FROM document_access da JOIN users u ON u.id = da.user_id
+      WHERE da.document_id = $1 ORDER BY u.name`,
+    [req.params.id],
+  );
+  res.json({ personas: rows });
+}
+
+export async function addDocAccess(req: Request, res: Response): Promise<void> {
+  await assertDocOwner(req);
+  const { email } = z.object({ email: z.string().email() }).parse(req.body);
+  const u = await query<{ id: string; name: string; email: string; role: string }>(
+    'SELECT id, name, email, role FROM users WHERE lower(email) = lower($1)', [email],
+  );
+  if (u.rows.length === 0) throw notFound('No hay ningún usuario con ese email');
+  if (!['profesor', 'super_admin', 'institution_admin', 'institution_teacher'].includes(u.rows[0].role)) {
+    throw badRequest('Solo puedes compartir un documento con profesorado o administración', 'NO_PROFESOR');
+  }
+  if (u.rows[0].id === req.auth!.sub) throw badRequest('El documento ya es tuyo', 'ES_DUENO');
+  await query(
+    `INSERT INTO document_access (document_id, user_id, granted_by) VALUES ($1, $2, $3)
+     ON CONFLICT (document_id, user_id) DO NOTHING`,
+    [req.params.id, u.rows[0].id, req.auth!.sub],
+  );
+  res.status(201).json({ persona: { id: u.rows[0].id, name: u.rows[0].name, email: u.rows[0].email } });
+}
+
+export async function removeDocAccess(req: Request, res: Response): Promise<void> {
+  await assertDocOwner(req);
+  await query('DELETE FROM document_access WHERE document_id = $1 AND user_id = $2', [req.params.id, req.params.userId]);
+  res.json({ ok: true });
 }
 
 /**
@@ -224,9 +286,8 @@ export async function getDocumentUrl(req: Request, res: Response): Promise<void>
     esSuper
       ? 'SELECT d.storage_key FROM documents d WHERE d.id = $1'
       : `SELECT d.storage_key FROM documents d
-           LEFT JOIN users u ON u.id = d.uploaded_by
-          WHERE d.id = $1 AND (d.uploaded_by = $2 OR u.role = 'super_admin')`,
-    esSuper ? [req.params.id] : [req.params.id, req.auth!.sub],
+          WHERE d.id = $1 AND ${docVisible('d', '$2', '$3')}`,
+    esSuper ? [req.params.id] : [req.params.id, false, req.auth!.sub],
   );
   if (rows.length === 0) throw notFound('Documento no encontrado');
   const key = rows[0].storage_key;

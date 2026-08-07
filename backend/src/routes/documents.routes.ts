@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { uploadDocument, listDocuments, getDocumentUrl, deleteDocument, updateDocument } from '../controllers/document.controller.js';
+import {
+  uploadDocument, listDocuments, getDocumentUrl, deleteDocument, updateDocument,
+  listDocAccess, addDocAccess, removeDocAccess,
+} from '../controllers/document.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -23,6 +26,9 @@ router.use(requireAuth, requireRole('super_admin', 'profesor'));
 router.get('/', asyncHandler(listDocuments));
 router.post('/', upload.single('file'), asyncHandler(uploadDocument));
 router.get('/:id/url', asyncHandler(getDocumentUrl));
+router.get('/:id/acceso', asyncHandler(listDocAccess));
+router.post('/:id/acceso', asyncHandler(addDocAccess));
+router.delete('/:id/acceso/:userId', asyncHandler(removeDocAccess));
 router.patch('/:id', asyncHandler(updateDocument));
 router.delete('/:id', asyncHandler(deleteDocument));
 

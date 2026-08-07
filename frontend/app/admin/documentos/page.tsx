@@ -20,11 +20,13 @@ interface DocRow {
   valid_until: string | null;
   autor: string | null;
   cursos: number | string;
+  visibility: 'privado' | 'publico' | 'restringido';
   /** Subido por mí: solo entonces se puede borrar. */
   mio?: boolean;
 }
 
 const KIND_LABEL = { erc: 'ERC 2025', pnrcp: 'PNRCP', otro: 'Otro' } as const;
+const VIS_LABEL: Record<string, string> = { privado: 'privado', publico: 'público', restringido: 'restringido' };
 const POR_PAGINA = 25;
 
 function humanSize(bytes: number | null): string {
@@ -51,6 +53,7 @@ export default function DocumentosPage() {
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<'erc' | 'pnrcp' | 'otro'>('erc');
   const [validUntil, setValidUntil] = useState('');
+  const [visibility, setVisibility] = useState<'privado' | 'publico' | 'restringido'>('privado');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -66,6 +69,12 @@ export default function DocumentosPage() {
   // Edición en línea de la caducidad de un documento propio.
   const [editId, setEditId] = useState<string | null>(null);
   const [editHasta, setEditHasta] = useState('');
+  // Edición de visibilidad + lista de acceso de un documento propio.
+  const [visDocId, setVisDocId] = useState<string | null>(null);
+  const [visValor, setVisValor] = useState<'privado' | 'publico' | 'restringido'>('privado');
+  const [visPersonas, setVisPersonas] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [visEmail, setVisEmail] = useState('');
+  const [visMsg, setVisMsg] = useState<string | null>(null);
 
   const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const autores = Array.from(new Set(docs.map((d) => d.autor).filter((a): a is string => !!a))).sort();
@@ -87,6 +96,46 @@ export default function DocumentosPage() {
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : 'No se pudo guardar la caducidad' });
     }
+  }
+
+  // --- Visibilidad + lista de acceso de un documento propio ---
+  function abrirVis(d: DocRow) {
+    setVisDocId(d.id); setVisValor(d.visibility); setVisEmail(''); setVisMsg(null); setVisPersonas([]);
+    if (d.visibility === 'restringido') cargarVisAcceso(d.id);
+  }
+  async function cambiarVis(nueva: 'privado' | 'publico' | 'restringido') {
+    if (!visDocId) return;
+    setVisValor(nueva); setVisMsg(null);
+    try {
+      await api(`/api/documents/${visDocId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ visibility: nueva }) });
+      if (nueva === 'restringido') cargarVisAcceso(visDocId);
+      loadDocs();
+    } catch (e) {
+      setVisMsg(e instanceof Error ? e.message : 'No se pudo cambiar la visibilidad');
+    }
+  }
+  async function cargarVisAcceso(docId: string) {
+    try {
+      const r = await api<{ personas: Array<{ id: string; name: string; email: string }> }>(`/api/documents/${docId}/acceso`, { auth: true });
+      setVisPersonas(r.personas);
+    } catch { setVisPersonas([]); }
+  }
+  async function agregarVisAcceso() {
+    if (!visDocId || !visEmail.trim()) return;
+    setVisMsg(null);
+    try {
+      await api(`/api/documents/${visDocId}/acceso`, { method: 'POST', auth: true, body: JSON.stringify({ email: visEmail.trim() }) });
+      setVisEmail(''); cargarVisAcceso(visDocId);
+    } catch (e) {
+      setVisMsg(e instanceof Error ? e.message : 'No se pudo añadir');
+    }
+  }
+  async function quitarVisAcceso(userId: string) {
+    if (!visDocId) return;
+    try {
+      await api(`/api/documents/${visDocId}/acceso/${userId}`, { method: 'DELETE', auth: true });
+      cargarVisAcceso(visDocId);
+    } catch { /* ignore */ }
   }
 
   async function borrar(d: DocRow) {
@@ -125,6 +174,7 @@ export default function DocumentosPage() {
       fd.append('file', file);
       fd.append('title', title);
       fd.append('kind', kind);
+      fd.append('visibility', visibility);
       if (validUntil) fd.append('validUntil', validUntil);
       const res = await fetch(`${API_URL}/api/documents`, {
         method: 'POST',
@@ -138,6 +188,7 @@ export default function DocumentosPage() {
       setMsg({ ok: true, text: 'Documento subido correctamente ✅' });
       setTitle('');
       setValidUntil('');
+      setVisibility('privado');
       setFile(null);
       if (fileRef.current) fileRef.current.value = '';
       loadDocs();
@@ -189,6 +240,17 @@ export default function DocumentosPage() {
               <label className="form-label">Caducidad <span className="muted" style={{ fontWeight: 400 }}>(opcional)</span></label>
               <input className="form-input" type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
               <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>Cuándo deja de estar vigente esta versión (p. ej. al publicarse una guía nueva). En blanco = sin caducidad.</p>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Visibilidad</label>
+              <select className="form-select" value={visibility} onChange={(e) => setVisibility(e.target.value as typeof visibility)}>
+                <option value="privado">Privado — solo yo</option>
+                <option value="publico">Público — cualquier profesor puede enlazarlo en sus cursos</option>
+                <option value="restringido">Restringido — solo profesores que yo elija</option>
+              </select>
+              {visibility === 'restringido' && (
+                <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>Tras subirlo, elige a qué profesores das acceso desde la columna «Visibilidad» de la lista.</p>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Archivo PDF</label>
@@ -266,6 +328,7 @@ export default function DocumentosPage() {
                   <th>Tipo</th>
                   <th>Estado</th>
                   <th>Caducidad</th>
+                  <th>Visibilidad</th>
                   <th>Autor</th>
                   <th>Usos</th>
                   <th></th>
@@ -298,6 +361,12 @@ export default function DocumentosPage() {
                         </span>
                       )}
                     </td>
+                    <td style={{ fontSize: 12 }}>
+                      <span className="muted">{VIS_LABEL[d.visibility]}</span>
+                      {d.mio && (
+                        <>{' '}<button className="link-action" onClick={() => (visDocId === d.id ? setVisDocId(null) : abrirVis(d))}>editar</button></>
+                      )}
+                    </td>
                     <td className="muted" style={{ fontSize: 12 }}>{d.autor ?? '—'}</td>
                     <td className="muted" style={{ fontSize: 12, textAlign: 'center' }}>{Number(d.cursos) || 0}</td>
                     <td>
@@ -309,9 +378,49 @@ export default function DocumentosPage() {
                   </tr>
                   );
                 })}
+                {visDocId && docsPagina.some((d) => d.id === visDocId) && (
+                  <tr>
+                    <td colSpan={8} style={{ background: 'var(--gray-50)' }}>
+                      <div style={{ padding: '10px 6px' }}>
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+                          <strong style={{ fontSize: 13 }}>Visibilidad del documento</strong>
+                          <select className="form-select" style={{ width: 'auto' }} value={visValor} onChange={(e) => cambiarVis(e.target.value as typeof visValor)}>
+                            <option value="privado">Privado — solo yo</option>
+                            <option value="publico">Público — cualquier profesor</option>
+                            <option value="restringido">Restringido — solo quien yo elija</option>
+                          </select>
+                          <button className="link-action" onClick={() => setVisDocId(null)}>cerrar</button>
+                        </div>
+                        {visMsg && <div className="alert alert-error" style={{ fontSize: 13 }}>{visMsg}</div>}
+                        {visValor === 'restringido' && (
+                          <div style={{ maxWidth: 480 }}>
+                            {visPersonas.length === 0 ? (
+                              <p className="muted" style={{ fontSize: 13, margin: '0 0 8px' }}>Aún no has dado acceso a nadie. Solo tú lo ves.</p>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                                {visPersonas.map((p) => (
+                                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                                    <span>{p.name} <span className="muted">· {p.email}</span></span>
+                                    <button className="link-action danger" onClick={() => quitarVisAcceso(p.id)}>Quitar</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <input className="form-input" style={{ flex: 1 }} type="email" placeholder="email del profesor"
+                                value={visEmail} onChange={(e) => setVisEmail(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregarVisAcceso(); } }} />
+                              <button className="btn btn-outline btn-small" onClick={agregarVisAcceso}>Añadir</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
                 {docsFiltrados.length === 0 && (
                   <tr>
-                    <td colSpan={7}>
+                    <td colSpan={8}>
                       <div style={{ padding: '14px 4px' }}>
                         <strong>Todavía no hay documentos disponibles.</strong>
                         <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
