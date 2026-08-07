@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration } from '../controllers/course.controller.js';
 import multer from 'multer';
 import {
-  updateCourse, deleteCourse, cambiarTipoCurso, uploadCourseThumbnail, addModule, updateModule, deleteModule,
+  updateCourse, deleteCourse, cambiarTipoCurso, solicitarCfc, cambiosCfc, uploadCourseThumbnail, addModule, updateModule, deleteModule,
   addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
   addCourseImage, deleteCourseImage, setActivityDuration,
 } from '../controllers/courseContent.controller.js';
@@ -39,6 +39,8 @@ router.get('/:id', asyncHandler(getCourse));
 router.patch('/:id', asyncHandler(updateCourse));
 router.delete('/:id', asyncHandler(deleteCourse));
 router.patch('/:id/tipo', asyncHandler(cambiarTipoCurso));
+router.post('/:id/solicitar-cfc', asyncHandler(solicitarCfc));
+router.get('/:id/cambios-cfc', asyncHandler(cambiosCfc));
 router.post('/:id/thumbnail', upload.single('file'), asyncHandler(uploadCourseThumbnail));
 router.post('/:id/gallery', upload.single('file'), asyncHandler(addCourseImage));
 router.delete('/:id/gallery/:imageId', asyncHandler(deleteCourseImage));

@@ -119,27 +119,119 @@ export async function updateCourse(req: Request, res: Response): Promise<void> {
     price_semestral_cents: d.priceSemestralCents,
     price_anual_cents: d.priceAnualCents,
   };
-  const fields: string[] = [];
-  const params: unknown[] = [];
-  for (const [col, val] of Object.entries(map)) {
-    if (val !== undefined) { params.push(val === '' ? null : val); fields.push(`${col} = $${params.length}`); }
+  const cambios = Object.entries(map).filter(([, val]) => val !== undefined)
+    .map(([col, val]) => ({ col, val: val === '' ? null : val }));
+  if (cambios.length === 0) throw badRequest('Nada que actualizar');
+
+  // Estado del curso antes del cambio: para saber si la solicitud de CFC ya
+  // congeló los campos acreditables, y para registrar el valor anterior.
+  const antesRow = await query<Record<string, unknown>>(
+    `SELECT cfc_solicitado_at, ${cambios.map((c) => c.col).join(', ')} FROM courses WHERE id = $1`,
+    [req.params.id],
+  );
+  if (antesRow.rows.length === 0) throw notFound('Curso no encontrado');
+  const antes = antesRow.rows[0];
+  const cfcCongelado = antes.cfc_solicitado_at !== null;
+
+  // Campos acreditables: bloqueados desde que se registra la solicitud de CFC.
+  const ACREDITABLES: Record<string, string> = {
+    title: 'el título', duration_hours: 'las horas lectivas',
+    starts_at: 'la fecha de inicio', ends_at: 'la fecha de fin',
+  };
+  if (cfcCongelado) {
+    const bloqueados = cambios
+      .filter((c) => ACREDITABLES[c.col] && String(antes[c.col] ?? '') !== String(c.val ?? ''))
+      .map((c) => ACREDITABLES[c.col]);
+    if (bloqueados.length > 0) {
+      throw forbidden(
+        `Este curso tiene una solicitud de CFC registrada, así que ${bloqueados.join(', ')} no se puede(n) cambiar. `
+        + 'El resto de campos (materiales, avisos, descripciones, imagen…) sí, y cada cambio queda registrado.',
+      );
+    }
   }
-  if (fields.length === 0) throw badRequest('Nada que actualizar');
-  params.push(req.params.id);
+
+  const fields = cambios.map((c, i) => `${c.col} = $${i + 1}`);
+  const params: unknown[] = [...cambios.map((c) => c.val), req.params.id];
   const { rows } = await query(
     `UPDATE courses SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${params.length} RETURNING id, status, enrollment_open`,
     params,
   );
   if (rows.length === 0) throw notFound('Curso no encontrado');
+
+  // Con la solicitud de CFC ya registrada, cada cambio efectivo se anota en el
+  // registro (qué campo, antes, después, quién): la prueba de que lo impartido
+  // coincide con lo acreditado.
+  if (cfcCongelado) {
+    for (const c of cambios) {
+      const ant = antes[c.col] ?? null;
+      if (String(ant ?? '') === String(c.val ?? '')) continue;
+      await query(
+        `INSERT INTO course_field_changes (course_id, campo, valor_antes, valor_nuevo, changed_by)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [req.params.id, c.col, ant === null ? null : String(ant), c.val === null ? null : String(c.val), req.auth!.sub],
+      ).catch(() => { /* el registro no debe impedir el cambio ya aplicado */ });
+    }
+  }
+
   await audit({ actorId: req.auth!.sub, actorType: req.auth!.role, action: 'COURSE_UPDATE', entity: 'course', entityId: req.params.id, ip: clientIp(req), metadata: d });
   res.json({ course: rows[0] });
+}
+
+/**
+ * POST /api/courses/:id/solicitar-cfc — registrar la solicitud de acreditación.
+ *
+ * Es la acción que congela los campos acreditables (título, horas, temario,
+ * profesorado, fechas). Un solo clic, deliberado: antes de él nada se bloquea.
+ * Marca además el curso como «en trámite» para que la Comisión pueda verlo.
+ */
+export async function solicitarCfc(req: Request, res: Response): Promise<void> {
+  await assertDirector(req);
+  const cur = await query<{ cfc_solicitado_at: string | null; es_ope: boolean }>(
+    'SELECT cfc_solicitado_at, es_ope FROM courses WHERE id = $1', [req.params.id],
+  );
+  if (cur.rows.length === 0) throw notFound('Curso no encontrado');
+  if (cur.rows[0].es_ope) throw badRequest('Una OPE no solicita CFC', 'ES_OPE');
+  if (cur.rows[0].cfc_solicitado_at) { res.json({ ok: true, yaEstaba: true }); return; }
+
+  await query(
+    `UPDATE courses SET cfc_solicitado_at = NOW(), cfc_solicitado_by = $2, cfc_en_tramite = TRUE, updated_at = NOW()
+      WHERE id = $1`,
+    [req.params.id, req.auth!.sub],
+  );
+  await audit({ actorId: req.auth!.sub, actorType: req.auth!.role, action: 'CFC_SOLICITADO', entity: 'course', entityId: req.params.id, ip: clientIp(req) });
+  res.json({ ok: true });
+}
+
+/** GET /api/courses/:id/cambios-cfc — registro de cambios tras la solicitud. */
+export async function cambiosCfc(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const { rows } = await query(
+    `SELECT c.campo, c.valor_antes, c.valor_nuevo, c.changed_at, u.name AS quien
+       FROM course_field_changes c LEFT JOIN users u ON u.id = c.changed_by
+      WHERE c.course_id = $1 ORDER BY c.changed_at DESC LIMIT 500`,
+    [req.params.id],
+  );
+  res.json({ cambios: rows });
 }
 
 // ---------------------------------------------------------------------------
 // Modules
 // ---------------------------------------------------------------------------
+/**
+ * Impide tocar el temario o el profesorado cuando ya se registró la solicitud
+ * de CFC: ambos son acreditables. Los materiales de apoyo (actividades) SÍ se
+ * pueden seguir cambiando; solo se fija la estructura.
+ */
+async function assertAcreditableAbierto(courseId: string, que: string): Promise<void> {
+  const r = await query<{ cfc_solicitado_at: string | null }>('SELECT cfc_solicitado_at FROM courses WHERE id = $1', [courseId]);
+  if (r.rows[0]?.cfc_solicitado_at) {
+    throw forbidden(`Con la solicitud de CFC registrada, ${que} queda fijado. Los materiales de apoyo sí puedes seguir cambiándolos.`);
+  }
+}
+
 export async function addModule(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
+  await assertAcreditableAbierto(req.params.id, 'el temario');
   const { title } = z.object({ title: z.string().min(2).max(200) }).parse(req.body);
   const { rows } = await query(
     `INSERT INTO modules (course_id, title, sort_order)
@@ -152,6 +244,7 @@ export async function addModule(req: Request, res: Response): Promise<void> {
 
 export async function updateModule(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
+  await assertAcreditableAbierto(req.params.id, 'el temario');
   const d = z.object({ title: z.string().min(2).max(200).optional(), isMandatory: z.boolean().optional() }).parse(req.body);
   const fields: string[] = [];
   const params: unknown[] = [];
@@ -168,6 +261,7 @@ export async function updateModule(req: Request, res: Response): Promise<void> {
 
 export async function deleteModule(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
+  await assertAcreditableAbierto(req.params.id, 'el temario');
   await query('DELETE FROM modules WHERE id = $1 AND course_id = $2', [req.params.moduleId, req.params.id]);
   res.json({ ok: true });
 }
@@ -326,6 +420,7 @@ export async function deleteActivity(req: Request, res: Response): Promise<void>
 // ---------------------------------------------------------------------------
 export async function inviteStaff(req: Request, res: Response): Promise<void> {
   await assertDirector(req);
+  await assertAcreditableAbierto(req.params.id, 'el profesorado');
   const { email, role, parte } = z.object({
     email: z.string().email(),
     role: z.enum(['director', 'instructor']).default('instructor'),
@@ -359,6 +454,7 @@ export async function inviteStaff(req: Request, res: Response): Promise<void> {
 
 export async function removeStaff(req: Request, res: Response): Promise<void> {
   await assertDirector(req);
+  await assertAcreditableAbierto(req.params.id, 'el profesorado');
   if (req.params.userId === req.auth!.sub) throw badRequest('No puedes quitarte a ti mismo', 'SELF_REMOVE');
   await query('DELETE FROM course_staff WHERE course_id = $1 AND user_id = $2', [req.params.id, req.params.userId]);
   res.json({ ok: true });

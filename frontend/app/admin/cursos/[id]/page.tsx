@@ -74,6 +74,7 @@ interface Course {
   billing_type: string;
   es_ope: boolean;
   cfc_en_tramite: boolean;
+  cfc_solicitado_at: string | null;
   tipo_clinico: string | null;
   empresa: string | null;
   lugar: string | null;
@@ -229,6 +230,21 @@ export default function CourseDetailPage() {
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo cambiar el tipo');
+    }
+  }
+
+  // Registrar la solicitud de CFC: congela los campos acreditables. Un clic
+  // deliberado, con aviso de lo que implica.
+  async function solicitarCfc() {
+    if (!confirm(
+      'Al registrar la solicitud de CFC se BLOQUEAN los campos acreditables: título, horas lectivas, temario, '
+      + 'profesorado y fechas. El resto (materiales, avisos, descripciones, imagen) sigue editable y cada cambio '
+      + 'queda registrado.\n\nTramitar los CFC por tu cuenta es gratuito. ¿Registrar la solicitud ahora?')) return;
+    try {
+      await api(`/api/courses/${courseId}/solicitar-cfc`, { method: 'POST', auth: true });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo registrar la solicitud');
     }
   }
 
@@ -573,20 +589,37 @@ export default function CourseDetailPage() {
           </p>
         </div>
 
-        {/* Visibilidad para la Comisión CFC (curso en trámite de acreditación) */}
+        {/* Acreditación CFC: solicitud y bloqueo de campos acreditables */}
         {!course.es_ope && (
           <div className="card" style={{ marginBottom: 24 }}>
-            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 14.5, cursor: 'pointer' }}>
-              <input type="checkbox" checked={!!course.cfc_en_tramite} style={{ marginTop: 3 }}
-                onChange={(e) => patchCourse({ cfcEnTramite: e.target.checked })} />
-              <span>
-                <strong>En trámite de CFC</strong>
-                <span className="muted" style={{ display: 'block', fontSize: 12.5, marginTop: 2 }}>
-                  Permite que la Comisión CFC vea este curso aunque todavía no esté publicado. Márcalo mientras
-                  dure el trámite de acreditación.
-                </span>
-              </span>
-            </label>
+            <div className="card-header">
+              <div className="card-title">Acreditación CFC</div>
+            </div>
+            {course.cfc_solicitado_at ? (
+              <div className="alert alert-success" style={{ fontSize: 13.5 }}>
+                <strong>✓ Solicitud de CFC registrada</strong> el {new Date(course.cfc_solicitado_at).toLocaleDateString('es-ES')}.
+                <div style={{ marginTop: 4 }}>
+                  Los campos acreditables (título, horas, temario, profesorado y fechas) están <strong>bloqueados</strong>.
+                  El resto —materiales, avisos, descripciones, imagen— sigue editable, y cada cambio queda registrado.
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="muted" style={{ fontSize: 13.5, marginTop: 0 }}>
+                  Tramitar los CFC por tu cuenta es <strong>gratuito</strong>. Al registrar la solicitud aquí, se
+                  fijan los campos acreditables para garantizar que lo impartido coincide con lo acreditado.
+                </p>
+                <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', fontSize: 13.5, cursor: 'pointer', margin: '4px 0 14px' }}>
+                  <input type="checkbox" checked={!!course.cfc_en_tramite} style={{ marginTop: 3 }}
+                    onChange={(e) => patchCourse({ cfcEnTramite: e.target.checked })} />
+                  <span>
+                    <strong>En trámite</strong> — deja que la Comisión CFC vea el curso aunque no esté publicado, sin
+                    bloquear todavía nada.
+                  </span>
+                </label>
+                <button className="btn btn-primary btn-small" onClick={solicitarCfc}>Registrar solicitud de CFC</button>
+              </>
+            )}
           </div>
         )}
 
