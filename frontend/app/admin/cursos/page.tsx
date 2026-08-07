@@ -59,6 +59,7 @@ export default function CursosPage() {
 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [tipoNuevo, setTipoNuevo] = useState<'curso' | 'ope' | null>(null); // elección previa al crear
   const [paso, setPaso] = useState(0); // bloque visible del asistente
   const [vista, setVista] = useState<'activos' | 'pasados' | 'todos'>('activos');
 
@@ -108,10 +109,11 @@ export default function CursosPage() {
     setMsg(null);
     setSaving(true);
     try {
+      const esOpe = tipoNuevo === 'ope';
       const created = await api<{ course: { id: string } }>('/api/courses', {
         method: 'POST',
         auth: true,
-        body: JSON.stringify({
+        body: JSON.stringify(esOpe ? { title, esOpe: true } : {
           title,
           tema: tema || undefined,
           subtema: subtema || undefined,
@@ -143,17 +145,71 @@ export default function CursosPage() {
   return (
     <AppShell user={user} title="Cursos" nav={nav}>
       <div className="grid grid-2">
-        {/* Crear curso */}
+        {/* Crear */}
         <div className="card" data-tour="crear-curso-form">
           <div className="card-header">
-            <div className="card-title">Crear nuevo curso</div>
-            <div className="card-subtitle">Se crea en borrador con Bienvenida + Módulo 1</div>
+            <div className="card-title">
+              {tipoNuevo === null ? 'Crear nuevo' : tipoNuevo === 'ope' ? 'Nueva OPE' : 'Nuevo curso'}
+            </div>
+            <div className="card-subtitle">
+              {tipoNuevo === 'ope'
+                ? 'Generador de exámenes: sin temario, actas ni certificados'
+                : tipoNuevo === 'curso'
+                  ? 'Se crea en borrador con Bienvenida + Módulo 1'
+                  : 'Elige qué quieres crear'}
+            </div>
           </div>
 
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
 
-          {/* Pestañas de bloque: verde = completo, rojo = falta lo obligatorio,
-              gris = opcional aún sin rellenar. Solo se ve un bloque a la vez. */}
+          {/* Elección previa e irreversible: un Curso y una OPE no comparten
+              formulario. Se decide ANTES, no con una casilla a media página. */}
+          {tipoNuevo === null && (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <button type="button" className="card press" style={{ textAlign: 'left', cursor: 'pointer', border: '1px solid var(--gray-300)' }}
+                onClick={() => setTipoNuevo('curso')}>
+                <div style={{ fontWeight: 700, color: 'var(--primary-dark)' }}>📘 Curso</div>
+                <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+                  Formación con temario, módulos, exámenes, asistencia y certificado. Puede solicitar CFC.
+                </div>
+              </button>
+              <button type="button" className="card press" style={{ textAlign: 'left', cursor: 'pointer', border: '1px solid var(--gray-300)' }}
+                onClick={() => setTipoNuevo('ope')}>
+                <div style={{ fontWeight: 700, color: 'var(--primary-dark)' }}>🎯 OPE / Simulacros</div>
+                <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>
+                  Generador de exámenes por bancos de preguntas, con estadísticas. Sin temario, actas ni certificados.
+                </div>
+              </button>
+            </div>
+          )}
+
+          {tipoNuevo !== null && (
+            <button type="button" className="link-action" style={{ marginBottom: 12 }} onClick={() => { setTipoNuevo(null); setMsg(null); }}>
+              ← Cambiar tipo
+            </button>
+          )}
+
+          {/* Formulario mínimo de OPE: el resto (bancos, precio, generador) se
+              configura en su ficha tras crearla. */}
+          {tipoNuevo === 'ope' && (
+            <form onSubmit={onSubmit}>
+              <div className="form-group">
+                <label className="form-label">Nombre de la OPE *</label>
+                <input className="form-input" value={title} onChange={(e) => setTitle(e.target.value)}
+                  placeholder="OPE Cardiología Canarias 2027" required autoFocus />
+              </div>
+              <button className="btn btn-primary btn-full" disabled={saving || title.trim().length < 3}>
+                {saving ? 'Creando…' : 'Crear OPE'}
+              </button>
+              <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                Al crearla entrarás en su ficha: allí eliges sus bancos de preguntas, el precio y la configuración del generador de exámenes.
+              </p>
+            </form>
+          )}
+
+          {/* Asistente del Curso: pestañas verde/rojo, un bloque a la vez. */}
+          {tipoNuevo === 'curso' && (
+          <>
           <div className="wiz-tabs">
             {bloques.map((b, k) => {
               const estado = b.ok ? 'ok' : (b.obligatorio ? 'falta' : 'opc');
@@ -278,6 +334,8 @@ export default function CursosPage() {
               en la ficha del curso, junto con la miniatura, el contenido y la publicación.
             </p>
           </form>
+          </>
+          )}
         </div>
 
         {/* Listado */}

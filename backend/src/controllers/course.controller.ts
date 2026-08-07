@@ -28,6 +28,8 @@ const createSchema = z.object({
   // Marca que el curso está en trámite de acreditación: hace que la Comisión CFC
   // pueda verlo antes de publicarse.
   cfcEnTramite: z.boolean().optional().default(false),
+  // Tipo elegido al crear: una OPE es un generador de exámenes, no un curso.
+  esOpe: z.boolean().optional().default(false),
 });
 
 export async function createCourse(req: Request, res: Response): Promise<void> {
@@ -38,13 +40,13 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
     const { rows } = await client.query(
       `INSERT INTO courses
          (title, tema, subtema, duration_hours, modality, objetivo_general,
-          objetivos_especificos, publico_objetivo, price_cents, resumen, acreditacion, cfc, cfc_en_tramite, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-       RETURNING id, title, tema, subtema, status, created_at`,
+          objetivos_especificos, publico_objetivo, price_cents, resumen, acreditacion, cfc, cfc_en_tramite, es_ope, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+       RETURNING id, title, tema, subtema, status, es_ope, created_at`,
       [
         data.title, data.tema ?? null, data.subtema ?? null, data.durationHours ?? null,
         data.modality, data.objetivoGeneral ?? null, data.objetivosEspecificos ?? null,
-        data.publicoObjetivo, data.priceCents, data.resumen ?? null, data.acreditacion ?? null, data.cfc ?? null, data.cfcEnTramite, userId,
+        data.publicoObjetivo, data.priceCents, data.resumen ?? null, data.acreditacion ?? null, data.cfc ?? null, data.cfcEnTramite, data.esOpe, userId,
       ],
     );
     const created = rows[0];
@@ -55,14 +57,15 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
       [created.id, userId],
     );
 
-    // Auto-generate a welcome + first module.
-    await client.query(
-      `INSERT INTO modules (course_id, title, sort_order) VALUES ($1, 'Bienvenida', 0), ($1, 'Módulo 1', 1)`,
-      [created.id],
-    );
-
-    // Y su encuesta de satisfacción, lista desde el primer momento.
-    await client.query('INSERT INTO course_surveys (course_id) VALUES ($1) ON CONFLICT (course_id) DO NOTHING', [created.id]);
+    // Una OPE no tiene módulos ni encuesta de satisfacción: es un generador de
+    // exámenes. Solo un Curso arranca con Bienvenida + Módulo 1 y su encuesta.
+    if (!data.esOpe) {
+      await client.query(
+        `INSERT INTO modules (course_id, title, sort_order) VALUES ($1, 'Bienvenida', 0), ($1, 'Módulo 1', 1)`,
+        [created.id],
+      );
+      await client.query('INSERT INTO course_surveys (course_id) VALUES ($1) ON CONFLICT (course_id) DO NOTHING', [created.id]);
+    }
 
     return created;
   });
