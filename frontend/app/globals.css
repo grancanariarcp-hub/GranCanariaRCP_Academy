@@ -1253,3 +1253,43 @@ summary:focus-visible,
   .guia-panel { animation: none; }
   .guia-foco { animation: none; transition: none; }
 }
+
+/* ---------- Asistente por bloques (crear curso) ---------- */
+.wiz-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.wiz-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.wiz-tab .wiz-punto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #fff;
+}
+/* Completo (verde), falta obligatorio (rojo), opcional pendiente (gris). */
+.wiz-ok { border-color: #7fcfa4; background: #f0fbf5; color: #1c6b45; }
+.wiz-ok .wiz-punto { background: var(--success); }
+.wiz-falta { border-color: #e6a6a6; background: #fdf3f3; color: #a12b2b; }
+.wiz-falta .wiz-punto { background: var(--danger); }
+.wiz-opc .wiz-punto { background: var(--gray-500); }
+/* Bloque seleccionado: se resalta con un anillo, conservando su color de estado. */
+.wiz-tab.sel { box-shadow: 0 0 0 2px var(--secondary-dark) inset; }

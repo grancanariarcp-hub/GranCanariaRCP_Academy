@@ -59,7 +59,17 @@ export default function CursosPage() {
 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [paso, setPaso] = useState(0); // bloque visible del asistente
   const [vista, setVista] = useState<'activos' | 'pasados' | 'todos'>('activos');
+
+  // Estado de cada bloque del asistente: verde cuando está completo, rojo cuando
+  // le falta algo obligatorio. Solo el nombre es obligatorio para crear; el resto
+  // se recomienda y se puede terminar después en la ficha.
+  const bloques = [
+    { titulo: 'Identificación', ok: title.trim().length >= 3, obligatorio: true, falta: 'el nombre del curso' },
+    { titulo: 'Descripción', ok: resumen.trim().length > 0, obligatorio: false, falta: 'el resumen' },
+    { titulo: 'Acreditación', ok: acreditacion.trim().length > 0, obligatorio: false, falta: 'la acreditación' },
+  ];
 
   // Por defecto se ven los activos, pero los pendientes de acta se cuelan
   // siempre: son los que reclaman acción y no deben esconderse en «pasados».
@@ -142,96 +152,131 @@ export default function CursosPage() {
 
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
 
+          {/* Pestañas de bloque: verde = completo, rojo = falta lo obligatorio,
+              gris = opcional aún sin rellenar. Solo se ve un bloque a la vez. */}
+          <div className="wiz-tabs">
+            {bloques.map((b, k) => {
+              const estado = b.ok ? 'ok' : (b.obligatorio ? 'falta' : 'opc');
+              return (
+                <button type="button" key={b.titulo} onClick={() => setPaso(k)}
+                  className={`wiz-tab ${paso === k ? 'sel' : ''} wiz-${estado}`}>
+                  <span className="wiz-punto">{b.ok ? '✓' : b.obligatorio ? '✗' : '•'}</span>
+                  {b.titulo}
+                </button>
+              );
+            })}
+          </div>
+
           <form onSubmit={onSubmit}>
-            <div className="form-group">
-              <label className="form-label">Nombre del curso</label>
-              <input className="form-input" value={title} onChange={(e) => setTitle(e.target.value)} required />
-            </div>
+            {paso === 0 && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Nombre del curso *</label>
+                  <input className="form-input" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
+                  {title.trim().length > 0 && title.trim().length < 3 && (
+                    <p className="muted" style={{ fontSize: 12, marginTop: 4, color: 'var(--danger)' }}>Al menos 3 caracteres.</p>
+                  )}
+                </div>
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Tema</label>
+                    <select className="form-select" value={tema} onChange={(e) => setTema(e.target.value)}>
+                      <option value="">—</option>
+                      {temas.map((t) => <option key={t.id} value={t.label}>{t.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Subtema</label>
+                    <select className="form-select" value={subtema} onChange={(e) => setSubtema(e.target.value)}>
+                      <option value="">—</option>
+                      {subtemas.map((t) => <option key={t.id} value={t.label}>{t.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Duración (horas)</label>
+                    <input className="form-input" type="number" min="0" step="0.5" value={durationHours} onChange={(e) => setDurationHours(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Modalidad</label>
+                    <select className="form-select" value={modality} onChange={(e) => setModality(e.target.value)}>
+                      <option value="online">Online</option>
+                      <option value="mixto">Mixto</option>
+                      <option value="presencial">Presencial</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
 
-            <div className="grid grid-2" style={{ gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">Tema</label>
-                <select className="form-select" value={tema} onChange={(e) => setTema(e.target.value)}>
-                  <option value="">—</option>
-                  {temas.map((t) => <option key={t.id} value={t.label}>{t.label}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Subtema</label>
-                <select className="form-select" value={subtema} onChange={(e) => setSubtema(e.target.value)}>
-                  <option value="">—</option>
-                  {subtemas.map((t) => <option key={t.id} value={t.label}>{t.label}</option>)}
-                </select>
-              </div>
-            </div>
+            {paso === 1 && (
+              <>
+                <div className="form-group">
+                  <label className="form-label">Público objetivo</label>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {publicos.map((p) => (
+                      <button type="button" key={p.id} onClick={() => togglePublico(p.label)}
+                        className={`tab ${publicoObjetivo.includes(p.label) ? 'active' : ''}`}
+                        style={{ flex: 'unset', padding: '8px 12px' }}>
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Resumen (para la ficha del curso)</label>
+                  <textarea className="form-input" style={{ height: 70, padding: 10 }} placeholder="Qué se verá y por qué es relevante realizarlo" value={resumen} onChange={(e) => setResumen(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Objetivo general</label>
+                  <textarea className="form-input" style={{ height: 60, padding: 10 }} value={objetivoGeneral} onChange={(e) => setObjetivoGeneral(e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Objetivos específicos</label>
+                  <textarea className="form-input" style={{ height: 60, padding: 10 }} value={objetivosEspecificos} onChange={(e) => setObjetivosEspecificos(e.target.value)} />
+                </div>
+              </>
+            )}
 
-            <div className="grid grid-2" style={{ gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">Duración (horas)</label>
-                <input className="form-input" type="number" min="0" step="0.5" value={durationHours} onChange={(e) => setDurationHours(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Modalidad</label>
-                <select className="form-select" value={modality} onChange={(e) => setModality(e.target.value)}>
-                  <option value="online">Online</option>
-                  <option value="mixto">Mixto</option>
-                  <option value="presencial">Presencial</option>
-                </select>
-              </div>
-            </div>
+            {paso === 2 && (
+              <>
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Acreditación</label>
+                    <input className="form-input" placeholder="Institución que acredita" value={acreditacion} onChange={(e) => setAcreditacion(e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">CFC</label>
+                    <input className="form-input" placeholder="Ej.: 2,5 créditos (otorgados)" value={cfc} onChange={(e) => setCfc(e.target.value)} />
+                  </div>
+                </div>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, marginBottom: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={cfcEnTramite} onChange={(e) => setCfcEnTramite(e.target.checked)} style={{ marginTop: 3 }} />
+                  <span>
+                    <strong>Tramitar CFC</strong> — permite que la Comisión CFC vea este curso aunque aún no esté
+                    publicado. Déjalo sin marcar si no está en trámite de acreditación.
+                  </span>
+                </label>
+              </>
+            )}
 
-            <div className="form-group">
-              <label className="form-label">Público objetivo</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {publicos.map((p) => (
-                  <button
-                    type="button"
-                    key={p.id}
-                    onClick={() => togglePublico(p.label)}
-                    className={`tab ${publicoObjetivo.includes(p.label) ? 'active' : ''}`}
-                    style={{ flex: 'unset', padding: '8px 12px' }}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
+            {/* Navegación entre bloques + crear (habilitado en cuanto hay nombre válido) */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+              {paso > 0 && (
+                <button type="button" className="btn btn-outline btn-small" onClick={() => setPaso(paso - 1)}>← Anterior</button>
+              )}
+              {paso < bloques.length - 1 && (
+                <button type="button" className="btn btn-outline btn-small" onClick={() => setPaso(paso + 1)}>Siguiente →</button>
+              )}
+              <button className="btn btn-primary btn-small" style={{ marginLeft: 'auto' }} disabled={saving || !bloques[0].ok}>
+                {saving ? 'Creando…' : 'Crear curso'}
+              </button>
             </div>
-
-            <div className="form-group">
-              <label className="form-label">Objetivo general</label>
-              <textarea className="form-input" style={{ height: 60, padding: 10 }} value={objetivoGeneral} onChange={(e) => setObjetivoGeneral(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Objetivos específicos</label>
-              <textarea className="form-input" style={{ height: 60, padding: 10 }} value={objetivosEspecificos} onChange={(e) => setObjetivosEspecificos(e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Resumen (para la ficha del curso)</label>
-              <textarea className="form-input" style={{ height: 70, padding: 10 }} placeholder="Qué se verá y por qué es relevante realizarlo" value={resumen} onChange={(e) => setResumen(e.target.value)} />
-            </div>
-            <div className="grid grid-2" style={{ gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">Acreditación</label>
-                <input className="form-input" placeholder="Institución que acredita" value={acreditacion} onChange={(e) => setAcreditacion(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">CFC</label>
-                <input className="form-input" placeholder="Ej.: 2,5 créditos (otorgados)" value={cfc} onChange={(e) => setCfc(e.target.value)} />
-              </div>
-            </div>
-
-            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, marginBottom: 12, cursor: 'pointer' }}>
-              <input type="checkbox" checked={cfcEnTramite} onChange={(e) => setCfcEnTramite(e.target.checked)} style={{ marginTop: 3 }} />
-              <span>
-                <strong>Tramitar CFC</strong> — permite que la Comisión CFC vea este curso aunque aún no esté
-                publicado. Déjalo sin marcar si no está en trámite de acreditación.
-              </span>
-            </label>
-
-            <button className="btn btn-primary btn-full" disabled={saving}>
-              {saving ? 'Creando…' : 'Crear curso'}
-            </button>
-            <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>Al crearlo te llevará a la edición: allí subes la miniatura, imágenes y contenido, y lo publicas.</p>
+            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+              Solo el <strong>nombre</strong> es obligatorio para crear. Lo demás puedes completarlo ahora o después,
+              en la ficha del curso, junto con la miniatura, el contenido y la publicación.
+            </p>
           </form>
         </div>
 
