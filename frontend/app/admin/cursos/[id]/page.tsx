@@ -146,6 +146,10 @@ export default function CourseDetailPage() {
   const [fCfc, setFCfc] = useState('');
   const [fWhats, setFWhats] = useState('');
   const [fTelegram, setFTelegram] = useState('');
+  // Clasificación temática (tema → subtema), con sugerencias de lo ya usado.
+  const [fTema, setFTema] = useState('');
+  const [fSubtema, setFSubtema] = useState('');
+  const [taxonomia, setTaxonomia] = useState<{ temas: string[]; porTema: Record<string, string[]> }>({ temas: [], porTema: {} });
   // Datos de la parte práctica (para PÚLSAR)
   const [fTipoClinico, setFTipoClinico] = useState('');
   const [fEmpresa, setFEmpresa] = useState('');
@@ -199,6 +203,10 @@ export default function CourseDetailPage() {
       setFCfc(c.course.cfc ?? '');
       setFWhats(c.course.whatsapp_url ?? '');
       setFTelegram(c.course.telegram_url ?? '');
+      setFTema(c.course.tema ?? '');
+      setFSubtema(c.course.subtema ?? '');
+      api<typeof taxonomia>('/api/courses/taxonomia', { auth: true })
+        .then((r) => setTaxonomia(r)).catch(() => {});
       setFTipoClinico(c.course.tipo_clinico ?? '');
       setFEmpresa(c.course.empresa ?? '');
       setFLugar(c.course.lugar ?? '');
@@ -295,7 +303,7 @@ export default function CourseDetailPage() {
   async function saveFicha() {
     setFichaMsg(null);
     try {
-      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats, telegramUrl: fTelegram, tipoClinico: fTipoClinico, empresa: fEmpresa, lugar: fLugar }) });
+      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats, telegramUrl: fTelegram, tema: fTema.trim(), subtema: fSubtema.trim(), tipoClinico: fTipoClinico, empresa: fEmpresa, lugar: fLugar }) });
       setFichaMsg('Ficha guardada ✅');
       load();
     } catch (err) {
@@ -754,6 +762,26 @@ export default function CourseDetailPage() {
                 <div className="form-group">
                   <label className="form-label">Resumen</label>
                   <textarea className="form-input" style={{ height: 70, padding: 10 }} value={fResumen} onChange={(e) => setFResumen(e.target.value)} />
+                </div>
+                {/* Clasificación temática: dos niveles (tema → subtema). Texto
+                    libre con sugerencias de lo ya usado en la academia. */}
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Tema</label>
+                    <input className="form-input" list="lista-temas" placeholder="Ej.: Soporte Vital"
+                      value={fTema} onChange={(e) => setFTema(e.target.value)} />
+                    <datalist id="lista-temas">
+                      {taxonomia.temas.map((t) => <option key={t} value={t} />)}
+                    </datalist>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Subtema</label>
+                    <input className="form-input" list="lista-subtemas" placeholder="Ej.: Adulto"
+                      value={fSubtema} onChange={(e) => setFSubtema(e.target.value)} />
+                    <datalist id="lista-subtemas">
+                      {(taxonomia.porTema[fTema] ?? Object.values(taxonomia.porTema).flat()).map((s) => <option key={s} value={s} />)}
+                    </datalist>
+                  </div>
                 </div>
                 <div className="grid grid-2" style={{ gap: 12 }}>
                   <div className="form-group">

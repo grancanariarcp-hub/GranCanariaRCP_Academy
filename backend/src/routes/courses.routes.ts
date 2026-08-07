@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration } from '../controllers/course.controller.js';
+import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration, courseTaxonomy } from '../controllers/course.controller.js';
 import multer from 'multer';
 import {
   updateCourse, deleteCourse, cambiarTipoCurso, solicitarCfc, cambiosCfc, uploadCourseThumbnail, addModule, updateModule, deleteModule,
@@ -34,6 +34,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 router.use(requireAuth, requireRole('super_admin', 'profesor'));
 
 router.get('/', asyncHandler(listCourses));
+router.get('/taxonomia', asyncHandler(courseTaxonomy));
 router.post('/', asyncHandler(createCourse));
 router.get('/:id', asyncHandler(getCourse));
 router.patch('/:id', asyncHandler(updateCourse));

@@ -155,6 +155,29 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
   res.json({ course, staff: staff.rows, program: program.rows, gallery: gallery.map((g) => ({ id: g.id, url: g.url })) });
 }
 
+/**
+ * GET /api/courses/taxonomia — temas y subtemas ya usados en la academia.
+ *
+ * Alimenta las sugerencias del formulario: el profesor escribe libremente, pero
+ * ve lo que ya existe para reutilizar la misma clasificación en vez de inventar
+ * variantes («RCP», «rcp», «R.C.P.»). Devuelve los temas y, por cada tema, sus
+ * subtemas, para que el desplegable de subtema se acote al tema elegido.
+ */
+export async function courseTaxonomy(_req: Request, res: Response): Promise<void> {
+  const { rows } = await query<{ tema: string; subtema: string | null }>(
+    `SELECT DISTINCT tema, subtema FROM courses
+      WHERE tema IS NOT NULL AND tema <> ''
+      ORDER BY tema, subtema`,
+  );
+  const temas: string[] = [];
+  const porTema: Record<string, string[]> = {};
+  for (const r of rows) {
+    if (!temas.includes(r.tema)) { temas.push(r.tema); porTema[r.tema] = []; }
+    if (r.subtema && !porTema[r.tema].includes(r.subtema)) porTema[r.tema].push(r.subtema);
+  }
+  res.json({ temas, porTema });
+}
+
 export async function listCourses(req: Request, res: Response): Promise<void> {
   const rol = req.auth!.role;
   // El auditor de la comisión revisa, pero solo lo que le compete: cursos ya
