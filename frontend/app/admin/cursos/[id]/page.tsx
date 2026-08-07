@@ -152,6 +152,7 @@ export default function CourseDetailPage() {
   const [actUrl, setActUrl] = useState('');
   const [actDoc, setActDoc] = useState('');
   const [actBody, setActBody] = useState('');
+  const [actDuracion, setActDuracion] = useState(''); // minutos, sobre todo para vídeos (CFC)
   const [examAttempts, setExamAttempts] = useState('1');
   const [examPass, setExamPass] = useState('60');
   const [examTime, setExamTime] = useState('');
@@ -379,10 +380,11 @@ export default function CourseDetailPage() {
             url: actType === 'video' || actType === 'enlace' ? actUrl : undefined,
             documentId: actType === 'documento' ? actDoc : undefined,
             body: actType === 'texto' ? actBody : undefined,
+            durationMin: actType === 'video' && actDuracion ? Number(actDuracion) : undefined,
           }),
         });
       }
-      setAddingTo(null); setActTitle(''); setActUrl(''); setActDoc(''); setActBody('');
+      setAddingTo(null); setActTitle(''); setActUrl(''); setActDoc(''); setActBody(''); setActDuracion('');
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al añadir actividad');
@@ -951,6 +953,15 @@ export default function CourseDetailPage() {
                       )}
                       {(actType === 'video' || actType === 'enlace') && (
                         <input className="form-input" placeholder="https://…" value={actUrl} onChange={(e) => setActUrl(e.target.value)} style={{ marginBottom: 8 }} />
+                      )}
+                      {actType === 'video' && (
+                        <div style={{ marginBottom: 8 }}>
+                          <input className="form-input" type="number" min="0" step="1" placeholder="Duración en minutos"
+                            value={actDuracion} onChange={(e) => setActDuracion(e.target.value)} />
+                          <p className="muted" style={{ fontSize: 11.5, marginTop: 3 }}>
+                            Necesaria para el cómputo de horas CFC. Es la duración del vídeo.
+                          </p>
+                        </div>
                       )}
                       {actType === 'texto' && (
                         <textarea className="form-input" style={{ height: 90, padding: 10, marginBottom: 8 }} placeholder="Escribe el contenido…" value={actBody} onChange={(e) => setActBody(e.target.value)} />

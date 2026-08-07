@@ -33,6 +33,23 @@ const metaSchema = z.object({
 });
 
 /**
+ * Cuenta las páginas de un PDF sin librerías: cada página es un objeto
+ * «/Type /Page» en el documento. Es una estimación —un PDF con los objetos
+ * comprimidos en streams puede contar de menos—, por eso el profesor siempre
+ * puede corregirla. Devuelve null si no logra contar ninguna.
+ */
+function contarPaginasPdf(buf: Buffer): number | null {
+  try {
+    const texto = buf.toString('latin1');
+    const coincidencias = texto.match(/\/Type\s*\/Page[^s]/g);
+    const n = coincidencias ? coincidencias.length : 0;
+    return n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * POST /api/admin/documents  (multipart: file + title + kind)
  * Uploads a reference PDF to R2 and stores its metadata.
  */
@@ -47,6 +64,9 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
   }
 
   const { title, kind, pages } = metaSchema.parse(req.body);
+  // Si el profesor no indica las páginas, se cuentan del propio PDF: es el dato
+  // que alimenta el cómputo de horas CFC (minutos por página × páginas).
+  const paginas = pages ?? contarPaginasPdf(file.buffer);
 
   // La franja gratuita se comprueba ANTES de subir: si no, se pagaría el
   // almacenamiento de un fichero que luego hay que rechazar.
@@ -68,7 +88,7 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
     `INSERT INTO documents (title, kind, storage_key, content_type, size_bytes, pages, uploaded_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id, title, kind, size_bytes, pages, created_at`,
-    [title, kind, key, file.mimetype, file.size, pages ?? null, req.auth!.sub],
+    [title, kind, key, file.mimetype, file.size, paginas, req.auth!.sub],
   );
 
   await audit({

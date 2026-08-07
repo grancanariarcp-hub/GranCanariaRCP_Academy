@@ -182,6 +182,8 @@ const addActivitySchema = z.object({
   url: z.string().url('URL no válida').optional(),
   body: z.string().optional(),
   isMandatory: z.boolean().optional().default(false),
+  // Duración en minutos (sobre todo para vídeos): cuenta para las horas CFC.
+  durationMin: z.number().int().min(0).max(1000).optional(),
 });
 
 /**
@@ -216,10 +218,10 @@ export async function addActivity(req: Request, res: Response): Promise<void> {
   if (d.type === 'texto' && (!d.body || d.body.trim().length === 0)) throw badRequest('Escribe el texto', 'NO_BODY');
 
   const { rows } = await query(
-    `INSERT INTO activities (module_id, type, title, document_id, url, body, is_mandatory, sort_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE((SELECT MAX(sort_order) + 1 FROM activities WHERE module_id = $1), 0))
-     RETURNING id, type, title, document_id, url, body, is_mandatory`,
-    [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.body ?? null, d.isMandatory],
+    `INSERT INTO activities (module_id, type, title, document_id, url, body, is_mandatory, duration_min, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE((SELECT MAX(sort_order) + 1 FROM activities WHERE module_id = $1), 0))
+     RETURNING id, type, title, document_id, url, body, is_mandatory, duration_min`,
+    [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.body ?? null, d.isMandatory, d.durationMin ?? null],
   );
   avisarContenidoNuevo(req.params.id, d.title, 'Nueva actividad').catch(() => { /* el aviso no debe romper la creación */ });
   res.status(201).json({ activity: rows[0] });
