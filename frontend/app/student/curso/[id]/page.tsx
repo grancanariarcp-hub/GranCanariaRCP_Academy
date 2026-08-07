@@ -12,6 +12,7 @@ import { api, ApiError, downloadFile } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
 import { MyAttendance } from '@/components/MyAttendance';
 import { PaymentGate } from '@/components/PaymentGate';
+import { VideoEmbed } from '@/components/VideoEmbed';
 import { MySubscription } from '@/components/MySubscription';
 
 interface Activity {
@@ -191,10 +192,16 @@ export default function StudentCoursePage() {
                     <div style={{ fontWeight: 600, marginBottom: 6 }}>{TYPE_ICON.imagen} {a.title}</div>
                     {a.image_url && <img src={a.image_url} alt={a.title} style={{ maxWidth: '100%', borderRadius: 8 }} />}
                   </div>
+                ) : a.type === 'video' ? (
+                  <div>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>{TYPE_ICON.video} {a.title}</div>
+                    {/* El vídeo se reproduce aquí mismo: el alumno no sale del campus. */}
+                    <VideoEmbed url={a.url} title={a.title} />
+                  </div>
                 ) : (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>{TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}</span>
-                    {(a.type === 'video' || a.type === 'enlace') && a.url ? (
+                    {a.type === 'enlace' && a.url ? (
                       <a className="btn btn-primary btn-small" href={a.url} target="_blank" rel="noreferrer">Abrir</a>
                     ) : a.type === 'documento' ? (
                       <span className="badge badge-primary">Documento</span>
