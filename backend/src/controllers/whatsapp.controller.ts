@@ -31,6 +31,9 @@ export async function setGlobalWhatsapp(req: Request, res: Response): Promise<vo
  * Alumno: grupos a los que aún no se ha unido (el general y los de sus cursos).
  * El frontend lo muestra como aviso emergente al entrar.
  */
+type Red = 'whatsapp' | 'telegram';
+interface Grupo { scope: 'global' | 'curso'; red: Red; courseId: string | null; title: string; url: string }
+
 export async function myPendingGroups(req: Request, res: Response): Promise<void> {
   if (req.auth!.role !== 'student') { res.json({ groups: [] }); return; }
   const studentId = req.auth!.sub;
@@ -38,36 +41,45 @@ export async function myPendingGroups(req: Request, res: Response): Promise<void
   const [global, me, courses] = await Promise.all([
     query<{ value: string | null }>('SELECT value FROM platform_settings WHERE key = $1', [GLOBAL_KEY]),
     query<{ whatsapp_joined_at: string | null }>('SELECT whatsapp_joined_at FROM students WHERE id = $1', [studentId]),
-    query<{ course_id: string; title: string; whatsapp_url: string }>(
-      `SELECT c.id AS course_id, c.title, c.whatsapp_url
-       FROM enrollments e JOIN courses c ON c.id = e.course_id
-       WHERE e.student_id = $1 AND e.status IN ('activo','completado')
-         AND c.whatsapp_url IS NOT NULL AND c.whatsapp_url <> ''
-         AND e.whatsapp_joined_at IS NULL`,
+    query<{ course_id: string; title: string; whatsapp_url: string | null; telegram_url: string | null; whatsapp_joined_at: string | null; telegram_joined_at: string | null }>(
+      `SELECT c.id AS course_id, c.title, c.whatsapp_url, c.telegram_url,
+              e.whatsapp_joined_at, e.telegram_joined_at
+         FROM enrollments e JOIN courses c ON c.id = e.course_id
+        WHERE e.student_id = $1 AND e.status IN ('activo','completado')`,
       [studentId],
     ),
   ]);
 
-  const groups: Array<{ scope: 'global' | 'curso'; courseId: string | null; title: string; url: string }> = [];
+  const groups: Grupo[] = [];
   const globalUrl = global.rows[0]?.value;
   if (globalUrl && !me.rows[0]?.whatsapp_joined_at) {
-    groups.push({ scope: 'global', courseId: null, title: 'Comunidad Gran Canaria RCP', url: globalUrl });
+    groups.push({ scope: 'global', red: 'whatsapp', courseId: null, title: 'Comunidad Gran Canaria RCP', url: globalUrl });
   }
   for (const c of courses.rows) {
-    groups.push({ scope: 'curso', courseId: c.course_id, title: c.title, url: c.whatsapp_url });
+    if (c.whatsapp_url && !c.whatsapp_joined_at) {
+      groups.push({ scope: 'curso', red: 'whatsapp', courseId: c.course_id, title: c.title, url: c.whatsapp_url });
+    }
+    if (c.telegram_url && !c.telegram_joined_at) {
+      groups.push({ scope: 'curso', red: 'telegram', courseId: c.course_id, title: c.title, url: c.telegram_url });
+    }
   }
   res.json({ groups });
 }
 
-/** Alumno: marca que ya se unió (o que no quiere que se lo recuerden más). */
+/** Alumno: marca que ya se unió a una red (o que no quiere que se lo recuerden). */
 export async function markJoined(req: Request, res: Response): Promise<void> {
   if (req.auth!.role !== 'student') throw badRequest('Solo alumnos', 'NOT_STUDENT');
-  const { courseId } = z.object({ courseId: z.string().uuid().optional() }).parse(req.body);
+  const { courseId, red } = z.object({
+    courseId: z.string().uuid().optional(),
+    red: z.enum(['whatsapp', 'telegram']).default('whatsapp'),
+  }).parse(req.body);
+  // Nombre de columna fijo por enum (no interpolación de entrada): sin inyección.
+  const col = red === 'telegram' ? 'telegram_joined_at' : 'whatsapp_joined_at';
   if (courseId) {
-    await query('UPDATE enrollments SET whatsapp_joined_at = NOW() WHERE student_id = $1 AND course_id = $2',
+    await query(`UPDATE enrollments SET ${col} = NOW() WHERE student_id = $1 AND course_id = $2`,
       [req.auth!.sub, courseId]);
   } else {
-    await query('UPDATE students SET whatsapp_joined_at = NOW() WHERE id = $1', [req.auth!.sub]);
+    await query(`UPDATE students SET ${col} = NOW() WHERE id = $1`, [req.auth!.sub]);
   }
   res.json({ ok: true });
 }

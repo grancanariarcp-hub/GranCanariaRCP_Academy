@@ -58,6 +58,7 @@ interface Course {
   acreditacion: string | null;
   cfc: string | null;
   whatsapp_url: string | null;
+  telegram_url: string | null;
   thumbnail_url?: string;
   certifica: string | null;
   firmante1_nombre: string | null;
@@ -130,6 +131,7 @@ export default function CourseDetailPage() {
   const [fAcred, setFAcred] = useState('');
   const [fCfc, setFCfc] = useState('');
   const [fWhats, setFWhats] = useState('');
+  const [fTelegram, setFTelegram] = useState('');
   // Datos de la parte práctica (para PÚLSAR)
   const [fTipoClinico, setFTipoClinico] = useState('');
   const [fEmpresa, setFEmpresa] = useState('');
@@ -181,6 +183,7 @@ export default function CourseDetailPage() {
       setFAcred(c.course.acreditacion ?? '');
       setFCfc(c.course.cfc ?? '');
       setFWhats(c.course.whatsapp_url ?? '');
+      setFTelegram(c.course.telegram_url ?? '');
       setFTipoClinico(c.course.tipo_clinico ?? '');
       setFEmpresa(c.course.empresa ?? '');
       setFLugar(c.course.lugar ?? '');
@@ -234,7 +237,7 @@ export default function CourseDetailPage() {
   async function saveFicha() {
     setFichaMsg(null);
     try {
-      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats, tipoClinico: fTipoClinico, empresa: fEmpresa, lugar: fLugar }) });
+      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats, telegramUrl: fTelegram, tipoClinico: fTipoClinico, empresa: fEmpresa, lugar: fLugar }) });
       setFichaMsg('Ficha guardada ✅');
       load();
     } catch (err) {
@@ -620,6 +623,13 @@ export default function CourseDetailPage() {
                   <label className="form-label">Grupo de WhatsApp del curso (enlace de invitación)</label>
                   <input className="form-input" placeholder="https://chat.whatsapp.com/..." value={fWhats} onChange={(e) => setFWhats(e.target.value)} />
                   <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>Se ofrecerá a los alumnos al entrar. Unirse es voluntario.</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Grupo de Telegram del curso (enlace de invitación)</label>
+                  <input className="form-input" placeholder="https://t.me/..." value={fTelegram} onChange={(e) => setFTelegram(e.target.value)} />
+                  <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                    Igual que el de WhatsApp: al alumno se le ofrece unirse para recibir novedades y actividades. Unirse es voluntario.
+                  </p>
                 </div>
                 {!course.es_ope && (
                   <>
