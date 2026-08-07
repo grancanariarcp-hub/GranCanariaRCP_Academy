@@ -100,7 +100,7 @@ export async function listOpenCourses(_req: Request, res: Response): Promise<voi
   const { rows } = await query(
     `SELECT id, title, tema, subtema, modality, duration_hours, price_cents, publico_objetivo, resumen, thumbnail_key, enrollment_open, cfc,
             early_bird_until, late_surcharge_pct
-     FROM courses WHERE status = 'publicado'
+     FROM courses WHERE status = 'publicado' AND NOT es_ope
      ORDER BY enrollment_open DESC, created_at DESC`,
   );
   const conUrl = await presignKeys(rows, 'thumbnail_key', 'thumbnail_url');
@@ -113,7 +113,7 @@ export async function getPublicCourse(req: Request, res: Response): Promise<void
     `SELECT id, title, tema, subtema, modality, duration_hours, price_cents,
             publico_objetivo, objetivo_general, objetivos_especificos, resumen, acreditacion, cfc,
             thumbnail_key, enrollment_open, early_bird_until, late_surcharge_pct, tipo_clinico
-     FROM courses WHERE id = $1 AND status = 'publicado'`,
+     FROM courses WHERE id = $1 AND status = 'publicado' AND NOT es_ope`,
     [req.params.id],
   );
   if (rows.length === 0) throw notFound('Curso no encontrado');
