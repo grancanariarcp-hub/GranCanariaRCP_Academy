@@ -8,6 +8,7 @@ import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 import { PerfilDocenteEditor } from '@/components/PerfilDocenteEditor';
 import { InvitacionesDocente } from '@/components/InvitacionesDocente';
 import { MisDatos } from '@/components/MisDatos';
+import { ServiciosExtrasGlobal } from '@/components/ServiciosExtrasGlobal';
 
 export default function AdminProfilePage() {
   // El auditor tiene «Perfil» en su menú lateral: si no se le admite aquí, el
@@ -23,6 +24,7 @@ export default function AdminProfilePage() {
       {(user.role === 'profesor' || user.role === 'super_admin' || user.role === 'institution_admin') && <InvitacionesDocente />}
       {user.role === 'profesor' && <PerfilDocenteEditor />}
       <ProfilePanel user={user} />
+      {user.role === 'super_admin' && <ServiciosExtrasGlobal />}
       {user.role !== 'auditor' && <MisDatos esAlumno={false} />}
     </AppShell>
   );

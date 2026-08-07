@@ -15,6 +15,7 @@ import { CoursePricing } from '@/components/CoursePricing';
 import { ActaPanel } from '@/components/ActaPanel';
 import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 import { CourseSubscription } from '@/components/CourseSubscription';
+import { ServiciosExtrasCurso } from '@/components/ServiciosExtrasCurso';
 import { CoursePayments } from '@/components/CoursePayments';
 import { SubgruposPanel } from '@/components/SubgruposPanel';
 import { Ayuda } from '@/components/ayuda/Ayuda';
@@ -726,6 +727,9 @@ export default function CourseDetailPage() {
 
         {/* Cobro recurrente por periodos */}
         <CourseSubscription courseId={courseId} course={course} onSaved={load} />
+
+        {/* Servicios extras: heredados de la academia, ajustables por el super admin */}
+        <ServiciosExtrasCurso courseId={courseId} canEdit={user.role === 'super_admin'} />
         </>
         )}
 

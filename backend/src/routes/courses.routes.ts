@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration, courseTaxonomy } from '../controllers/course.controller.js';
+import { getCourseExtras, updateCourseExtras } from '../controllers/academia.controller.js';
 import multer from 'multer';
 import {
   updateCourse, deleteCourse, cambiarTipoCurso, solicitarCfc, cambiosCfc, uploadCourseThumbnail, addModule, updateModule, deleteModule,
@@ -40,6 +41,8 @@ router.get('/:id', asyncHandler(getCourse));
 router.patch('/:id', asyncHandler(updateCourse));
 router.delete('/:id', asyncHandler(deleteCourse));
 router.patch('/:id/tipo', asyncHandler(cambiarTipoCurso));
+router.get('/:id/extras', asyncHandler(getCourseExtras));
+router.put('/:id/extras', asyncHandler(updateCourseExtras));
 router.post('/:id/solicitar-cfc', asyncHandler(solicitarCfc));
 router.get('/:id/cambios-cfc', asyncHandler(cambiosCfc));
 router.post('/:id/thumbnail', upload.single('file'), asyncHandler(uploadCourseThumbnail));
