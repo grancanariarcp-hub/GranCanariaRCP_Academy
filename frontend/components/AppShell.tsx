@@ -85,15 +85,15 @@ export function AppShell({
 
       <div className="main">
         <div className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <div className="topbar-left">
             <button className="menu-toggle" aria-label="Menú" onClick={() => setMenuOpen((v) => !v)}>☰</button>
             <h2>{title}</h2>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="topbar-actions">
             {/* Ayuda de la pantalla actual: se resuelve sola por la ruta. */}
             <span data-tour="ayuda"><Ayuda variante="boton" /></span>
             <NotificationBell />
-            <span className="muted" style={{ fontSize: 13 }}>
+            <span className="topbar-user muted" style={{ fontSize: 13 }}>
               {user.name} · <span className="badge badge-primary">{roleLabel(user.role)}</span>
             </span>
             <button className="btn btn-outline btn-small" onClick={logout}>

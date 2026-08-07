@@ -512,6 +512,28 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+/* El título ocupa el hueco sobrante y se recorta con «…» en vez de empujar sobre
+   los botones de la derecha (que es lo que solapaba «Ayuda»). */
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+.topbar-left h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;   /* los controles nunca se comprimen ni se solapan */
 }
 .muted {
   color: var(--text-secondary);
@@ -586,6 +608,17 @@ tbody tr:hover {
   h1 {
     font-size: 22px;
   }
+  /* En móvil la barra superior aprieta: se recorta el relleno, el título baja de
+     tamaño y el nombre+rol se ocultan (ya están en el menú lateral). Así «Ayuda»,
+     la campana y «Salir» caben sin pisarse. */
+  .topbar {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+  .topbar-left { gap: 8px; }
+  .topbar-left h2 { font-size: 17px; }
+  .topbar-actions { gap: 8px; }
+  .topbar-user { display: none; }
 }
 
 /* ---------- Barra de filtros del catálogo ---------- */
