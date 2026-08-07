@@ -42,6 +42,7 @@ interface Staff {
   email: string;
   role: 'director' | 'instructor';
   parte?: 'teorica' | 'practica' | 'ambas';
+  status?: 'pendiente' | 'aceptado' | 'rechazado';
 }
 
 const PARTE_LABEL: Record<string, string> = { teorica: 'Teoría', practica: 'Práctica', ambas: 'Teoría y práctica' };
@@ -1054,7 +1055,12 @@ export default function CourseDetailPage() {
                   <tbody>
                     {staff.map((s) => (
                       <tr key={s.id}>
-                        <td>{s.name}<div className="muted" style={{ fontSize: 12 }}>{s.email}</div></td>
+                        <td>
+                          {s.name}
+                          {s.status === 'pendiente' && <span className="badge badge-warning" style={{ marginLeft: 8, fontSize: 10.5 }}>pendiente de aceptar</span>}
+                          {s.status === 'rechazado' && <span className="badge badge-danger" style={{ marginLeft: 8, fontSize: 10.5 }}>rechazó</span>}
+                          <div className="muted" style={{ fontSize: 12 }}>{s.email}</div>
+                        </td>
                         <td><span className={`badge ${s.role === 'director' ? 'badge-primary' : 'badge-success'}`}>{s.role}</span></td>
                         <td className="muted" style={{ fontSize: 12.5 }}>{PARTE_LABEL[s.parte ?? 'ambas']}</td>
                       </tr>

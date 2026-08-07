@@ -340,16 +340,21 @@ export async function inviteStaff(req: Request, res: Response): Promise<void> {
   if (u.rows.length === 0) throw notFound('No hay un profesor con ese email (¿está registrado y aprobado?)');
   if (u.rows[0].status !== 'active') throw badRequest('Ese profesor aún no está activo/validado', 'NOT_ACTIVE');
 
+  // El invitado nace 'pendiente' (default): no participa hasta que lo acepte.
+  // Al reinvitar no se pisa un estado ya resuelto sin querer, salvo que estuviera
+  // rechazado, en cuyo caso vuelve a quedar pendiente para que pueda reconsiderar.
   await query(
     `INSERT INTO course_staff (course_id, user_id, role, parte) VALUES ($1, $2, $3, $4)
-     ON CONFLICT (course_id, user_id) DO UPDATE SET role = EXCLUDED.role, parte = EXCLUDED.parte`,
+     ON CONFLICT (course_id, user_id) DO UPDATE SET role = EXCLUDED.role, parte = EXCLUDED.parte,
+       status = CASE WHEN course_staff.status = 'rechazado' THEN 'pendiente' ELSE course_staff.status END`,
     [req.params.id, u.rows[0].id, role, parte],
   );
   const ct = await query<{ title: string }>('SELECT title FROM courses WHERE id = $1', [req.params.id]);
-  await notify({ id: u.rows[0].id, type: 'user' }, 'Te han añadido a un curso',
-    `Ahora eres ${role} de «${ct.rows[0]?.title ?? 'un curso'}»`, `/admin/cursos/${req.params.id}`).catch(() => { /* no bloquear */ });
+  await notify({ id: u.rows[0].id, type: 'user' }, 'Invitación a un curso',
+    `Te han invitado a participar como ${role} en «${ct.rows[0]?.title ?? 'un curso'}». Acéptala desde tu perfil.`,
+    '/admin/perfil').catch(() => { /* no bloquear */ });
   await audit({ actorId: req.auth!.sub, actorType: req.auth!.role, action: 'COURSE_STAFF_ADD', entity: 'course', entityId: req.params.id, ip: clientIp(req), metadata: { email: email.toLowerCase(), role } });
-  res.status(201).json({ staff: { id: u.rows[0].id, name: u.rows[0].name, email: email.toLowerCase(), role } });
+  res.status(201).json({ staff: { id: u.rows[0].id, name: u.rows[0].name, email: email.toLowerCase(), role, status: 'pendiente' } });
 }
 
 export async function removeStaff(req: Request, res: Response): Promise<void> {

@@ -51,9 +51,9 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
     );
     const created = rows[0];
 
-    // Creator becomes director of the course.
+    // Creator becomes director of the course, ya aceptado (creó el curso).
     await client.query(
-      `INSERT INTO course_staff (course_id, user_id, role) VALUES ($1, $2, 'director')`,
+      `INSERT INTO course_staff (course_id, user_id, role, status) VALUES ($1, $2, 'director', 'aceptado')`,
       [created.id, userId],
     );
 
@@ -343,7 +343,7 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
   const [modules, staff, activities] = await Promise.all([
     query<{ id: string }>('SELECT id, title, sort_order, is_mandatory, starts_at, ends_at FROM modules WHERE course_id = $1 ORDER BY sort_order', [id]),
     query(
-      `SELECT u.id, u.name, u.email, cs.role, cs.parte
+      `SELECT u.id, u.name, u.email, cs.role, cs.parte, cs.status
        FROM course_staff cs JOIN users u ON u.id = cs.user_id
        WHERE cs.course_id = $1`,
       [id],

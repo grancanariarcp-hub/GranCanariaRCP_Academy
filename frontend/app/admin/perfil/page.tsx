@@ -6,6 +6,7 @@ import { ProfilePanel } from '@/components/ProfilePanel';
 import { adminNav } from '@/lib/nav';
 import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
 import { PerfilDocenteEditor } from '@/components/PerfilDocenteEditor';
+import { InvitacionesDocente } from '@/components/InvitacionesDocente';
 import { MisDatos } from '@/components/MisDatos';
 
 export default function AdminProfilePage() {
@@ -19,6 +20,7 @@ export default function AdminProfilePage() {
   return (
     <AppShell user={user} title="Perfil" nav={nav}>
       {user.role === 'profesor' && <PerfilDocenteAviso />}
+      {(user.role === 'profesor' || user.role === 'super_admin' || user.role === 'institution_admin') && <InvitacionesDocente />}
       {user.role === 'profesor' && <PerfilDocenteEditor />}
       <ProfilePanel user={user} />
       {user.role !== 'auditor' && <MisDatos esAlumno={false} />}

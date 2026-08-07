@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { documentoValido, normalizarDocumento } from '../services/documento.js';
+import { notifyCourseStaff } from '../services/notify.js';
 import { socialLinksSchema } from '../services/socialLinks.js';
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
 import { audit } from '../services/audit.js';
@@ -16,12 +17,55 @@ import { estadoPerfilDocente } from '../services/perfilDocente.js';
 const COURSE_FIELDS = 'c.title, c.starts_at, c.ends_at, c.duration_hours, c.acreditacion, c.cfc, c.publico_objetivo';
 
 async function taughtCourses(userId: string): Promise<LegajoCourse[]> {
+  // Solo los cursos que el profesor HA ACEPTADO: una invitación pendiente aún no
+  // es participación. Las pendientes se ven aparte, en «mis invitaciones».
   const { rows } = await query<LegajoCourse>(
     `SELECT ${COURSE_FIELDS} FROM course_staff cs JOIN courses c ON c.id = cs.course_id
-     WHERE cs.user_id = $1 ORDER BY c.created_at DESC`,
+     WHERE cs.user_id = $1 AND cs.status = 'aceptado' ORDER BY c.created_at DESC`,
     [userId],
   );
   return rows;
+}
+
+/** GET /api/profile/invitaciones — cursos a los que se ha invitado al profesor. */
+export async function misInvitaciones(req: Request, res: Response): Promise<void> {
+  if (req.auth!.role === 'student') { res.json({ invitaciones: [] }); return; }
+  const { rows } = await query<{ course_id: string; title: string; role: string; parte: string; director: string | null }>(
+    `SELECT c.id AS course_id, c.title, cs.role, cs.parte,
+            (SELECT u.name FROM course_staff d JOIN users u ON u.id = d.user_id
+              WHERE d.course_id = c.id AND d.role = 'director' AND d.status = 'aceptado' LIMIT 1) AS director
+       FROM course_staff cs JOIN courses c ON c.id = cs.course_id
+      WHERE cs.user_id = $1 AND cs.status = 'pendiente'
+      ORDER BY c.created_at DESC`,
+    [req.auth!.sub],
+  );
+  res.json({ invitaciones: rows });
+}
+
+/** POST /api/profile/invitaciones/:courseId — aceptar o rechazar una invitación. */
+export async function responderInvitacion(req: Request, res: Response): Promise<void> {
+  if (req.auth!.role === 'student') throw badRequest('No disponible', 'NOT_ALLOWED');
+  const { accion } = z.object({ accion: z.enum(['aceptar', 'rechazar']) }).parse(req.body);
+  const nuevo = accion === 'aceptar' ? 'aceptado' : 'rechazado';
+  const { rows } = await query<{ role: string }>(
+    `UPDATE course_staff SET status = $1
+      WHERE course_id = $2 AND user_id = $3 AND status = 'pendiente'
+      RETURNING role`,
+    [nuevo, req.params.courseId, req.auth!.sub],
+  );
+  if (rows.length === 0) throw notFound('No tienes ninguna invitación pendiente a ese curso');
+  // Avisar a la dirección del curso de la respuesta.
+  const info = await query<{ title: string; nombre: string }>(
+    'SELECT c.title, u.name AS nombre FROM courses c, users u WHERE c.id = $1 AND u.id = $2',
+    [req.params.courseId, req.auth!.sub],
+  );
+  await notifyCourseStaff(
+    req.params.courseId,
+    accion === 'aceptar' ? 'Invitación aceptada' : 'Invitación rechazada',
+    `${info.rows[0]?.nombre ?? 'Un profesor'} ha ${accion === 'aceptar' ? 'aceptado' : 'rechazado'} participar en «${info.rows[0]?.title ?? 'el curso'}».`,
+    `/admin/cursos/${req.params.courseId}`,
+  ).catch(() => { /* el aviso no debe romper la respuesta */ });
+  res.json({ ok: true, status: nuevo });
 }
 async function receivedCourses(studentId: string): Promise<LegajoCourse[]> {
   const { rows } = await query<LegajoCourse>(
@@ -371,7 +415,7 @@ export async function listPublicProfessors(_req: Request, res: Response): Promis
   const { rows } = await query<{ id: string; name: string; headline: string | null; photo_key: string | null; cursos: string; social_links: unknown }>(
     `SELECT u.id, u.name, u.headline, u.photo_key, u.social_links, COUNT(DISTINCT c.id)::text AS cursos
        FROM users u
-       JOIN course_staff cs ON cs.user_id = u.id
+       JOIN course_staff cs ON cs.user_id = u.id AND cs.status = 'aceptado'
        JOIN courses c ON c.id = cs.course_id
       WHERE u.role = 'profesor' AND u.status = 'active'
         AND c.status = 'publicado'

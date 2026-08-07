@@ -84,7 +84,7 @@ export async function recopilarActa(courseId: string): Promise<ActaSnapshot> {
   const staff = await query<{ name: string; headline: string | null; role: string }>(
     `SELECT u.name, u.headline, cs.role
        FROM course_staff cs JOIN users u ON u.id = cs.user_id
-      WHERE cs.course_id = $1
+      WHERE cs.course_id = $1 AND cs.status = 'aceptado'
       ORDER BY CASE cs.role WHEN 'director' THEN 0 ELSE 1 END, u.name`,
     [courseId],
   );

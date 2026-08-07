@@ -93,7 +93,7 @@ export async function createConvocatoria(req: Request, res: Response): Promise<v
       courseId = curso.rows[0].id;
 
       await client.query(
-        `INSERT INTO course_staff (course_id, user_id, role) VALUES ($1, $2, 'director')`,
+        `INSERT INTO course_staff (course_id, user_id, role, status) VALUES ($1, $2, 'director', 'aceptado')`,
         [courseId, userId],
       );
       // Misma estructura de partida que cualquier curso.
