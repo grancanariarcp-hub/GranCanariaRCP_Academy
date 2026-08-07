@@ -7,16 +7,13 @@ name: Keep API warm
 # Solo en horario activo (06:00-22:00 UTC ≈ 07:00-23:00 en Canarias) para no
 # agotar las 750 horas/mes de instancia del plan gratuito.
 #
-# IMPORTANTE: que este workflow "falle" casi nunca significa que la API esté
-# caída. Lo habitual es que GitHub no consiga una máquina para el trabajo
-# ("job was not acquired by Runner"): es un problema de la infraestructura
-# gratuita de GitHub, no de la plataforma, y un ping perdido es inofensivo
-# porque el siguiente (10 min después) despierta igual el servicio. El arreglo
-# de fondo —un monitor de uptime externo que solo avisa si la API está
-# realmente caída— está en docs/UPTIME.md.
+# DESACTIVADO (2026-08-07): el keepalive lo lleva ahora un monitor externo
+# (cron-job.org), que además solo avisa si la API está REALMENTE caída, sin los
+# falsos fallos de "job was not acquired by Runner" de los runners gratuitos de
+# GitHub. Se quita el disparador por horario y se deja solo el manual
+# (workflow_dispatch): el workflow no se ejecuta solo, pero sigue aquí por si
+# hubiera que reactivarlo (basta devolver el bloque `schedule`).
 on:
-  schedule:
-    - cron: '*/10 6-22 * * *'
   workflow_dispatch: {}
 
 # Si un ping se solapa con el siguiente, se cancela el viejo en vez de acumular.
