@@ -22,6 +22,7 @@ import documentsRoutes from './routes/documents.routes.js';
 import questionsRoutes from './routes/questions.routes.js';
 import maestroRoutes from './routes/maestro.routes.js';
 import { stripeWebhook } from './controllers/payment.controller.js';
+import { enviarRecordatorios } from './controllers/reminders.controller.js';
 import { asyncHandler } from './utils/asyncHandler.js';
 
 const app = express();
@@ -67,6 +68,11 @@ app.use(globalLimiter);
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'grancanaria-rcp-backend', time: new Date().toISOString() });
 });
+
+// Recordatorios de fecha límite: lo llama una tarea diaria (cron-job.org) con el
+// secreto CRON_SECRET. Idempotente; sin secreto configurado queda deshabilitado.
+app.get('/api/internal/recordatorios', asyncHandler(enviarRecordatorios));
+app.post('/api/internal/recordatorios', asyncHandler(enviarRecordatorios));
 
 // Feature routes
 app.use('/api/auth', authRoutes);

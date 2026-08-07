@@ -5,7 +5,7 @@ import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { assertEditor, assertDirector, relacionConCurso } from '../services/courseAuth.js';
-import { notify } from '../services/notify.js';
+import { notify, notifyMany } from '../services/notify.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl, deleteObject } from '../services/r2.js';
 import { estadoPerfilDocente } from '../services/perfilDocente.js';
 
@@ -183,6 +183,29 @@ const addActivitySchema = z.object({
   isMandatory: z.boolean().optional().default(false),
 });
 
+/**
+ * Avisa a los alumnos matriculados de que hay contenido nuevo en el curso.
+ *
+ * Solo en cursos PUBLICADOS: un borrador aún no tiene alumnos, así que montar el
+ * curso no dispara avisos. Es un aviso in-app (campanita); si Resend está
+ * configurado, además por correo. No bloquea nunca la respuesta al profesor.
+ */
+async function avisarContenidoNuevo(courseId: string, titulo: string, tipoLabel: string): Promise<void> {
+  const c = await query<{ status: string; title: string }>('SELECT status, title FROM courses WHERE id = $1', [courseId]);
+  if (c.rows[0]?.status !== 'publicado') return;
+  const alumnos = await query<{ student_id: string }>(
+    `SELECT student_id FROM enrollments WHERE course_id = $1 AND status IN ('activo','completado')`,
+    [courseId],
+  );
+  if (alumnos.rows.length === 0) return;
+  await notifyMany(
+    alumnos.rows.map((a) => ({ id: a.student_id, type: 'student' as const })),
+    `Nuevo contenido en «${c.rows[0].title}»`,
+    `${tipoLabel}: ${titulo}`,
+    () => `/student/curso/${courseId}`,
+  );
+}
+
 export async function addActivity(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   const d = addActivitySchema.parse(req.body);
@@ -201,6 +224,7 @@ export async function addActivity(req: Request, res: Response): Promise<void> {
      RETURNING id, type, title, document_id, url, body, is_mandatory`,
     [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.body ?? null, d.isMandatory],
   );
+  avisarContenidoNuevo(req.params.id, d.title, 'Nueva actividad').catch(() => { /* el aviso no debe romper la creación */ });
   res.status(201).json({ activity: rows[0] });
 }
 
@@ -283,6 +307,7 @@ export async function addImageActivity(req: Request, res: Response): Promise<voi
      RETURNING id, type, title, image_key`,
     [req.params.moduleId, title, key],
   );
+  avisarContenidoNuevo(req.params.id, title, 'Nueva actividad').catch(() => { /* idem */ });
   res.status(201).json({ activity: rows[0] });
 }
 
