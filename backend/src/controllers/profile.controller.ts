@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
 import { documentoValido, normalizarDocumento } from '../services/documento.js';
+import { socialLinksSchema } from '../services/socialLinks.js';
 import { hashPassword, verifyPassword } from '../utils/crypto.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
@@ -43,6 +44,7 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
     headline: z.string().max(160).nullish(),
     profession: z.string().max(120).nullish(),
     dni: z.string().max(30).nullish(),
+    socialLinks: socialLinksSchema.optional(),
   }).parse(req.body);
 
   const sets: string[] = [];
@@ -52,6 +54,7 @@ export async function updateMyProfile(req: Request, res: Response): Promise<void
   // Se normaliza igual que el del alumno (mayúsculas, sin espacios/guiones): si
   // no, el documento del instructor no casaría en PÚLSAR como sí casa el suyo.
   if (d.dni !== undefined) { vals.push(d.dni ? normalizarDocumento(d.dni) : null); sets.push(`dni = $${vals.length}`); }
+  if (d.socialLinks !== undefined) { vals.push(JSON.stringify(d.socialLinks)); sets.push(`social_links = $${vals.length}`); }
   if (sets.length === 0) throw badRequest('Nada que actualizar');
   vals.push(req.auth!.sub);
   await query(`UPDATE users SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $${vals.length}`, vals);
@@ -103,7 +106,7 @@ export async function getProfile(req: Request, res: Response): Promise<void> {
     res.json({ profile: { ...u.rows[0], role: 'student' }, taught: [], received: await receivedCourses(sub) });
     return;
   }
-  const u = await query<{ photo_key: string | null }>('SELECT id, name, headline, profession, dni, email, role, photo_key FROM users WHERE id = $1', [sub]);
+  const u = await query<{ photo_key: string | null }>('SELECT id, name, headline, profession, dni, email, role, photo_key, social_links FROM users WHERE id = $1', [sub]);
   const photoUrl = u.rows[0]?.photo_key && r2Configured() ? await presignedGetUrl(u.rows[0].photo_key, 3600) : null;
   res.json({ profile: { ...u.rows[0], photo_url: photoUrl }, taught: await taughtCourses(sub), received: [] });
 }
@@ -365,8 +368,8 @@ export async function listPublicProfessors(_req: Request, res: Response): Promis
   // Solo el profesorado con curso VIVO: publicado y aún no terminado, esté la
   // matrícula abierta o no. Al cerrarse el curso deja de aparecer solo, sin que
   // nadie tenga que acordarse de retirarlo.
-  const { rows } = await query<{ id: string; name: string; headline: string | null; photo_key: string | null; cursos: string }>(
-    `SELECT u.id, u.name, u.headline, u.photo_key, COUNT(DISTINCT c.id)::text AS cursos
+  const { rows } = await query<{ id: string; name: string; headline: string | null; photo_key: string | null; cursos: string; social_links: unknown }>(
+    `SELECT u.id, u.name, u.headline, u.photo_key, u.social_links, COUNT(DISTINCT c.id)::text AS cursos
        FROM users u
        JOIN course_staff cs ON cs.user_id = u.id
        JOIN courses c ON c.id = cs.course_id
@@ -382,14 +385,15 @@ export async function listPublicProfessors(_req: Request, res: Response): Promis
     name: u.name,
     headline: u.headline,
     cursos: Number(u.cursos),
+    social_links: u.social_links ?? [],
     photo_url: u.photo_key && r2Configured() ? await presignedGetUrl(u.photo_key, 3600) : null,
   })));
   res.json({ profesores });
 }
 
 export async function getProfessorCv(req: Request, res: Response): Promise<void> {
-  const u = await query<{ name: string; headline: string | null; photo_key: string | null }>(
-    "SELECT name, headline, photo_key FROM users WHERE id = $1 AND role = 'profesor'",
+  const u = await query<{ name: string; headline: string | null; photo_key: string | null; social_links: unknown }>(
+    "SELECT name, headline, photo_key, social_links FROM users WHERE id = $1 AND role = 'profesor'",
     [req.params.id],
   );
   if (u.rows.length === 0) throw notFound('Profesor no encontrado');
@@ -398,5 +402,5 @@ export async function getProfessorCv(req: Request, res: Response): Promise<void>
     'SELECT category, text FROM cv_items WHERE user_id = $1 ORDER BY category, sort_order, created_at',
     [req.params.id],
   );
-  res.json({ professor: { name: u.rows[0].name, headline: u.rows[0].headline, photo_url: photoUrl }, cv: groupCv(items.rows) });
+  res.json({ professor: { name: u.rows[0].name, headline: u.rows[0].headline, photo_url: photoUrl, social_links: u.rows[0].social_links ?? [] }, cv: groupCv(items.rows) });
 }

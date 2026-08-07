@@ -11,6 +11,8 @@ import { LeadCapture } from '@/components/LeadCapture';
 import { Faq, type ItemFaq } from '@/components/Faq';
 import { Contacto } from '@/components/Contacto';
 import { PartnerBanner } from '@/components/PartnerBanner';
+import { SocialLinks } from '@/components/SocialLinks';
+import type { EnlaceSocial } from '@/lib/social';
 import { useReferido } from '@/lib/useReferido';
 
 interface OpenCourse {
@@ -122,7 +124,7 @@ const FAQ: ItemFaq[] = [
 export default function CampusPage() {
   useReferido(); // registra las llegadas con ?ref=... (p.ej. desde PÚLSAR)
   const [courses, setCourses] = useState<OpenCourse[]>([]);
-  const [profes, setProfes] = useState<Array<{ id: string; name: string; headline: string | null; photo_url: string | null }>>([]);
+  const [profes, setProfes] = useState<Array<{ id: string; name: string; headline: string | null; photo_url: string | null; social_links?: EnlaceSocial[] }>>([]);
   const [fMatricula, setFMatricula] = useState<'todas' | 'abierta' | 'proximamente'>('todas');
   const [fTema, setFTema] = useState('');
   const [fPublico, setFPublico] = useState('');
@@ -346,24 +348,33 @@ export default function CampusPage() {
             <div className="grid grid-4" style={{ marginBottom: 44 }}>
               {profes.map((p, i) => (
                 <Reveal key={p.id} delay={i * 70}>
-                  <Link href={`/profesor/${p.id}`} className="card press" style={{ display: 'block', textDecoration: 'none', textAlign: 'center', height: '100%' }}>
-                    <div style={{
-                      width: 84, height: 84, borderRadius: '50%', margin: '0 auto 10px', overflow: 'hidden',
-                      background: 'linear-gradient(135deg,var(--primary-dark),var(--secondary-dark))',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: '#fff', fontSize: 28, fontWeight: 700,
-                    }}>
-                      {p.photo_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        p.name.split(' ').slice(0, 2).map((n) => n[0]).join('')
-                      )}
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
-                    <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{p.headline}</div>
-                    <div style={{ fontSize: 12.5, marginTop: 8, color: 'var(--secondary-dark)', fontWeight: 600 }}>Ver currículum →</div>
-                  </Link>
+                  {/* La tarjeta no es un enlace envolvente: los iconos de redes son
+                      enlaces propios y anidar <a> dentro de <a> es HTML inválido. */}
+                  <div className="card press" style={{ textAlign: 'center', height: '100%' }}>
+                    <Link href={`/profesor/${p.id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit' }}>
+                      <div style={{
+                        width: 84, height: 84, borderRadius: '50%', margin: '0 auto 10px', overflow: 'hidden',
+                        background: 'linear-gradient(135deg,var(--primary-dark),var(--secondary-dark))',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontSize: 28, fontWeight: 700,
+                      }}>
+                        {p.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={p.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          p.name.split(' ').slice(0, 2).map((n) => n[0]).join('')
+                        )}
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 15 }}>{p.name}</div>
+                      <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{p.headline}</div>
+                      <div style={{ fontSize: 12.5, marginTop: 8, color: 'var(--secondary-dark)', fontWeight: 600 }}>Ver currículum →</div>
+                    </Link>
+                    {p.social_links && p.social_links.length > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 10 }}>
+                        <SocialLinks enlaces={p.social_links} size={16} />
+                      </div>
+                    )}
+                  </div>
                 </Reveal>
               ))}
             </div>

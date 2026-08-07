@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
 import { PageNav } from '@/components/PageNav';
+import { SocialLinks } from '@/components/SocialLinks';
+import type { EnlaceSocial } from '@/lib/social';
 
 type CvCat = 'formacion' | 'investigacion' | 'publicaciones' | 'reconocimientos' | 'experiencia';
 const LABELS: Record<CvCat, string> = {
@@ -18,7 +20,7 @@ const LABELS: Record<CvCat, string> = {
 
 export default function PublicProfessorPage() {
   const { id } = useParams();
-  const [data, setData] = useState<{ professor: { name: string; headline: string | null; photo_url: string | null }; cv: Record<CvCat, Array<{ text: string }>> } | null>(null);
+  const [data, setData] = useState<{ professor: { name: string; headline: string | null; photo_url: string | null; social_links?: EnlaceSocial[] }; cv: Record<CvCat, Array<{ text: string }>> } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,6 +48,7 @@ export default function PublicProfessorPage() {
               <div style={{ color: '#fff' }}>
                 <h1 style={{ fontSize: 24 }}>{data.professor.name}</h1>
                 {data.professor.headline && <div style={{ opacity: 0.9 }}>{data.professor.headline}</div>}
+                <div style={{ marginTop: 8 }}><SocialLinks enlaces={data.professor.social_links} /></div>
               </div>
             </div>
 

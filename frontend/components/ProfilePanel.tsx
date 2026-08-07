@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 import type { SessionUser } from '@/lib/auth';
+import { SocialLinks } from '@/components/SocialLinks';
+import type { EnlaceSocial } from '@/lib/social';
 
 interface Course {
   title: string;
@@ -19,6 +21,7 @@ interface Profile {
   photo_url?: string | null;
   access_code?: string;
   age?: number | null;
+  social_links?: EnlaceSocial[];
 }
 
 export function ProfilePanel({ user }: { user: SessionUser }) {
@@ -165,6 +168,9 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
               <div style={{ fontWeight: 700, fontSize: 16 }}>{profile?.name}</div>
               {profile?.headline && <div className="muted" style={{ fontSize: 13 }}>{profile.headline}</div>}
               {profile?.email && <div className="muted" style={{ fontSize: 13 }}>{profile.email}</div>}
+              {profile?.social_links && profile.social_links.length > 0 && (
+                <div style={{ marginTop: 8 }}><SocialLinks enlaces={profile.social_links} size={16} /></div>
+              )}
               {isStaff && (
                 <label className="btn btn-outline btn-small" style={{ cursor: 'pointer', marginTop: 8 }}>
                   Cambiar foto

@@ -1,0 +1,12 @@
+-- Enlaces a redes sociales del profesorado.
+--
+-- Cada docente puede añadir varios: Instagram, LinkedIn, X, un sitio web, o
+-- cualquier otra que indique a mano. Se ven en su ficha pública y en la tarjeta
+-- resumen, y solo si los rellena. Se guardan como lista JSON en la propia fila
+-- del usuario —son pocos, no se consultan por separado y viajan siempre con el
+-- perfil— en vez de crear una tabla aparte.
+--
+-- Forma de cada elemento: { "red": "instagram|linkedin|x|web|otra",
+--                           "etiqueta": "<nombre si red = otra>",
+--                           "url": "https://…" }
+ALTER TABLE users ADD COLUMN IF NOT EXISTS social_links JSONB NOT NULL DEFAULT '[]'::jsonb;
