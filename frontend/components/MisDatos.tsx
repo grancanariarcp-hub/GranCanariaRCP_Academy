@@ -79,7 +79,7 @@ export function MisDatos({ esAlumno }: { esAlumno: boolean }) {
   return (
     <div className="card" style={{ marginTop: 24 }}>
       <div className="card-header">
-        <div className="card-title">Mis datos <Ayuda tema="mis-datos" /></div>
+        <div className="card-title">Privacidad y datos <Ayuda tema="mis-datos" /></div>
         <div className="card-subtitle">Qué guardamos de ti y qué puedes hacer con ello</div>
       </div>
 

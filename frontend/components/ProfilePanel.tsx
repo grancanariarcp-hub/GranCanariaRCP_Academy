@@ -151,7 +151,9 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
     <>
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="grid grid-2">
+      {/* align-items:start evita que la tarjeta corta (datos/foto) se estire a la
+          altura de la de al lado (contraseña + correo) y deje un hueco enorme. */}
+      <div className="grid grid-2" style={{ alignItems: 'start' }}>
         {/* Datos + foto + legajo */}
         <div className="card">
           <div className="card-header"><div className="card-title">Mis datos</div></div>
@@ -222,7 +224,7 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
       </div>
 
       {/* Cursos */}
-      <div className="card" style={{ marginTop: 24 }}>
+      <div className="card" style={{ marginTop: 16 }}>
         <div className="card-header">
           <div className="card-title">{isStaff ? 'Cursos impartidos' : 'Mis cursos'}</div>
           <div className="card-subtitle">{courses.length} cursos</div>
@@ -250,7 +252,7 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
 
       {/* CV (solo profesores) */}
       {isStaff && cv && (
-        <div className="card" style={{ marginTop: 24 }}>
+        <div className="card" style={{ marginTop: 16 }}>
           <div className="card-header">
             <div className="card-title">Mi CV</div>
             <div className="card-subtitle">Esquemático, visible para los alumnos</div>
