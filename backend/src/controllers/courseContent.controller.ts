@@ -5,7 +5,7 @@ import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { assertEditor, assertDirector, relacionConCurso } from '../services/courseAuth.js';
-import { notify, notifyMany } from '../services/notify.js';
+import { notify, notifyCourseStudents } from '../services/notify.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl, deleteObject } from '../services/r2.js';
 import { estadoPerfilDocente } from '../services/perfilDocente.js';
 
@@ -193,16 +193,12 @@ const addActivitySchema = z.object({
 async function avisarContenidoNuevo(courseId: string, titulo: string, tipoLabel: string): Promise<void> {
   const c = await query<{ status: string; title: string }>('SELECT status, title FROM courses WHERE id = $1', [courseId]);
   if (c.rows[0]?.status !== 'publicado') return;
-  const alumnos = await query<{ student_id: string }>(
-    `SELECT student_id FROM enrollments WHERE course_id = $1 AND status IN ('activo','completado')`,
-    [courseId],
-  );
-  if (alumnos.rows.length === 0) return;
-  await notifyMany(
-    alumnos.rows.map((a) => ({ id: a.student_id, type: 'student' as const })),
+  // Una sola sentencia para todo el alumnado: sin bucle por alumno.
+  await notifyCourseStudents(
+    courseId,
     `Nuevo contenido en «${c.rows[0].title}»`,
     `${tipoLabel}: ${titulo}`,
-    () => `/student/curso/${courseId}`,
+    `/student/curso/${courseId}`,
   );
 }
 

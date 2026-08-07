@@ -61,6 +61,26 @@ export async function notifyCourseStaff(
   );
 }
 
+/**
+ * Aviso in-app a TODO el alumnado activo de un curso, en una sola sentencia.
+ * Para avisos masivos (contenido nuevo): evita el ida y vuelta por alumno que
+ * ataría una conexión del pool en cursos con mucha gente.
+ */
+export async function notifyCourseStudents(
+  courseId: string,
+  title: string,
+  body: string | null,
+  link: string | null,
+): Promise<void> {
+  await query(
+    `INSERT INTO notifications (user_id, user_type, title, body, link)
+     SELECT e.student_id, 'student', $2, $3, $4
+       FROM enrollments e
+      WHERE e.course_id = $1 AND e.status IN ('activo','completado')`,
+    [courseId, title, body, link],
+  );
+}
+
 /** Notifica a varios destinatarios. `link` puede depender del tipo de destinatario. */
 export async function notifyMany(
   recipients: Recipient[],

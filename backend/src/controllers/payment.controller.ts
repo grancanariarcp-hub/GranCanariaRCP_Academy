@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type Stripe from 'stripe';
 import { query, withTransaction } from '../config/database.js';
-import { badRequest, notFound } from '../utils/httpError.js';
+import { badRequest, notFound, forbidden } from '../utils/httpError.js';
 import { stripe, stripeConfigurado, stripeEnProduccion, diagnosticoClave, NOTA_EXENCION } from '../services/stripe.js';
 import { precioDe, euros } from '../services/pricing.js';
 import { notify, notifyCourseStaff } from '../services/notify.js';
@@ -309,6 +309,9 @@ export async function coursePayments(req: Request, res: Response): Promise<void>
   // correo de cada alumno que ha pagado. Todas las demás rutas del curso lo
   // comprueban; esta se quedó sin hacerlo.
   await assertEditor(req);
+  // La Comisión CFC no ve datos nominales: los cobros llevan nombre y correo de
+  // cada alumno que pagó, que no le competen.
+  if (req.auth!.role === 'auditor') throw forbidden('La comisión no accede a los cobros del curso');
   const { rows } = await query(
     `SELECT p.id, p.amount_cents, p.status, p.receipt_number, p.paid_at, p.livemode,
             p.refunded_cents, p.refunded_at, s.display_name, s.email

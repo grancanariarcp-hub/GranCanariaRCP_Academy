@@ -11,11 +11,17 @@ export function requireRole(...allowed: UserRole[]) {
     if (!req.auth) {
       throw unauthorized();
     }
-    // El auditor de la comisión ve TODA la plataforma en modo consulta. Se
-    // resuelve aquí y no abriendo su rol en decenas de rutas, que se acabaría
-    // olvidando en alguna. Lo que puede hacer lo acota restringirAuditor:
-    // solo GET y sin descargas.
-    if (req.auth.role === 'auditor' && ['GET', 'HEAD'].includes(req.method)) {
+    // El auditor de la comisión consulta el CONTENIDO (cursos, bancos,
+    // documentos): rutas que también sirven al profesorado. Se le abre aquí, en
+    // esas rutas, para no repetir su rol en cada una. Pero NO en las rutas
+    // exclusivas de administración (requireRole('super_admin') a secas), que
+    // exponen datos de gestión y PII de todos —incluidos menores— y no le
+    // competen. Escribir se lo impide igualmente restringirAuditor (solo GET).
+    if (
+      req.auth.role === 'auditor'
+      && ['GET', 'HEAD'].includes(req.method)
+      && allowed.includes('profesor')
+    ) {
       next();
       return;
     }

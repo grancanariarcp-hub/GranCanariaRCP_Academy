@@ -272,6 +272,9 @@ export async function courseDuration(req: Request, res: Response): Promise<void>
 export async function listCourseStudents(req: Request, res: Response): Promise<void> {
   const { id } = req.params;
   await assertCanAccess(id, req);
+  // La Comisión CFC audita el curso (contenido, estructura, horas), no a las
+  // personas: no debe ver el listado nominal con nombres, correos y aprobados.
+  if (req.auth!.role === 'auditor') throw forbidden('La comisión no accede a los datos nominales del alumnado');
   // Total de actividades del curso: denominador de la barra de avance.
   const tot = await query<{ n: string }>(
     'SELECT COUNT(*) AS n FROM activities WHERE module_id IN (SELECT id FROM modules WHERE course_id = $1)',

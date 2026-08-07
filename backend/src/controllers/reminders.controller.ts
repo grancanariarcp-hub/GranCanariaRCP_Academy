@@ -1,6 +1,15 @@
 import type { Request, Response } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { query } from '../config/database.js';
 import { notify } from '../services/notify.js';
+
+/** Comparación en tiempo constante, tolerante a longitudes distintas. */
+function claveIgual(a: string, b: string): boolean {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
 
 /**
  * Recordatorios automáticos de fecha límite.
@@ -26,8 +35,10 @@ const AVISOS: Array<{ dias: number; kind: string }> = [
 export async function enviarRecordatorios(req: Request, res: Response): Promise<void> {
   const secreto = process.env.CRON_SECRET;
   if (!secreto) { res.status(503).json({ error: 'Recordatorios no configurados (falta CRON_SECRET)' }); return; }
+  // Preferible por cabecera (no queda en logs ni en el Referer); se admite ?key=
+  // como respaldo para servicios que solo permiten una URL.
   const dado = req.header('x-cron-key') || String(req.query.key || '');
-  if (dado !== secreto) { res.status(401).json({ error: 'Clave no válida' }); return; }
+  if (!claveIgual(dado, secreto)) { res.status(401).json({ error: 'Clave no válida' }); return; }
 
   let enviados = 0;
   for (const aviso of AVISOS) {
