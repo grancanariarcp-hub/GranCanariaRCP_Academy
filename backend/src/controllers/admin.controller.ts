@@ -467,6 +467,107 @@ export async function createQuestionWithImage(req: Request, res: Response): Prom
   res.status(201).json({ question: (await withImageUrls(rows))[0] });
 }
 
+/** El profesorado solo toca preguntas de SUS bancos; el super admin, todas. */
+async function assertPuedeEditarPregunta(req: Request, questionId: string): Promise<{ bankId: string }> {
+  const { rows } = await query<{ bank_id: string; created_by: string | null }>(
+    `SELECT q.bank_id, b.created_by
+       FROM questions q JOIN question_banks b ON b.id = q.bank_id
+      WHERE q.id = $1`,
+    [questionId],
+  );
+  if (rows.length === 0) throw notFound('Pregunta no encontrada');
+  if (req.auth!.role !== 'super_admin' && rows[0].created_by !== req.auth!.sub) {
+    throw forbidden('Solo puedes editar preguntas de tus propios bancos');
+  }
+  return { bankId: rows[0].bank_id };
+}
+
+/** GET /api/questions/:id — pregunta completa (para editar y previsualizar). */
+export async function getQuestion(req: Request, res: Response): Promise<void> {
+  await assertPuedeEditarPregunta(req, req.params.id);
+  const { rows } = await query(
+    `SELECT q.id, q.bank_id, q.tema, q.category, q.audiences, q.qtype, q.difficulty, q.text,
+            q.clinical_context, q.options, q.correct_index, q.explanation, q.source_erc,
+            q.source_plan_nacional, q.video_url, q.image_key, q.flashcard, q.tags, q.is_critical,
+            q.ref_document_id, q.ref_page, b.name AS bank_name, b.visibility AS bank_visibility
+       FROM questions q LEFT JOIN question_banks b ON b.id = q.bank_id
+      WHERE q.id = $1`,
+    [req.params.id],
+  );
+  res.json({ question: (await withImageUrls(rows))[0] });
+}
+
+const updateQuestionSchema = z.object({
+  tema: z.string().max(160).nullish(),
+  category: z.enum(['SVB', 'SVI', 'SVA']).nullish(),
+  audiences: z.array(z.enum(['ninos', 'jovenes', 'adultos'])).min(1).optional(),
+  qtype: z.enum(['teorica', 'caso_clinico']).optional(),
+  difficulty: z.number().int().min(1).max(3).optional(),
+  text: z.string().min(10).optional(),
+  clinicalContext: z.string().nullish(),
+  options: z.array(z.string().min(1)).min(2).max(6).optional(),
+  correctIndex: z.number().int().min(0).optional(),
+  explanation: z.string().nullish(),
+  sourceErc: z.string().nullish(),
+  sourcePlanNacional: z.string().nullish(),
+  videoUrl: z.string().url().or(z.literal('')).nullish(),
+  flashcard: z.string().nullish(),
+  tags: z.array(z.string()).optional(),
+  isCritical: z.boolean().optional(),
+  refDocumentId: z.string().uuid().or(z.literal('')).nullish(),
+  refPage: z.coerce.number().int().positive().nullish(),
+});
+
+/** PATCH /api/questions/:id — editar una pregunta existente. */
+export async function updateQuestion(req: Request, res: Response): Promise<void> {
+  await assertPuedeEditarPregunta(req, req.params.id);
+  const d = updateQuestionSchema.parse(req.body);
+
+  // Coherencia opción correcta / nº de opciones, con los valores finales.
+  const actual = await query<{ options: string[]; correct_index: number; qtype: string }>(
+    'SELECT options, correct_index, qtype FROM questions WHERE id = $1', [req.params.id],
+  );
+  const opciones = d.options ?? actual.rows[0].options;
+  const correcta = d.correctIndex ?? actual.rows[0].correct_index;
+  if (correcta >= opciones.length) throw badRequest('La opción correcta está fuera de rango', 'BAD_CORRECT_INDEX');
+
+  const col: Record<string, string> = {
+    tema: 'tema', category: 'category', audiences: 'audiences', qtype: 'qtype', difficulty: 'difficulty',
+    text: 'text', clinicalContext: 'clinical_context', correctIndex: 'correct_index', explanation: 'explanation',
+    sourceErc: 'source_erc', sourcePlanNacional: 'source_plan_nacional', videoUrl: 'video_url',
+    flashcard: 'flashcard', tags: 'tags', isCritical: 'is_critical', refDocumentId: 'ref_document_id', refPage: 'ref_page',
+  };
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const [k, c] of Object.entries(col)) {
+    if (k in d && d[k as keyof typeof d] !== undefined) {
+      let v = d[k as keyof typeof d] as unknown;
+      if (k === 'videoUrl' || k === 'refDocumentId') v = (v as string) || null; // '' → NULL
+      params.push(v);
+      sets.push(`${c} = $${params.length}`);
+    }
+  }
+  if (d.options !== undefined) { params.push(JSON.stringify(d.options)); sets.push(`options = $${params.length}::jsonb`); }
+  if (d.text !== undefined) {
+    sets.push(`text_norm = md5(lower(regexp_replace(text, '[^[:alnum:]]+', '', 'g')))`);
+  }
+  if (sets.length === 0) throw badRequest('Nada que actualizar', 'NO_CHANGES');
+
+  params.push(req.params.id);
+  const { rows } = await query(
+    `UPDATE questions SET ${sets.join(', ')} WHERE id = $${params.length}
+     RETURNING id, category, audiences, qtype, difficulty, text, tema`,
+    params,
+  );
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role, action: 'QUESTION_UPDATE',
+    entity: 'question', entityId: req.params.id, ip: clientIp(req),
+  });
+
+  res.json({ question: rows[0] });
+}
+
 // ---------------------------------------------------------------------------
 // Audit logs (super_admin only) - security review
 // ---------------------------------------------------------------------------

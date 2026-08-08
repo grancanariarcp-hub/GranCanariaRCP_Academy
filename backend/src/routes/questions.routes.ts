@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { createQuestion, createQuestionWithImage, listQuestions } from '../controllers/admin.controller.js';
+import { createQuestion, createQuestionWithImage, listQuestions, getQuestion, updateQuestion } from '../controllers/admin.controller.js';
 import { getTemplate, importQuestions } from '../controllers/questionImport.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireRole } from '../middleware/role.js';
@@ -25,5 +25,8 @@ router.post('/', asyncHandler(createQuestion));
 router.post('/image', upload.single('file'), asyncHandler(createQuestionWithImage));
 router.get('/template', getTemplate);
 router.post('/import', upload.single('file'), asyncHandler(importQuestions));
+// Preguntas concretas: obtener completa (editar/previsualizar) y actualizar.
+router.get('/:id', asyncHandler(getQuestion));
+router.patch('/:id', asyncHandler(updateQuestion));
 
 export default router;

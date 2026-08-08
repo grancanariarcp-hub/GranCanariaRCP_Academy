@@ -5,6 +5,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
+import { VideoEmbed } from '@/components/VideoEmbed';
 
 type Level = 'SVB' | 'SVI' | 'SVA';
 type Audience = 'ninos' | 'jovenes' | 'adultos';
@@ -25,11 +26,88 @@ interface QuestionRow {
   bank_visibility: Visibility | null;
 }
 
+interface FullQuestion {
+  id: string;
+  bank_id: string;
+  tema: string | null;
+  category: Level | null;
+  audiences: Audience[];
+  qtype: QType;
+  difficulty: number;
+  text: string;
+  clinical_context: string | null;
+  options: string[];
+  correct_index: number;
+  explanation: string | null;
+  source_erc: string | null;
+  source_plan_nacional: string | null;
+  video_url: string | null;
+  image_url?: string | null;
+  flashcard: string | null;
+  tags: string[];
+  is_critical: boolean;
+  ref_document_id: string | null;
+  ref_page: number | null;
+}
+
 const AUDIENCE_LABEL: Record<Audience, string> = {
   ninos: '👶 Niños',
   jovenes: '🧑 Jóvenes',
   adultos: '👨 Adultos',
 };
+
+/** Previsualización de una pregunta tal como la ve el alumno (con la correcta marcada). */
+function PreviewAlumno({ q, onClose }: { q: FullQuestion; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <div className="card-title">Vista del alumno</div>
+          <button className="btn btn-outline btn-small" onClick={onClose}>Cerrar</button>
+        </div>
+        <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+          Así se ve al responderla. La opción correcta va resaltada (el alumno no la ve hasta corregir).
+        </div>
+
+        {q.qtype === 'caso_clinico' && q.clinical_context && (
+          <div className="info-box" style={{ marginBottom: 12 }}>{q.clinical_context}</div>
+        )}
+        {q.image_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={q.image_url} alt="" style={{ maxWidth: '100%', borderRadius: 10, marginBottom: 12 }} />
+        )}
+        {q.video_url && <div style={{ marginBottom: 12 }}><VideoEmbed url={q.video_url} /></div>}
+
+        <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 12 }}>{q.text}</div>
+
+        <div style={{ display: 'grid', gap: 8 }}>
+          {q.options.map((op, i) => {
+            const correcta = i === q.correct_index;
+            return (
+              <div key={i} style={{
+                padding: '10px 12px', borderRadius: 10,
+                border: `1.5px solid ${correcta ? 'var(--success)' : 'var(--gray-200)'}`,
+                background: correcta ? 'rgba(39,103,73,0.08)' : '#fff',
+                display: 'flex', gap: 10, alignItems: 'center',
+              }}>
+                <span style={{ fontWeight: 700, color: correcta ? 'var(--success)' : 'var(--text-secondary)' }}>{String.fromCharCode(65 + i)}</span>
+                <span style={{ flex: 1 }}>{op}</span>
+                {correcta && <span className="badge badge-success">correcta</span>}
+              </div>
+            );
+          })}
+        </div>
+
+        {q.explanation && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Explicación (debriefing)</div>
+            <div className="info-box" style={{ fontSize: 13.5 }}>{q.explanation}</div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const VIS_LABEL: Record<Visibility, string> = {
   privado: '🔒 Privado',
@@ -50,6 +128,10 @@ export default function PreguntasPage() {
   const [fNivel, setFNivel] = useState<'' | Level>('');
   const [fTema, setFTema] = useState('');
   const [fVis, setFVis] = useState<'' | Visibility>('');
+  // Edición de una pregunta existente + previsualización «como alumno».
+  const [editId, setEditId] = useState<string | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [preview, setPreview] = useState<FullQuestion | null>(null);
   const [category, setCategory] = useState<Level>('SVB');
   const [audiences, setAudiences] = useState<Audience[]>(['jovenes', 'adultos']);
   const [qtype, setQtype] = useState<QType>('teorica');
@@ -135,6 +217,56 @@ export default function PreguntasPage() {
     setRefPage('');
   }
 
+  /** Cargar una pregunta existente en el formulario para editarla. */
+  async function editar(id: string) {
+    setMsg(null);
+    try {
+      const { question: q } = await api<{ question: FullQuestion }>(`/api/questions/${id}`, { auth: true });
+      setEditId(q.id);
+      setBankId(q.bank_id);
+      setTema(q.tema ?? '');
+      setCategory((q.category ?? 'SVB') as Level);
+      setAudiences(q.audiences?.length ? q.audiences : ['adultos']);
+      setQtype(q.qtype);
+      setDifficulty(q.difficulty);
+      setClinicalContext(q.clinical_context ?? '');
+      setText(q.text);
+      setOptions(q.options?.length ? q.options : ['', '']);
+      setCorrectIndex(q.correct_index ?? 0);
+      setExplanation(q.explanation ?? '');
+      setSourceErc(q.source_erc ?? '');
+      setSourcePlan(q.source_plan_nacional ?? '');
+      setVideoUrl(q.video_url ?? '');
+      setFlashcard(q.flashcard ?? '');
+      setTags((q.tags ?? []).join(', '));
+      setIsCritical(q.is_critical);
+      setRefDocumentId(q.ref_document_id ?? '');
+      setRefPage(q.ref_page ? String(q.ref_page) : '');
+      setQImage(null);
+      setFormOpen(true);
+      if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'No se pudo cargar la pregunta' });
+    }
+  }
+
+  function salirEdicion() {
+    setEditId(null);
+    setBankId('');
+    setTema('');
+    resetForm();
+  }
+
+  async function verComoAlumno(id: string) {
+    setMsg(null);
+    try {
+      const { question } = await api<{ question: FullQuestion }>(`/api/questions/${id}`, { auth: true });
+      setPreview(question);
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'No se pudo previsualizar' });
+    }
+  }
+
   async function handleImport(file: File | undefined) {
     if (!file) return;
     setImportError(null);
@@ -185,6 +317,15 @@ export default function PreguntasPage() {
           refDocumentId: refDocumentId || undefined,
           refPage: refPage ? Number(refPage) : undefined,
       };
+      if (editId) {
+        // Edición: se actualizan las etiquetas y el contenido (la imagen se
+        // conserva; para cambiarla se crea una pregunta nueva por ahora).
+        await api(`/api/questions/${editId}`, { method: 'PATCH', auth: true, body: JSON.stringify(payload) });
+        setMsg({ ok: true, text: 'Pregunta actualizada ✅' });
+        salirEdicion();
+        loadList(filterMedia || undefined);
+        return;
+      }
       if (qImage) {
         // Con imagen: va como multipart, pero conserva TODAS las etiquetas.
         await uploadFile('/api/questions/image', qImage, {
@@ -307,15 +448,21 @@ export default function PreguntasPage() {
         </div>
       </details>
 
-      <div className="grid">
-        {/* ---------------- Form ---------------- */}
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">Nueva pregunta</div>
-            <div className="card-subtitle">Clasifícala por nivel, público y tipo</div>
-          </div>
-
+      {/* ---------------- Form (plegable, ancho completo) ---------------- */}
+      <details className="card" style={{ marginBottom: 16 }} open={formOpen}
+        onToggle={(e) => setFormOpen((e.target as HTMLDetailsElement).open)}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 16 }}>
+          {editId ? '✏️ Editar pregunta' : 'Nueva pregunta'}
+          <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}> · clasifícala por nivel, público y tipo</span>
+        </summary>
+        <div style={{ marginTop: 14 }}>
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
+          {editId && (
+            <div className="info-box" style={{ marginBottom: 12, fontSize: 13 }}>
+              Estás editando una pregunta existente.{' '}
+              <button type="button" className="link-action" onClick={salirEdicion}>Cancelar y empezar una nueva</button>
+            </div>
+          )}
 
           <form onSubmit={onSubmit}>
             {/* Toda pregunta pertenece a un banco: así nunca quedan huérfanas. */}
@@ -494,13 +641,14 @@ export default function PreguntasPage() {
             </details>
 
             <button className="btn btn-primary btn-full" disabled={saving || audiences.length === 0}>
-              {saving ? 'Guardando…' : 'Crear pregunta'}
+              {saving ? 'Guardando…' : editId ? 'Guardar cambios' : 'Crear pregunta'}
             </button>
           </form>
         </div>
+      </details>
 
-        {/* ---------------- List ---------------- */}
-        <div className="card">
+      {/* ---------------- List (ancho completo) ---------------- */}
+      <div className="card">
           <div className="card-header">
             <div className="card-title">Banco de preguntas</div>
           </div>
@@ -549,6 +697,7 @@ export default function PreguntasPage() {
                   <th>Público</th>
                   <th>Tipo</th>
                   <th>Enunciado</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -561,12 +710,20 @@ export default function PreguntasPage() {
                     <td style={{ fontSize: 12 }} title={q.bank_name ?? ''}>{q.bank_visibility ? VIS_LABEL[q.bank_visibility].split(' ')[0] : '—'}</td>
                     <td style={{ fontSize: 12 }}>{q.audiences.map((a) => AUDIENCE_LABEL[a].split(' ')[0]).join(' ')}</td>
                     <td style={{ fontSize: 12 }}>{q.qtype === 'caso_clinico' ? '🩺' : '📘'}</td>
-                    <td style={{ fontSize: 13 }}>{q.text.length > 60 ? q.text.slice(0, 60) + '…' : q.text}</td>
+                    <td style={{ fontSize: 13 }}>
+                      <button className="link-action" onClick={() => editar(q.id)} title="Editar esta pregunta" style={{ textAlign: 'left' }}>
+                        {q.text.length > 60 ? q.text.slice(0, 60) + '…' : q.text}
+                      </button>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <button className="link-action" onClick={() => verComoAlumno(q.id)}>👁 Ver</button>{' · '}
+                      <button className="link-action" onClick={() => editar(q.id)}>Editar</button>
+                    </td>
                   </tr>
                 ))}
                 {listaFiltrada.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="empty-state">
+                    <td colSpan={7} className="empty-state">
                       {list.length === 0 ? 'Aún no hay preguntas en este banco.' : 'Ninguna pregunta coincide con los filtros.'}
                     </td>
                   </tr>
@@ -575,7 +732,9 @@ export default function PreguntasPage() {
             </table>
           </div>
         </div>
-      </div>
+
+      {/* ---------------- Previsualización «como alumno» ---------------- */}
+      {preview && <PreviewAlumno q={preview} onClose={() => setPreview(null)} />}
     </AppShell>
   );
 }
