@@ -363,6 +363,11 @@ tbody td {
 tbody tr {
   transition: background 0.15s ease;
 }
+/* Filas alternas (cebra): una clara y una con un tinte suave, para diferenciar
+   cada fila de un vistazo. Se aplica a todas las tablas de la plataforma. */
+tbody tr:nth-child(even) {
+  background: rgba(26, 54, 93, 0.045);
+}
 tbody tr:hover {
   background: var(--gray-100);
 }

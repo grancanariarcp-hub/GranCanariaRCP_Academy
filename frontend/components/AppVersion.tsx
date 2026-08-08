@@ -1,8 +1,8 @@
 import { APP_VERSION, APP_COMMIT } from '@/lib/version';
 
 /**
- * Small version badge. Shows the semantic version and, on hover, the
- * exact commit that is deployed — so it's easy to confirm what's live.
+ * Etiqueta de versión: se muestra solo «vX.Y.Z». El commit exacto queda en el
+ * tooltip (hover) por si hace falta para depurar, pero no se publica a la vista.
  */
 export function AppVersion({ style }: { style?: React.CSSProperties }) {
   return (
@@ -11,9 +11,6 @@ export function AppVersion({ style }: { style?: React.CSSProperties }) {
       style={{ fontSize: 12, color: 'var(--text-secondary)', ...style }}
     >
       v{APP_VERSION}
-      {APP_COMMIT !== 'local' && (
-        <span style={{ opacity: 0.6 }}> · {APP_COMMIT}</span>
-      )}
     </span>
   );
 }
