@@ -372,7 +372,7 @@ export default function CursosPage() {
                   return (
                     <tr key={c.id} style={rojo ? { background: '#fff5f5' } : undefined}>
                       <td style={rojo ? { borderLeft: '3px solid var(--danger)' } : undefined}>
-                        {c.es_ope && <span className="badge badge-primary" style={{ marginRight: 6, fontSize: 10.5, background: '#7c3aed' }}>OPE</span>}
+                        {c.es_ope && <span className="badge badge-ope" style={{ marginRight: 6, fontSize: 10.5 }}>OPE</span>}
                         <Link href={`/admin/cursos/${c.id}`}>{c.title}</Link>
                         {rojo && <span className="badge badge-danger" style={{ marginLeft: 8, fontSize: 10.5 }}>Falta el acta</span>}
                       </td>

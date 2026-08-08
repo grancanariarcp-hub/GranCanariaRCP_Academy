@@ -483,7 +483,7 @@ export default function PreguntasPage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
             <span className="muted" style={{ fontSize: 13 }}>Filtrar:</span>
             {([['', 'Todas'], ['any', 'Con imagen o vídeo'], ['imagen', 'Con imagen'], ['video', 'Con vídeo']] as Array<[string, string]>).map(([v, label]) => (
-              <button key={v} type="button" className={`link-action ${filterMedia === v ? '' : ''}`}
+              <button key={v} type="button" className="link-action"
                 style={{ fontWeight: filterMedia === v ? 700 : 400 }}
                 onClick={() => { setFilterMedia(v); loadList(v || undefined); }}>
                 {label}
@@ -513,8 +513,8 @@ export default function PreguntasPage() {
                 ))}
                 {list.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="muted">
-                      Aún no hay preguntas
+                    <td colSpan={4} className="empty-state">
+                      Aún no hay preguntas en este banco.
                     </td>
                   </tr>
                 )}

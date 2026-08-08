@@ -231,10 +231,11 @@ export default function AdminDashboard() {
         <Kpi value={dash?.actividad.horas ?? '—'} label="Horas de estudio" />
         <Kpi value={dash?.actividad.aprobados ?? '—'} label="Alumnos aprobados" />
       </div>
-      <div className="grid grid-2" style={{ marginBottom: 24 }}>
-        <Kpi value="—" label="Suscriptores (con el módulo de pagos)" />
-        <Kpi value="—" label="Facturación (con el módulo de pagos)" />
-      </div>
+      {/* Suscriptores y facturación se mostrarán al activar el módulo de pagos;
+          hasta entonces no se pintan dos tarjetas vacías con «—». */}
+      <p className="muted" style={{ fontSize: 12.5, margin: '0 0 20px' }}>
+        Suscriptores y facturación aparecerán aquí al activar el cobro.
+      </p>
 
       {/* Evolución por periodos */}
       <div className="card animate-in" style={{ marginBottom: 24 }}>
@@ -314,7 +315,7 @@ export default function AdminDashboard() {
                   </tr>
                 ))}
                 {institutions.length === 0 && (
-                  <tr><td colSpan={4} className="muted">Sin instituciones</td></tr>
+                  <tr><td colSpan={4} className="empty-state">Aún no hay instituciones registradas.</td></tr>
                 )}
               </tbody>
             </table>
@@ -390,14 +391,14 @@ export default function AdminDashboard() {
         </div>
 
         {/* Buscador + filtros del registro */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-          <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Buscar (acción, entidad, IP…)"
+        <div className="toolbar">
+          <input className="form-input toolbar-buscar" placeholder="Buscar (acción, entidad, IP…)"
             value={aq} onChange={(e) => { setAq(e.target.value); setAPagina(1); }} />
-          <select className="form-select" style={{ width: 'auto' }} value={aActor} onChange={(e) => { setAActor(e.target.value); setAPagina(1); }}>
+          <select className="form-select" value={aActor} onChange={(e) => { setAActor(e.target.value); setAPagina(1); }}>
             <option value="">Cualquier actor</option>
             {actores.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
-          <select className="form-select" style={{ width: 'auto' }} value={aAction} onChange={(e) => { setAAction(e.target.value); setAPagina(1); }}>
+          <select className="form-select" value={aAction} onChange={(e) => { setAAction(e.target.value); setAPagina(1); }}>
             <option value="">Cualquier acción</option>
             {acciones.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>

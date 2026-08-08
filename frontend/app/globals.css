@@ -93,6 +93,7 @@
   --success: #276749;
   --warning: #975a16;
   --danger: #c53030;
+  --ope: #6b46c1;   /* etiqueta OPE/oposiciones, un color propio y consistente */
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -156,7 +157,7 @@ h3 {
 
 .grid {
   display: grid;
-  gap: 24px;
+  gap: 20px;
 }
 .grid-4 {
   grid-template-columns: repeat(4, 1fr);
@@ -174,7 +175,7 @@ h3 {
   border: 1px solid var(--gray-200);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  padding: 24px;
+  padding: 20px;
   transition: box-shadow 0.2s ease;
 }
 .card:hover {
@@ -201,11 +202,11 @@ h3 {
   background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-medium) 100%);
   color: #fff;
   border-radius: var(--radius);
-  padding: 24px;
+  padding: 18px;
   box-shadow: var(--shadow-md);
 }
 .stat-value {
-  font-size: 34px;
+  font-size: 30px;
   font-weight: 700;
   line-height: 1.1;
 }
@@ -342,7 +343,7 @@ table {
 thead th {
   background: var(--gray-100);
   text-align: left;
-  padding: 12px;
+  padding: 10px 12px;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -350,7 +351,7 @@ thead th {
   border-bottom: 1px solid var(--gray-300);
 }
 tbody td {
-  padding: 12px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--gray-200);
 }
 tbody tr {
@@ -793,6 +794,35 @@ tbody tr:hover {
 .table-plain tbody tr:hover {
   background: var(--gray-100);
 }
+
+/* Estado vacío homogéneo ("aún no hay …"): centrado y sereno, no un texto pelado. */
+.empty-state {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+.empty-state strong { color: var(--gray-700); }
+
+/* Barra de filtros/acciones reutilizable: buscador que crece + selects que no
+   se encogen, y en móvil cada control ocupa toda la fila. */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.toolbar > .form-input,
+.toolbar > .form-select { height: 38px; }
+.toolbar-buscar { flex: 1 1 220px; min-width: 180px; }
+.toolbar > .form-select { min-width: 150px; width: auto; }
+@media (max-width: 640px) {
+  .toolbar > * { flex: 1 1 100%; width: 100%; min-width: 0; }
+}
+
+/* Etiqueta OPE consistente en toda la app. */
+.badge-ope { background: var(--ope); color: #fff; }
 
 /* ---------- Preguntas frecuentes ---------- */
 .faq details {

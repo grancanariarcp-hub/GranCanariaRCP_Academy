@@ -108,7 +108,7 @@ export default function StudentDashboard() {
                 {lista.map((c, i) => (
                   <div key={c.id} className="press animate-in" style={{ border: '1px solid var(--gray-200)', borderLeft: `4px solid ${temaPalette(c.tema).main}`, borderRadius: 8, padding: 16, animationDelay: `${Math.min(i, 8) * 50}ms` }}>
                     <div style={{ fontWeight: 600 }}>
-                      {c.es_ope && <span className="badge" style={{ marginRight: 6, fontSize: 10.5, background: 'var(--secondary-dark)', color: '#fff' }}>OPE</span>}
+                      {c.es_ope && <span className="badge badge-ope" style={{ marginRight: 6, fontSize: 10.5 }}>OPE</span>}
                       {c.title}
                     </div>
                     <div className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>

@@ -150,7 +150,7 @@ export default function ProfesoresPage() {
                     </td>
                   </tr>
                 ))}
-                {list.length === 0 && <tr><td colSpan={3} className="muted">Aún no hay profesores</td></tr>}
+                {list.length === 0 && <tr><td colSpan={3} className="empty-state">Aún no hay profesores.</td></tr>}
               </tbody>
             </table>
           </div>

@@ -271,10 +271,10 @@ export default function DocumentosPage() {
           </div>
 
           {/* Filtros: el listado crecerá rápido y sin ellos deja de ser manejable. */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-            <input className="form-input" style={{ flex: 1, minWidth: 180 }} placeholder="Buscar por título…"
+          <div className="toolbar">
+            <input className="form-input toolbar-buscar" placeholder="Buscar por título…"
               value={q} onChange={(e) => { setQ(e.target.value); setPagina(1); }} />
-            <select className="form-select" style={{ width: 'auto' }} value={fKind} onChange={(e) => { setFKind(e.target.value as typeof fKind); setPagina(1); }}>
+            <select className="form-select" value={fKind} onChange={(e) => { setFKind(e.target.value as typeof fKind); setPagina(1); }}>
               <option value="">Todos los tipos</option>
               <option value="erc">{KIND_LABEL.erc}</option>
               <option value="pnrcp">{KIND_LABEL.pnrcp}</option>
