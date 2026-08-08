@@ -225,7 +225,8 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
         </div>
       </div>
 
-      {/* Cursos */}
+      {/* Cursos — el super admin es un puesto administrativo: no imparte ni tiene CV. */}
+      {user.role !== 'super_admin' && (
       <div className="card" style={{ marginTop: 16 }}>
         <div className="card-header">
           <div className="card-title">{isStaff ? 'Cursos impartidos' : 'Mis cursos'}</div>
@@ -246,14 +247,15 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
                   <td style={{ fontSize: 12 }}>{c.publico_objetivo?.join(', ') || '—'}</td>
                 </tr>
               ))}
-              {courses.length === 0 && <tr><td colSpan={5} className="muted">Sin cursos todavía</td></tr>}
+              {courses.length === 0 && <tr><td colSpan={5} className="empty-state">Sin cursos todavía</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
+      )}
 
-      {/* CV (solo profesores) */}
-      {isStaff && cv && (
+      {/* CV (solo profesores, no el super admin) */}
+      {isStaff && user.role !== 'super_admin' && cv && (
         <div className="card" style={{ marginTop: 16 }}>
           <div className="card-header">
             <div className="card-title">Mi CV</div>

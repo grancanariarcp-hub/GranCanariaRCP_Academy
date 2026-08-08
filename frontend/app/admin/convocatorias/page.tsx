@@ -113,7 +113,7 @@ export default function ConvocatoriasPage() {
 
       {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
 
-      <div className="grid grid-2">
+      <div className="grid">
         <div className="card">
           <div className="card-header">
             <div className="card-title">{editando ? 'Editar convocatoria' : 'Nueva convocatoria'}</div>

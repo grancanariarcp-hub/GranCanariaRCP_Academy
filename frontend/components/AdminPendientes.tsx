@@ -46,9 +46,8 @@ export function AdminPendientes() {
           </div>
         </div>
         {!leads || leads.leads.length === 0 ? (
-          <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
-            Nadie ha pedido aviso todavía. El formulario aparece en el campus cuando no hay cursos con
-            matrícula abierta.
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            Nadie ha pedido aviso todavía.
           </p>
         ) : (
           <>
@@ -82,9 +81,8 @@ export function AdminPendientes() {
           <div className="card-subtitle">Cuentas con muchos dispositivos o conexiones en 14 días</div>
         </div>
         {compartido.length === 0 ? (
-          <p className="muted" style={{ margin: 0, fontSize: 13.5 }}>
-            Ninguna cuenta da señales de estar repartida. El límite de dos sesiones simultáneas hace el
-            trabajo por sí solo.
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            Ninguna cuenta da señales de estar repartida.
           </p>
         ) : (
           <>

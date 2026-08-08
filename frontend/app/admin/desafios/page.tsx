@@ -127,7 +127,7 @@ export default function AdminDesafiosPage() {
       title="Desafíos"
       nav={adminNav(user.role, '/admin/desafios')}
     >
-      <div className="grid grid-2">
+      <div className="grid">
         <div className="card">
           <div className="card-header">
             <div className="card-title">{editandoId ? 'Editar desafío' : 'Nuevo desafío'}</div>

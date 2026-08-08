@@ -208,9 +208,6 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* Lo que hay que mirar: interesados, indicios de uso compartido y pasarela. */}
-      {pestana === 'resumen' && <AdminPendientes />}
-
       {/* Captación por la zona gratuita: cuánta gente prueba y cuánta se queda */}
       {pestana === 'captacion' && <AnonPracticeStats />}
 
@@ -236,6 +233,9 @@ export default function AdminDashboard() {
       <p className="muted" style={{ fontSize: 12.5, margin: '0 0 20px' }}>
         Suscriptores y facturación aparecerán aquí al activar el cobro.
       </p>
+
+      {/* Lo que hay que mirar: interesados, uso compartido y pasarela (bajo los KPIs) */}
+      <AdminPendientes />
 
       {/* Evolución por periodos */}
       <div className="card animate-in" style={{ marginBottom: 24 }}>
@@ -272,7 +272,7 @@ export default function AdminDashboard() {
       </>)}
 
       {pestana === 'instituciones' && (
-      <div className="grid grid-2">
+      <div className="grid">
         {/* Institutions table */}
         <div className="card animate-in">
           <div className="card-header">
