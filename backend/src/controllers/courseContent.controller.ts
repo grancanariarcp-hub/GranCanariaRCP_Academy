@@ -311,6 +311,10 @@ const addActivitySchema = z.object({
   isMandatory: z.boolean().optional().default(false),
   // Duración en minutos (sobre todo para vídeos): cuenta para las horas CFC.
   durationMin: z.number().int().min(0).max(1000).optional(),
+  // Evaluable: el profesor decide si esta actividad cuenta como calificación y
+  // con qué método (finalización = apto al completarla, manual = pone la nota).
+  evaluable: z.boolean().optional().default(false),
+  metodoEval: z.enum(['examen', 'finalizacion', 'manual']).nullable().optional(),
 });
 
 /**
@@ -359,10 +363,11 @@ export async function addActivity(req: Request, res: Response): Promise<void> {
   }
 
   const { rows } = await query(
-    `INSERT INTO activities (module_id, type, title, document_id, url, body, is_mandatory, duration_min, sort_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE((SELECT MAX(sort_order) + 1 FROM activities WHERE module_id = $1), 0))
-     RETURNING id, type, title, document_id, url, body, is_mandatory, duration_min`,
-    [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.body ?? null, d.isMandatory, d.durationMin ?? null],
+    `INSERT INTO activities (module_id, type, title, document_id, url, body, is_mandatory, duration_min, evaluable, metodo_eval, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE((SELECT MAX(sort_order) + 1 FROM activities WHERE module_id = $1), 0))
+     RETURNING id, type, title, document_id, url, body, is_mandatory, duration_min, evaluable, metodo_eval`,
+    [req.params.moduleId, d.type, d.title, d.documentId ?? null, d.url ?? null, d.body ?? null, d.isMandatory, d.durationMin ?? null,
+      d.evaluable ?? false, d.evaluable ? (d.metodoEval ?? 'finalizacion') : null],
   );
   avisarContenidoNuevo(req.params.id, d.title, 'Nueva actividad').catch(() => { /* el aviso no debe romper la creación */ });
   res.status(201).json({ activity: rows[0] });
@@ -380,6 +385,68 @@ export async function setActivityDuration(req: Request, res: Response): Promise<
   );
   if (rows.length === 0) throw notFound('Actividad no encontrada');
   res.json({ activity: rows[0] });
+}
+
+/**
+ * PATCH /api/courses/:id/activities/:activityId/eval — marca una actividad como
+ * evaluable y con qué método. El profesor decide qué cuenta como calificación.
+ */
+export async function setActivityEval(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const d = z.object({
+    evaluable: z.boolean(),
+    metodoEval: z.enum(['examen', 'finalizacion', 'manual']).nullable().optional(),
+  }).parse(req.body);
+  const metodo = d.evaluable ? (d.metodoEval ?? 'finalizacion') : null;
+  const { rows } = await query(
+    `UPDATE activities SET evaluable = $1, metodo_eval = $2
+      WHERE id = $3 AND module_id IN (SELECT id FROM modules WHERE course_id = $4)
+      RETURNING id, evaluable, metodo_eval`,
+    [d.evaluable, metodo, req.params.activityId, req.params.id],
+  );
+  if (rows.length === 0) throw notFound('Actividad no encontrada');
+  res.json({ activity: rows[0] });
+}
+
+/**
+ * GET /api/courses/:id/activities/:activityId/grades — alumnos del curso con su
+ * nota manual (para el panel de calificación del profesor).
+ */
+export async function listActivityGrades(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const { rows } = await query(
+    `SELECT s.id AS student_id, COALESCE(s.display_name, s.email) AS nombre,
+            g.nota, g.apto
+       FROM enrollments e
+       JOIN students s ON s.id = e.student_id
+       LEFT JOIN activity_grades g ON g.student_id = s.id AND g.activity_id = $2
+      WHERE e.course_id = $1 AND e.status IN ('activo','completado')
+      ORDER BY nombre`,
+    [req.params.id, req.params.activityId],
+  );
+  res.json({ alumnos: rows });
+}
+
+/**
+ * PUT /api/courses/:id/activities/:activityId/grades/:studentId — pone/actualiza
+ * la nota manual de un alumno en una actividad.
+ */
+export async function setActivityGrade(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const d = z.object({
+    nota: z.number().min(0).max(100).nullable().optional(),
+    apto: z.boolean().nullable().optional(),
+  }).parse(req.body);
+  // La actividad debe ser de este curso.
+  const a = await query('SELECT 1 FROM activities WHERE id = $1 AND module_id IN (SELECT id FROM modules WHERE course_id = $2)', [req.params.activityId, req.params.id]);
+  if (a.rows.length === 0) throw notFound('Actividad no encontrada');
+  await query(
+    `INSERT INTO activity_grades (activity_id, student_id, nota, apto, graded_by)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (activity_id, student_id) DO UPDATE SET nota = EXCLUDED.nota, apto = EXCLUDED.apto, graded_by = EXCLUDED.graded_by, graded_at = NOW()`,
+    [req.params.activityId, req.params.studentId, d.nota ?? null, d.apto ?? null, req.auth!.sub],
+  );
+  res.json({ ok: true });
 }
 
 /** Upload the course thumbnail (multipart image) to R2. */

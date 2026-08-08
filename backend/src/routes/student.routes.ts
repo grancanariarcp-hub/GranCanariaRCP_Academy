@@ -4,6 +4,7 @@ import {
   listAvailableCourses,
   enrollCourse,
   listMyCourses,
+  misCalificaciones,
   getMyCourseContent,
   setActivityCompleted,
 } from '../controllers/student.controller.js';
@@ -29,6 +30,7 @@ router.get('/dashboard', asyncHandler(getStudentDashboard));
 router.get('/available-courses', asyncHandler(listAvailableCourses));
 router.post('/enroll/:courseId', asyncHandler(enrollCourse));
 router.get('/courses', asyncHandler(listMyCourses));
+router.get('/calificaciones', asyncHandler(misCalificaciones));
 router.get('/courses/:courseId', asyncHandler(getMyCourseContent));
 router.post('/courses/:courseId/activities/:activityId/complete', asyncHandler(setActivityCompleted));
 router.get('/courses/:courseId/survey', asyncHandler(getSurveyForStudent));

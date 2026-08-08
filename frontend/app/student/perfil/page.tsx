@@ -8,6 +8,7 @@ import { MyRecognitions } from '@/components/MyRecognitions';
 import { MySessions } from '@/components/MySessions';
 import { MisDatos } from '@/components/MisDatos';
 import { MisDatosPersonales } from '@/components/MisDatosPersonales';
+import { MisCalificaciones } from '@/components/MisCalificaciones';
 
 export default function StudentProfilePage() {
   const user = useSession(['student'], '/login/menor');
@@ -17,7 +18,7 @@ export default function StudentProfilePage() {
   // El perfil apilaba cinco bloques pesados; se reparten en pestañas para no
   // tener que hacer scroll hasta abajo.
   const TABS: Array<[string, string]> = [
-    ['perfil', 'Perfil'], ['datos', 'Mis datos'], ['reconocimientos', 'Reconocimientos'], ['sesiones', 'Sesiones'],
+    ['perfil', 'Perfil'], ['calificaciones', 'Calificaciones'], ['datos', 'Mis datos'], ['reconocimientos', 'Reconocimientos'], ['sesiones', 'Sesiones'],
   ];
 
   return (
@@ -36,6 +37,7 @@ export default function StudentProfilePage() {
       </div>
 
       {tab === 'perfil' && <ProfilePanel user={user} />}
+      {tab === 'calificaciones' && <MisCalificaciones />}
       {tab === 'datos' && <><MisDatosPersonales /><MisDatos esAlumno={true} /></>}
       {tab === 'reconocimientos' && <MyRecognitions />}
       {tab === 'sesiones' && <MySessions />}

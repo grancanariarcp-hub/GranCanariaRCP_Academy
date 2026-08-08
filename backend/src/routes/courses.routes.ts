@@ -6,6 +6,7 @@ import {
   updateCourse, deleteCourse, cambiarTipoCurso, solicitarCfc, cambiosCfc, uploadCourseThumbnail, addModule, updateModule, deleteModule,
   addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
   addCourseImage, deleteCourseImage, setActivityDuration, auditoriaCurso,
+  setActivityEval, listActivityGrades, setActivityGrade,
 } from '../controllers/courseContent.controller.js';
 import {
   createExam, getExam, updateExam, addExamQuestion, importExamQuestions, addExamQuestionsFromBank, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts,
@@ -60,6 +61,9 @@ router.post('/:id/modules/:moduleId/activities', asyncHandler(addActivity));
 router.post('/:id/modules/:moduleId/activities/image', upload.single('file'), asyncHandler(addImageActivity));
 router.delete('/:id/activities/:activityId', asyncHandler(deleteActivity));
 router.patch('/:id/activities/:activityId/duration', asyncHandler(setActivityDuration));
+router.patch('/:id/activities/:activityId/eval', asyncHandler(setActivityEval));
+router.get('/:id/activities/:activityId/grades', asyncHandler(listActivityGrades));
+router.put('/:id/activities/:activityId/grades/:studentId', asyncHandler(setActivityGrade));
 
 // Staff (directores / instructores)
 router.post('/:id/staff', asyncHandler(inviteStaff));

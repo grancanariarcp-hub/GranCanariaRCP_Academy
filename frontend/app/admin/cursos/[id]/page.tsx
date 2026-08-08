@@ -176,6 +176,8 @@ export default function CourseDetailPage() {
   const [actDoc, setActDoc] = useState('');
   const [actBody, setActBody] = useState('');
   const [actDuracion, setActDuracion] = useState(''); // minutos, sobre todo para vídeos (CFC)
+  const [actEvaluable, setActEvaluable] = useState(false);
+  const [actMetodo, setActMetodo] = useState<'finalizacion' | 'manual'>('finalizacion');
   const [examAttempts, setExamAttempts] = useState('1');
   const [examPass, setExamPass] = useState('60');
   const [examTime, setExamTime] = useState('');
@@ -443,10 +445,12 @@ export default function CourseDetailPage() {
             documentId: actType === 'documento' ? actDoc : undefined,
             body: actType === 'texto' ? actBody : undefined,
             durationMin: actType === 'video' && actDuracion ? Number(actDuracion) : undefined,
+            evaluable: actEvaluable,
+            metodoEval: actEvaluable ? actMetodo : undefined,
           }),
         });
       }
-      setAddingTo(null); setActTitle(''); setActUrl(''); setActDoc(''); setActBody(''); setActDuracion('');
+      setAddingTo(null); setActTitle(''); setActUrl(''); setActDoc(''); setActBody(''); setActDuracion(''); setActEvaluable(false); setActMetodo('finalizacion');
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error al añadir actividad');
@@ -1147,6 +1151,20 @@ export default function CourseDetailPage() {
                       )}
                       {(actType === 'test' || actType === 'examen') && (
                         <ExamWizard courseId={courseId} moduleId={m.id} onCreated={() => { setAddingTo(null); load(); }} />
+                      )}
+                      {actType !== 'imagen' && actType !== 'test' && actType !== 'examen' && (
+                        <div style={{ background: 'var(--gray-50, #f7fafc)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, cursor: 'pointer' }}>
+                            <input type="checkbox" checked={actEvaluable} onChange={(e) => setActEvaluable(e.target.checked)} />
+                            <span>Actividad <strong>evaluable</strong> (aparece en las calificaciones del alumno)</span>
+                          </label>
+                          {actEvaluable && (
+                            <select className="form-select" style={{ marginTop: 8 }} value={actMetodo} onChange={(e) => setActMetodo(e.target.value as typeof actMetodo)}>
+                              <option value="finalizacion">Por finalización — apto al completarla</option>
+                              <option value="manual">Nota manual — la pones tú por alumno</option>
+                            </select>
+                          )}
+                        </div>
                       )}
                       {actType !== 'imagen' && actType !== 'test' && actType !== 'examen' && (
                         <button className="btn btn-primary btn-small btn-full" onClick={() => addActivity(m.id)} disabled={!actTitle.trim() || (actType === 'documento' && !actDoc)}>

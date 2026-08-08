@@ -131,6 +131,31 @@ export async function listMyCourses(req: Request, res: Response): Promise<void> 
   res.json({ courses: rows });
 }
 
+/**
+ * "Calificaciones": todas las actividades evaluables de sus cursos con el
+ * resultado según su método (examen automático, finalización o nota manual).
+ */
+export async function misCalificaciones(req: Request, res: Response): Promise<void> {
+  const me = req.auth!.sub;
+  const { rows } = await query(
+    `SELECT c.id AS course_id, c.title AS course_title, m.title AS modulo,
+            a.title AS actividad, a.metodo_eval,
+            (SELECT MAX(score) FROM exam_attempts ea WHERE ea.exam_id = a.exam_id AND ea.student_id = $1) AS examen_score,
+            (SELECT bool_or(passed) FROM exam_attempts ea WHERE ea.exam_id = a.exam_id AND ea.student_id = $1) AS examen_apto,
+            EXISTS (SELECT 1 FROM activity_completions ac WHERE ac.activity_id = a.id AND ac.student_id = $1) AS completada,
+            g.nota AS manual_nota, g.apto AS manual_apto
+       FROM enrollments e
+       JOIN courses c ON c.id = e.course_id
+       JOIN modules m ON m.course_id = c.id
+       JOIN activities a ON a.module_id = m.id AND a.evaluable = TRUE
+       LEFT JOIN activity_grades g ON g.activity_id = a.id AND g.student_id = $1
+      WHERE e.student_id = $1 AND e.status IN ('activo','completado')
+      ORDER BY c.title, m.sort_order, a.sort_order`,
+    [me],
+  );
+  res.json({ items: rows });
+}
+
 /** Contenido del curso para estudiar (solo si está matriculado). */
 export async function getMyCourseContent(req: Request, res: Response): Promise<void> {
   const courseId = req.params.courseId;
