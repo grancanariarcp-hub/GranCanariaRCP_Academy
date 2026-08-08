@@ -32,7 +32,7 @@ import { stripeStatus } from '../controllers/payment.controller.js';
 import { listLeads } from '../controllers/lead.controller.js';
 import { listTemplates, createTemplate, updateTemplate, deleteTemplate, uploadTemplateBackground, previewTemplate } from '../controllers/recognition.controller.js';
 import { anonStats } from '../controllers/anonPractice.controller.js';
-import { listConvocatorias, createConvocatoria, updateConvocatoria, deleteConvocatoria, setConvocatoriaBanks } from '../controllers/convocatoria.controller.js';
+import { listConvocatorias, createConvocatoria, updateConvocatoria, deleteConvocatoria, setConvocatoriaBanks, documentoConvocatoria } from '../controllers/convocatoria.controller.js';
 import { listAuditores, crearAuditor, editarAuditor, borrarAuditor, actividadAuditor, cursosAuditor, vincularCursoAuditor, desvincularCursoAuditor } from '../controllers/auditor.controller.js';
 import { usoCompartido } from '../controllers/sesion.controller.js';
 import { getAcademySettings, updateAcademySettings, enviarCorreoPrueba } from '../controllers/academia.controller.js';
@@ -71,6 +71,7 @@ router.post('/convocatorias', asyncHandler(createConvocatoria));
 router.patch('/convocatorias/:id', asyncHandler(updateConvocatoria));
 router.delete('/convocatorias/:id', asyncHandler(deleteConvocatoria));
 router.put('/convocatorias/:id/banks', asyncHandler(setConvocatoriaBanks));
+router.get('/convocatorias/:id/documento.pdf', asyncHandler(documentoConvocatoria));
 
 // Certificados de reconocimiento (plantillas)
 router.get('/recognition-templates', asyncHandler(listTemplates));

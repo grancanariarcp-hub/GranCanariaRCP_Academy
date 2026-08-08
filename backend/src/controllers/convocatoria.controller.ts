@@ -1,7 +1,9 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import PDFDocument from 'pdfkit';
 import { query, withTransaction } from '../config/database.js';
 import { badRequest, notFound } from '../utils/httpError.js';
+import { renderConvocatoria } from '../services/convocatoriaPdf.js';
 
 /**
  * Convocatorias de oposición.
@@ -9,6 +11,8 @@ import { badRequest, notFound } from '../utils/httpError.js';
  * Agrupan los bancos que el super admin asigna a UNA oposición concreta, para
  * que el opositor vea solo lo que le corresponde y no todo el catálogo.
  */
+
+const FECHA = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 const convSchema = z.object({
   name: z.string().min(2).max(200),
@@ -19,6 +23,15 @@ const convSchema = z.object({
   isActive: z.boolean().optional(),
   /** Curso que da acceso. Vacío = convocatoria abierta a cualquiera. */
   courseId: z.string().uuid().nullish(),
+  // Datos del documento oficial de convocatoria (todos opcionales).
+  organismo: z.string().max(200).nullish(),
+  plazas: z.number().int().min(0).max(100000).nullish(),
+  fechaPublicacion: FECHA.or(z.literal('')).nullish(),
+  plazoDesde: FECHA.or(z.literal('')).nullish(),
+  plazoHasta: FECHA.or(z.literal('')).nullish(),
+  requisitos: z.string().max(5000).nullish(),
+  basesUrl: z.string().max(500).nullish(),
+  boletinRef: z.string().max(200).nullish(),
 });
 
 /** GET /api/admin/convocatorias */
@@ -108,9 +121,13 @@ export async function createConvocatoria(req: Request, res: Response): Promise<v
     }
 
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO ope_convocatorias (name, comunidad, categoria, anio, descripcion, is_active, course_id)
-       VALUES ($1,$2,$3,$4,$5,COALESCE($6, TRUE),$7) RETURNING id`,
-      [d.name, d.comunidad || null, d.categoria || null, d.anio ?? null, d.descripcion || null, d.isActive, courseId],
+      `INSERT INTO ope_convocatorias
+         (name, comunidad, categoria, anio, descripcion, is_active, course_id,
+          organismo, plazas, fecha_publicacion, plazo_desde, plazo_hasta, requisitos, bases_url, boletin_ref)
+       VALUES ($1,$2,$3,$4,$5,COALESCE($6, TRUE),$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
+      [d.name, d.comunidad || null, d.categoria || null, d.anio ?? null, d.descripcion || null, d.isActive, courseId,
+       d.organismo || null, d.plazas ?? null, d.fechaPublicacion || null, d.plazoDesde || null, d.plazoHasta || null,
+       d.requisitos || null, d.basesUrl || null, d.boletinRef || null],
     );
     return { id: rows[0].id, courseId };
   });
@@ -124,6 +141,9 @@ export async function updateConvocatoria(req: Request, res: Response): Promise<v
   const map: Record<string, unknown> = {
     name: d.name, comunidad: d.comunidad, categoria: d.categoria,
     anio: d.anio, descripcion: d.descripcion, is_active: d.isActive, course_id: d.courseId,
+    organismo: d.organismo, plazas: d.plazas, fecha_publicacion: d.fechaPublicacion,
+    plazo_desde: d.plazoDesde, plazo_hasta: d.plazoHasta, requisitos: d.requisitos,
+    bases_url: d.basesUrl, boletin_ref: d.boletinRef,
   };
   const sets: string[] = [];
   const vals: unknown[] = [];
@@ -177,6 +197,48 @@ export async function setConvocatoriaBanks(req: Request, res: Response): Promise
     );
   }
   res.json({ ok: true, bancos: bankIds.length });
+}
+
+/**
+ * GET /api/admin/convocatorias/:id/documento.pdf — documento de convocatoria.
+ * Reúne los datos formales y el temario (materias de sus bancos) en un PDF.
+ */
+export async function documentoConvocatoria(req: Request, res: Response): Promise<void> {
+  const { rows } = await query<Record<string, unknown>>(
+    'SELECT * FROM ope_convocatorias WHERE id = $1', [req.params.id],
+  );
+  if (rows.length === 0) throw notFound('Convocatoria no encontrada');
+  const c = rows[0] as {
+    name: string; organismo: string | null; comunidad: string | null; categoria: string | null;
+    anio: number | null; plazas: number | null; fecha_publicacion: string | null; plazo_desde: string | null;
+    plazo_hasta: string | null; requisitos: string | null; descripcion: string | null;
+    bases_url: string | null; boletin_ref: string | null;
+  };
+
+  // Temario orientativo: materias distintas de las preguntas de sus bancos.
+  const temas = await query<{ tema: string }>(
+    `SELECT DISTINCT q.tema
+       FROM questions q
+       JOIN ope_convocatoria_banks cb ON cb.bank_id = q.bank_id
+      WHERE cb.convocatoria_id = $1 AND q.is_active AND q.tema IS NOT NULL AND q.tema <> ''
+      ORDER BY q.tema`,
+    [req.params.id],
+  );
+
+  const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true });
+  res.setHeader('Content-Type', 'application/pdf');
+  const slug = c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'convocatoria';
+  res.setHeader('Content-Disposition', `attachment; filename="convocatoria-${slug}.pdf"`);
+  doc.pipe(res);
+  renderConvocatoria(doc, {
+    name: c.name, organismo: c.organismo, comunidad: c.comunidad, categoria: c.categoria,
+    anio: c.anio, plazas: c.plazas, fechaPublicacion: c.fecha_publicacion, plazoDesde: c.plazo_desde,
+    plazoHasta: c.plazo_hasta, requisitos: c.requisitos, descripcion: c.descripcion,
+    basesUrl: c.bases_url, boletinRef: c.boletin_ref,
+    temario: temas.rows.map((r) => r.tema),
+    generadoEl: new Date().toISOString(),
+  });
+  doc.end();
 }
 
 /**

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
 import { useSession } from '@/hooks/useSession';
 import { adminNav } from '@/lib/nav';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, downloadFile } from '@/lib/api';
 import { COMUNIDADES, CATEGORIAS } from '@/lib/sanidad';
 
 /**
@@ -20,11 +20,19 @@ interface Convocatoria {
   anio: number | null; descripcion: string | null; is_active: boolean;
   course_id: string | null; curso_titulo: string | null;
   curso_estado: string | null; curso_matricula: boolean | null;
+  organismo: string | null; plazas: number | null; fecha_publicacion: string | null;
+  plazo_desde: string | null; plazo_hasta: string | null; requisitos: string | null;
+  bases_url: string | null; boletin_ref: string | null;
   bancos: Array<{ id: string; name: string; preguntas: number }>;
 }
 interface Curso { id: string; title: string; status: string }
 
-const VACIA = { name: '', comunidad: '', categoria: '', anio: '', descripcion: '', courseId: '' };
+const VACIA = {
+  name: '', comunidad: '', categoria: '', anio: '', descripcion: '', courseId: '',
+  organismo: '', plazas: '', fechaPublicacion: '', plazoDesde: '', plazoHasta: '',
+  requisitos: '', basesUrl: '', boletinRef: '',
+};
+const soloFecha = (v: string | null) => (v ? String(v).slice(0, 10) : '');
 
 export default function ConvocatoriasPage() {
   const user = useSession(['super_admin'], '/login/admin');
@@ -63,6 +71,14 @@ export default function ConvocatoriasPage() {
       anio: form.anio ? Number(form.anio) : null,
       descripcion: form.descripcion || null,
       courseId: form.courseId || null,
+      organismo: form.organismo || null,
+      plazas: form.plazas ? Number(form.plazas) : null,
+      fechaPublicacion: form.fechaPublicacion || null,
+      plazoDesde: form.plazoDesde || null,
+      plazoHasta: form.plazoHasta || null,
+      requisitos: form.requisitos || null,
+      basesUrl: form.basesUrl || null,
+      boletinRef: form.boletinRef || null,
     };
     try {
       if (editando) {
@@ -170,6 +186,72 @@ export default function ConvocatoriasPage() {
                 <strong> publicarlo</strong> desde su ficha.
               </p>
             </div>
+
+            {/* Datos del documento de convocatoria (todos opcionales). */}
+            <details style={{ marginBottom: 14 }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 14 }}>
+                Documento de convocatoria <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>· datos para el PDF (opcional)</span>
+              </summary>
+              <div style={{ marginTop: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Organismo convocante</label>
+                  <input className="form-input" value={form.organismo}
+                    onChange={(e) => setForm({ ...form, organismo: e.target.value })}
+                    placeholder="Servicio Canario de la Salud" />
+                </div>
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Plazas</label>
+                    <input className="form-input" type="number" min={0} value={form.plazas}
+                      onChange={(e) => setForm({ ...form, plazas: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Fecha de publicación</label>
+                    <input className="form-input" type="date" value={form.fechaPublicacion}
+                      onChange={(e) => setForm({ ...form, fechaPublicacion: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Plazo: desde</label>
+                    <input className="form-input" type="date" value={form.plazoDesde}
+                      onChange={(e) => setForm({ ...form, plazoDesde: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Plazo: hasta</label>
+                    <input className="form-input" type="date" value={form.plazoHasta}
+                      onChange={(e) => setForm({ ...form, plazoHasta: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Requisitos</label>
+                  <textarea className="form-input" style={{ height: 70, padding: 10 }} value={form.requisitos}
+                    onChange={(e) => setForm({ ...form, requisitos: e.target.value })}
+                    placeholder="Titulación exigida, requisitos generales…" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Descripción</label>
+                  <textarea className="form-input" style={{ height: 60, padding: 10 }} value={form.descripcion}
+                    onChange={(e) => setForm({ ...form, descripcion: e.target.value })} />
+                </div>
+                <div className="grid grid-2" style={{ gap: 12 }}>
+                  <div className="form-group">
+                    <label className="form-label">Referencia del boletín</label>
+                    <input className="form-input" value={form.boletinRef}
+                      onChange={(e) => setForm({ ...form, boletinRef: e.target.value })}
+                      placeholder="BOC nº 123, 01/03/2026" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Enlace a las bases</label>
+                    <input className="form-input" value={form.basesUrl}
+                      onChange={(e) => setForm({ ...form, basesUrl: e.target.value })}
+                      placeholder="https://…" />
+                  </div>
+                </div>
+                <p className="muted" style={{ fontSize: 12 }}>
+                  El temario del PDF se genera solo, a partir de las materias de los bancos asignados.
+                </p>
+              </div>
+            </details>
+
             <button className="btn btn-primary btn-full">{editando ? 'Guardar cambios' : 'Crear convocatoria'}</button>
           </form>
         </div>
@@ -206,8 +288,14 @@ export default function ConvocatoriasPage() {
                       name: c.name, comunidad: c.comunidad ?? '', categoria: c.categoria ?? '',
                       anio: c.anio ? String(c.anio) : '', descripcion: c.descripcion ?? '',
                       courseId: c.course_id ?? '',
+                      organismo: c.organismo ?? '', plazas: c.plazas != null ? String(c.plazas) : '',
+                      fechaPublicacion: soloFecha(c.fecha_publicacion), plazoDesde: soloFecha(c.plazo_desde),
+                      plazoHasta: soloFecha(c.plazo_hasta), requisitos: c.requisitos ?? '',
+                      basesUrl: c.bases_url ?? '', boletinRef: c.boletin_ref ?? '',
                     });
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}>Editar</button>{' · '}
+                  <button className="link-action" onClick={() => downloadFile(`/api/admin/convocatorias/${c.id}/documento.pdf`, `convocatoria-${c.name}.pdf`)} title="Descargar el documento de convocatoria (PDF)">📄 Documento</button>{' · '}
                   <button className="link-action danger" onClick={() => borrar(c)}>Borrar</button>
                 </div>
               </div>
