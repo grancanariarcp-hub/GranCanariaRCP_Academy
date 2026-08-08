@@ -334,7 +334,7 @@ export async function listQuestions(req: Request, res: Response): Promise<void> 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   const { rows } = await query(
     `SELECT q.id, q.category, q.audiences, q.qtype, q.difficulty, q.text, q.tema, q.is_critical, q.is_active,
-            q.image_key, q.video_url, q.created_at, b.name AS bank_name
+            q.image_key, q.video_url, q.created_at, b.name AS bank_name, b.visibility AS bank_visibility
      FROM questions q LEFT JOIN question_banks b ON b.id = q.bank_id
      ${where.replace(/(category|audiences|qtype|bank_id|image_key|video_url)/g, 'q.$1')}
      ORDER BY q.created_at DESC

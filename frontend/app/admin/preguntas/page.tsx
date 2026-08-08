@@ -10,6 +10,8 @@ type Level = 'SVB' | 'SVI' | 'SVA';
 type Audience = 'ninos' | 'jovenes' | 'adultos';
 type QType = 'teorica' | 'caso_clinico';
 
+type Visibility = 'privado' | 'publico' | 'restringido';
+
 interface QuestionRow {
   id: string;
   category: Level;
@@ -17,13 +19,22 @@ interface QuestionRow {
   qtype: QType;
   difficulty: number;
   text: string;
+  tema: string | null;
   is_critical: boolean;
+  bank_name: string | null;
+  bank_visibility: Visibility | null;
 }
 
 const AUDIENCE_LABEL: Record<Audience, string> = {
   ninos: '👶 Niños',
   jovenes: '🧑 Jóvenes',
   adultos: '👨 Adultos',
+};
+
+const VIS_LABEL: Record<Visibility, string> = {
+  privado: '🔒 Privado',
+  publico: '🌐 Público',
+  restringido: '👥 Restringido',
 };
 
 export default function PreguntasPage() {
@@ -35,6 +46,10 @@ export default function PreguntasPage() {
   const [tema, setTema] = useState('');
   const [qImage, setQImage] = useState<File | null>(null);
   const [filterMedia, setFilterMedia] = useState('');
+  // Filtros del listado (en cliente, sobre lo ya cargado): nivel, tema, visibilidad.
+  const [fNivel, setFNivel] = useState<'' | Level>('');
+  const [fTema, setFTema] = useState('');
+  const [fVis, setFVis] = useState<'' | Visibility>('');
   const [category, setCategory] = useState<Level>('SVB');
   const [audiences, setAudiences] = useState<Audience[]>(['jovenes', 'adultos']);
   const [qtype, setQtype] = useState<QType>('teorica');
@@ -198,6 +213,15 @@ export default function PreguntasPage() {
       setSaving(false);
     }
   }
+
+  // Temas presentes en lo cargado, para el desplegable de filtro.
+  const temasDisponibles = Array.from(new Set(list.map((q) => q.tema).filter((t): t is string => !!t))).sort((a, b) => a.localeCompare(b, 'es'));
+  // Filtros de nivel/tema/visibilidad aplicados en cliente sobre la lista.
+  const listaFiltrada = list.filter((q) =>
+    (!fNivel || q.category === fNivel) &&
+    (!fTema || q.tema === fTema) &&
+    (!fVis || q.bank_visibility === fVis),
+  );
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
@@ -479,10 +503,11 @@ export default function PreguntasPage() {
         <div className="card">
           <div className="card-header">
             <div className="card-title">Banco de preguntas</div>
-            <div className="card-subtitle">{list.length} preguntas</div>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-            <span className="muted" style={{ fontSize: 13 }}>Filtrar:</span>
+
+          {/* Filtro por soporte (servidor) + nivel/tema/visibilidad (cliente). */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+            <span className="muted" style={{ fontSize: 13 }}>Soporte:</span>
             {([['', 'Todas'], ['any', 'Con imagen o vídeo'], ['imagen', 'Con imagen'], ['video', 'Con vídeo']] as Array<[string, string]>).map(([v, label]) => (
               <button key={v} type="button" className="link-action"
                 style={{ fontWeight: filterMedia === v ? 700 : 400 }}
@@ -491,31 +516,58 @@ export default function PreguntasPage() {
               </button>
             ))}
           </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+            <select className="form-select" style={{ width: 'auto', minWidth: 120 }} value={fNivel} onChange={(e) => setFNivel(e.target.value as '' | Level)}>
+              <option value="">Nivel: todos</option>
+              <option value="SVB">SVB · Básico</option>
+              <option value="SVI">SVI · Intermedio</option>
+              <option value="SVA">SVA · Avanzado</option>
+            </select>
+            <select className="form-select" style={{ width: 'auto', minWidth: 140 }} value={fTema} onChange={(e) => setFTema(e.target.value)}>
+              <option value="">Tema: todos</option>
+              {temasDisponibles.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select className="form-select" style={{ width: 'auto', minWidth: 150 }} value={fVis} onChange={(e) => setFVis(e.target.value as '' | Visibility)}>
+              <option value="">Visibilidad: todas</option>
+              <option value="publico">🌐 Público</option>
+              <option value="restringido">👥 Restringido</option>
+              <option value="privado">🔒 Privado</option>
+            </select>
+            {(fNivel || fTema || fVis) && (
+              <button type="button" className="link-action" onClick={() => { setFNivel(''); setFTema(''); setFVis(''); }}>Limpiar</button>
+            )}
+            <span className="muted" style={{ fontSize: 13, marginLeft: 'auto' }}>{listaFiltrada.length} de {list.length}</span>
+          </div>
+
           <div className="table-responsive">
             <table>
               <thead>
                 <tr>
                   <th>Nivel</th>
+                  <th>Tema</th>
+                  <th>Visib.</th>
                   <th>Público</th>
                   <th>Tipo</th>
                   <th>Enunciado</th>
                 </tr>
               </thead>
               <tbody>
-                {list.map((q) => (
+                {listaFiltrada.map((q) => (
                   <tr key={q.id}>
                     <td>
                       <span className="badge badge-primary">{q.category}</span>
                     </td>
+                    <td style={{ fontSize: 12 }}>{q.tema || '—'}</td>
+                    <td style={{ fontSize: 12 }} title={q.bank_name ?? ''}>{q.bank_visibility ? VIS_LABEL[q.bank_visibility].split(' ')[0] : '—'}</td>
                     <td style={{ fontSize: 12 }}>{q.audiences.map((a) => AUDIENCE_LABEL[a].split(' ')[0]).join(' ')}</td>
                     <td style={{ fontSize: 12 }}>{q.qtype === 'caso_clinico' ? '🩺' : '📘'}</td>
                     <td style={{ fontSize: 13 }}>{q.text.length > 60 ? q.text.slice(0, 60) + '…' : q.text}</td>
                   </tr>
                 ))}
-                {list.length === 0 && (
+                {listaFiltrada.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="empty-state">
-                      Aún no hay preguntas en este banco.
+                    <td colSpan={6} className="empty-state">
+                      {list.length === 0 ? 'Aún no hay preguntas en este banco.' : 'Ninguna pregunta coincide con los filtros.'}
                     </td>
                   </tr>
                 )}
