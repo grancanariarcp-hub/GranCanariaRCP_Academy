@@ -306,7 +306,7 @@ export async function deleteModule(req: Request, res: Response): Promise<void> {
 // Activities
 // ---------------------------------------------------------------------------
 const addActivitySchema = z.object({
-  type: z.enum(['documento', 'video', 'enlace', 'texto']),
+  type: z.enum(['documento', 'video', 'enlace', 'texto', 'videoconferencia']),
   title: z.string().min(2).max(200),
   documentId: z.string().uuid().optional(),
   url: z.string().url('URL no válida').optional(),

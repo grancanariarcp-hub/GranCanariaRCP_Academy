@@ -21,6 +21,7 @@ import institutionRoutes from './routes/institution.routes.js';
 import documentsRoutes from './routes/documents.routes.js';
 import questionsRoutes from './routes/questions.routes.js';
 import maestroRoutes from './routes/maestro.routes.js';
+import videoRoutes from './routes/video.routes.js';
 import { stripeWebhook } from './controllers/payment.controller.js';
 import { enviarRecordatorios } from './controllers/reminders.controller.js';
 import { asyncHandler } from './utils/asyncHandler.js';
@@ -91,6 +92,7 @@ app.use('/api/institution', institutionRoutes);
 app.use('/api/documents', documentsRoutes);
 app.use('/api/questions', questionsRoutes);
 app.use('/api/maestro', maestroRoutes);
+app.use('/api/video', videoRoutes);
 
 // 404 + central error handler (must be last)
 app.use(notFoundHandler);

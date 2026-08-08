@@ -68,6 +68,18 @@ export const env = {
       return Boolean(this.accountId && this.accessKeyId && this.secretAccessKey);
     },
   },
+
+  // LiveKit (SFU) para la videoconferencia dentro del campus. Si no está
+  // configurado, la sala avisa amablemente y la app sigue funcionando.
+  livekit: {
+    apiKey: process.env.LIVEKIT_API_KEY ?? '',
+    apiSecret: process.env.LIVEKIT_API_SECRET ?? '',
+    // wss://... (servidor LiveKit Cloud o autoalojado). El front lo recibe por env pública.
+    url: process.env.LIVEKIT_URL ?? '',
+    get configured() {
+      return Boolean(this.apiKey && this.apiSecret && this.url);
+    },
+  },
 };
 
 // In production we refuse to run with insecure defaults.

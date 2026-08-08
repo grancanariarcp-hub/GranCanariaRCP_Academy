@@ -42,6 +42,7 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "livekit-server-sdk": "^2.17.0",
     "multer": "^2.2.0",
     "pdfkit": "^0.19.1",
     "pg": "^8.12.0",

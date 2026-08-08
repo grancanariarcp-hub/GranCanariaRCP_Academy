@@ -45,6 +45,14 @@ services:
         sync: false
       - key: RESEND_FROM
         sync: false
+      # Videoconferencia (LiveKit). Claves del proyecto LiveKit Cloud o autoalojado.
+      # LIVEKIT_URL es del tipo wss://<proyecto>.livekit.cloud
+      - key: LIVEKIT_API_KEY
+        sync: false
+      - key: LIVEKIT_API_SECRET
+        sync: false
+      - key: LIVEKIT_URL
+        sync: false
       # Base pública del campus para los enlaces de los correos.
       - key: STRIPE_SECRET_KEY
         sync: false
