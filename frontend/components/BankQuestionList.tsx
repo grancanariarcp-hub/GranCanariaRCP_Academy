@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api';
 import { useDebounced } from '@/hooks/useDebounced';
+import { PreviewPregunta } from '@/components/PreviewPregunta';
 
 /**
  * Preguntas de un banco, con sus filtros.
@@ -27,6 +29,7 @@ export function BankQuestionList({ bankId, bankName }: { bankId: string; bankNam
   const [total, setTotal] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [f, setF] = useState({ tema: '', dificultad: '', qtype: '', audiencia: '', media: '', q: '' });
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   // Igual que en el listado de bancos: sin esperar, una petición por tecla.
   const fEstable = useDebounced(f);
@@ -127,14 +130,16 @@ export function BankQuestionList({ bankId, bankName }: { bankId: string; bankNam
         <div className="table-responsive" style={{ maxHeight: '55vh' }}>
           <table className="table-plain">
             <thead>
-              <tr><th>Nº</th><th>Pregunta</th><th>Materia</th><th>Dificultad</th><th>Tipo</th></tr>
+              <tr><th>Nº</th><th>Pregunta</th><th>Materia</th><th>Dificultad</th><th>Tipo</th><th></th></tr>
             </thead>
             <tbody>
               {preguntas.map((q) => (
                 <tr key={q.id}>
                   <td className="muted">{q.orden ?? '—'}</td>
                   <td>
-                    {q.text}
+                    <button className="link-action" style={{ textAlign: 'left' }} onClick={() => setPreviewId(q.id)} title="Ver como alumno">
+                      {q.text}
+                    </button>
                     <span style={{ marginLeft: 6 }}>
                       {q.con_imagen && <span className="badge" style={{ fontSize: 10 }}>imagen</span>}
                       {q.con_video && <span className="badge" style={{ fontSize: 10, marginLeft: 4 }}>vídeo</span>}
@@ -144,12 +149,18 @@ export function BankQuestionList({ bankId, bankName }: { bankId: string; bankNam
                   <td>{q.tema ?? <span className="muted">—</span>}</td>
                   <td>{q.difficulty ? (DIFICULTAD[String(q.difficulty)] ?? q.difficulty) : '—'}</td>
                   <td>{TIPO[q.qtype] ?? q.qtype}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="link-action" onClick={() => setPreviewId(q.id)}>👁 Ver</button>{' · '}
+                    <Link className="link-action" href={`/admin/preguntas?edit=${q.id}`}>Editar</Link>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {previewId && <PreviewPregunta questionId={previewId} onClose={() => setPreviewId(null)} />}
     </div>
   );
 }

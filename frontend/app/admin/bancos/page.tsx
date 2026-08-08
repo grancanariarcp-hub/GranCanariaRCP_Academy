@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, downloadFile } from '@/lib/api';
@@ -412,7 +412,8 @@ export default function BancosPage() {
               <thead><tr><th>Banco</th><th>Preguntas</th><th>Acciones</th></tr></thead>
               <tbody>
                 {banks.map((b) => (
-                  <tr key={b.id}>
+                  <Fragment key={b.id}>
+                  <tr>
                     <td>
                       <strong>{b.name}</strong>
                       <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
@@ -449,6 +450,15 @@ export default function BancosPage() {
                       </div>
                     </td>
                   </tr>
+                  {verPreguntasDe?.id === b.id && (
+                    <tr>
+                      <td colSpan={3} style={{ background: 'var(--gray-50)', padding: 12 }}>
+                        {/* Las preguntas del banco, justo debajo de su fila. */}
+                        <BankQuestionList bankId={b.id} bankName={b.name} />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))}
                 {banks.length === 0 && <tr><td colSpan={3} className="muted">Sin bancos</td></tr>}
               </tbody>
@@ -456,9 +466,6 @@ export default function BancosPage() {
           </div>
         </div>
       </div>
-
-      {/* Preguntas del banco, con sus propios filtros */}
-      {verPreguntasDe && <BankQuestionList bankId={verPreguntasDe.id} bankName={verPreguntasDe.name} />}
 
       {/* Importar preguntas al banco seleccionado */}
       {selBank && (

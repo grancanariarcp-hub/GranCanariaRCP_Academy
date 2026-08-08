@@ -5,7 +5,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
-import { VideoEmbed } from '@/components/VideoEmbed';
+import { PreviewPregunta } from '@/components/PreviewPregunta';
 
 type Level = 'SVB' | 'SVI' | 'SVA';
 type Audience = 'ninos' | 'jovenes' | 'adultos';
@@ -56,58 +56,6 @@ const AUDIENCE_LABEL: Record<Audience, string> = {
   adultos: '👨 Adultos',
 };
 
-/** Previsualización de una pregunta tal como la ve el alumno (con la correcta marcada). */
-function PreviewAlumno({ q, onClose }: { q: FullQuestion; onClose: () => void }) {
-  return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
-      <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div className="card-title">Vista del alumno</div>
-          <button className="btn btn-outline btn-small" onClick={onClose}>Cerrar</button>
-        </div>
-        <div className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
-          Así se ve al responderla. La opción correcta va resaltada (el alumno no la ve hasta corregir).
-        </div>
-
-        {q.qtype === 'caso_clinico' && q.clinical_context && (
-          <div className="info-box" style={{ marginBottom: 12 }}>{q.clinical_context}</div>
-        )}
-        {q.image_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={q.image_url} alt="" style={{ maxWidth: '100%', borderRadius: 10, marginBottom: 12 }} />
-        )}
-        {q.video_url && <div style={{ marginBottom: 12 }}><VideoEmbed url={q.video_url} /></div>}
-
-        <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 12 }}>{q.text}</div>
-
-        <div style={{ display: 'grid', gap: 8 }}>
-          {q.options.map((op, i) => {
-            const correcta = i === q.correct_index;
-            return (
-              <div key={i} style={{
-                padding: '10px 12px', borderRadius: 10,
-                border: `1.5px solid ${correcta ? 'var(--success)' : 'var(--gray-200)'}`,
-                background: correcta ? 'rgba(39,103,73,0.08)' : '#fff',
-                display: 'flex', gap: 10, alignItems: 'center',
-              }}>
-                <span style={{ fontWeight: 700, color: correcta ? 'var(--success)' : 'var(--text-secondary)' }}>{String.fromCharCode(65 + i)}</span>
-                <span style={{ flex: 1 }}>{op}</span>
-                {correcta && <span className="badge badge-success">correcta</span>}
-              </div>
-            );
-          })}
-        </div>
-
-        {q.explanation && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Explicación (debriefing)</div>
-            <div className="info-box" style={{ fontSize: 13.5 }}>{q.explanation}</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 const VIS_LABEL: Record<Visibility, string> = {
   privado: '🔒 Privado',
@@ -131,7 +79,7 @@ export default function PreguntasPage() {
   // Edición de una pregunta existente + previsualización «como alumno».
   const [editId, setEditId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const [preview, setPreview] = useState<FullQuestion | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [category, setCategory] = useState<Level>('SVB');
   const [audiences, setAudiences] = useState<Audience[]>(['jovenes', 'adultos']);
   const [qtype, setQtype] = useState<QType>('teorica');
@@ -183,6 +131,14 @@ export default function PreguntasPage() {
   }
   useEffect(() => {
     if (user) loadList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Enlace directo desde las preguntas de un banco: /admin/preguntas?edit=<id>.
+  useEffect(() => {
+    if (!user) return;
+    const eid = new URLSearchParams(window.location.search).get('edit');
+    if (eid) editar(eid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
@@ -257,14 +213,8 @@ export default function PreguntasPage() {
     resetForm();
   }
 
-  async function verComoAlumno(id: string) {
-    setMsg(null);
-    try {
-      const { question } = await api<{ question: FullQuestion }>(`/api/questions/${id}`, { auth: true });
-      setPreview(question);
-    } catch (err) {
-      setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'No se pudo previsualizar' });
-    }
+  function verComoAlumno(id: string) {
+    setPreviewId(id);
   }
 
   async function handleImport(file: File | undefined) {
@@ -734,7 +684,7 @@ export default function PreguntasPage() {
         </div>
 
       {/* ---------------- Previsualización «como alumno» ---------------- */}
-      {preview && <PreviewAlumno q={preview} onClose={() => setPreview(null)} />}
+      {previewId && <PreviewPregunta questionId={previewId} onClose={() => setPreviewId(null)} />}
     </AppShell>
   );
 }
