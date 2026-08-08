@@ -316,7 +316,7 @@ const addActivitySchema = z.object({
   // Evaluable: el profesor decide si esta actividad cuenta como calificación y
   // con qué método (finalización = apto al completarla, manual = pone la nota).
   evaluable: z.boolean().optional().default(false),
-  metodoEval: z.enum(['examen', 'finalizacion', 'manual']).nullable().optional(),
+  metodoEval: z.enum(['examen', 'finalizacion', 'manual', 'foro']).nullable().optional(),
 });
 
 /**
@@ -397,7 +397,7 @@ export async function setActivityEval(req: Request, res: Response): Promise<void
   await assertEditor(req);
   const d = z.object({
     evaluable: z.boolean(),
-    metodoEval: z.enum(['examen', 'finalizacion', 'manual']).nullable().optional(),
+    metodoEval: z.enum(['examen', 'finalizacion', 'manual', 'foro']).nullable().optional(),
   }).parse(req.body);
   const metodo = d.evaluable ? (d.metodoEval ?? 'finalizacion') : null;
   const { rows } = await query(

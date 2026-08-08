@@ -3,7 +3,7 @@ import { query } from '../config/database.js';
 import { badRequest, forbidden, notFound, HttpError } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
-import { withImageUrls } from '../services/r2.js';
+import { withImageUrls, presignedGetUrl } from '../services/r2.js';
 import { notifyCourseStaff } from '../services/notify.js';
 import { precioDe } from '../services/pricing.js';
 
@@ -143,6 +143,8 @@ export async function misCalificaciones(req: Request, res: Response): Promise<vo
             (SELECT MAX(score) FROM exam_attempts ea WHERE ea.exam_id = a.exam_id AND ea.student_id = $1) AS examen_score,
             (SELECT bool_or(passed) FROM exam_attempts ea WHERE ea.exam_id = a.exam_id AND ea.student_id = $1) AS examen_apto,
             EXISTS (SELECT 1 FROM activity_completions ac WHERE ac.activity_id = a.id AND ac.student_id = $1) AS completada,
+            EXISTS (SELECT 1 FROM forum_posts fp JOIN forum_threads ft ON ft.id = fp.thread_id
+                     WHERE ft.module_id = m.id AND fp.author_id = $1 AND fp.author_type = 'student') AS foro_ok,
             g.nota AS manual_nota, g.apto AS manual_apto
        FROM enrollments e
        JOIN courses c ON c.id = e.course_id
@@ -245,4 +247,32 @@ export async function setActivityCompleted(req: Request, res: Response): Promise
     await query('DELETE FROM activity_completions WHERE student_id = $1 AND activity_id = $2', [req.auth!.sub, activityId]);
   }
   res.json({ ok: true, completed });
+}
+
+/**
+ * GET /api/student/courses/:courseId/documents/:activityId/url
+ * Enlace firmado para ver/descargar el documento de una actividad, si el alumno
+ * está matriculado. Abrirlo marca la actividad como hecha (auto-completado).
+ */
+export async function getStudentDocumentUrl(req: Request, res: Response): Promise<void> {
+  const { courseId, activityId } = req.params;
+  const enr = await query(
+    "SELECT 1 FROM enrollments WHERE student_id = $1 AND course_id = $2 AND status IN ('activo','completado')",
+    [req.auth!.sub, courseId],
+  );
+  if (enr.rows.length === 0) throw forbidden('No estás matriculado en este curso');
+  const a = await query<{ storage_key: string | null }>(
+    `SELECT d.storage_key FROM activities a JOIN documents d ON d.id = a.document_id
+      WHERE a.id = $1 AND a.type = 'documento' AND a.module_id IN (SELECT id FROM modules WHERE course_id = $2)`,
+    [activityId, courseId],
+  );
+  if (a.rows.length === 0 || !a.rows[0].storage_key) throw notFound('Documento no disponible');
+  const url = await presignedGetUrl(a.rows[0].storage_key, 600);
+  // Abrir el documento cuenta como haberlo realizado (método «hecho»).
+  await query(
+    `INSERT INTO activity_completions (student_id, activity_id) VALUES ($1,$2)
+     ON CONFLICT (student_id, activity_id) DO NOTHING`,
+    [req.auth!.sub, activityId],
+  ).catch(() => { /* que abrir no falle por el registro */ });
+  res.json({ url });
 }

@@ -13,10 +13,11 @@ interface Item {
   course_title: string;
   modulo: string;
   actividad: string;
-  metodo_eval: 'examen' | 'finalizacion' | 'manual' | null;
+  metodo_eval: 'examen' | 'finalizacion' | 'manual' | 'foro' | null;
   examen_score: number | null;
   examen_apto: boolean | null;
   completada: boolean;
+  foro_ok: boolean;
   manual_nota: number | string | null;
   manual_apto: boolean | null;
 }
@@ -28,6 +29,9 @@ function Resultado({ it }: { it: Item }) {
   }
   if (it.metodo_eval === 'finalizacion') {
     return it.completada ? <span className="badge badge-success">Hecho ✓</span> : <span className="badge badge-warning">Pendiente</span>;
+  }
+  if (it.metodo_eval === 'foro') {
+    return it.foro_ok ? <span className="badge badge-success">Participó ✓</span> : <span className="badge badge-warning">Falta participar</span>;
   }
   if (it.metodo_eval === 'manual') {
     if (it.manual_nota == null && it.manual_apto == null) return <span className="muted">Sin calificar</span>;

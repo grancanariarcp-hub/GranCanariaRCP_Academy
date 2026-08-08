@@ -181,7 +181,7 @@ export default function CourseDetailPage() {
   const [actBody, setActBody] = useState('');
   const [actDuracion, setActDuracion] = useState(''); // minutos, sobre todo para vídeos (CFC)
   const [actEvaluable, setActEvaluable] = useState(false);
-  const [actMetodo, setActMetodo] = useState<'finalizacion' | 'manual'>('finalizacion');
+  const [actMetodo, setActMetodo] = useState<'finalizacion' | 'manual' | 'foro'>('finalizacion');
   // Panel de calificación manual de una actividad
   const [gradeAct, setGradeAct] = useState<{ id: string; title: string } | null>(null);
   const [gradeAlumnos, setGradeAlumnos] = useState<Array<{ student_id: string; nombre: string; nota: number | string | null; apto: boolean | null }>>([]);
@@ -1129,8 +1129,9 @@ export default function CourseDetailPage() {
                             <select className="form-select" style={{ width: 'auto', height: 28, fontSize: 12, padding: '0 6px' }}
                               value={a.evaluable ? (a.metodo_eval ?? 'finalizacion') : 'no'} onChange={(e) => cambiarEval(a, e.target.value)} title="¿Cuenta como calificación?">
                               <option value="no">No evaluable</option>
-                              <option value="finalizacion">Eval: finalización</option>
+                              <option value="finalizacion">Eval: finalización (hecho)</option>
                               <option value="manual">Eval: nota manual</option>
+                              <option value="foro">Eval: participación en foro</option>
                             </select>
                           )}
                           {a.evaluable && a.metodo_eval === 'manual' && (
@@ -1210,8 +1211,9 @@ export default function CourseDetailPage() {
                           </label>
                           {actEvaluable && (
                             <select className="form-select" style={{ marginTop: 8 }} value={actMetodo} onChange={(e) => setActMetodo(e.target.value as typeof actMetodo)}>
-                              <option value="finalizacion">Por finalización — apto al completarla</option>
+                              <option value="finalizacion">Por finalización — apto al completarla (hecho)</option>
                               <option value="manual">Nota manual — la pones tú por alumno</option>
+                              <option value="foro">Participación en el foro del módulo</option>
                             </select>
                           )}
                         </div>

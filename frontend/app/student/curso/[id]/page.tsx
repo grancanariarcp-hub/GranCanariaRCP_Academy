@@ -85,6 +85,26 @@ export default function StudentCoursePage() {
       setError(err instanceof ApiError ? err.message : 'Error');
     }
   }
+  // Marca una actividad como hecha (idempotente): la usa el vídeo al reproducirse.
+  async function marcarHecho(a: Activity) {
+    if (a.completed) return;
+    try {
+      await api(`/api/student/courses/${courseId}/activities/${a.id}/complete`, {
+        method: 'POST', auth: true, body: JSON.stringify({ completed: true }),
+      });
+      reload();
+    } catch { /* silencioso: no molestar mientras ve el vídeo */ }
+  }
+  // Abrir un documento: pide el enlace firmado, lo abre y queda marcado como hecho.
+  async function verDocumento(a: Activity) {
+    try {
+      const r = await api<{ url: string }>(`/api/student/courses/${courseId}/documents/${a.id}/url`, { auth: true });
+      window.open(r.url, '_blank', 'noopener');
+      reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo abrir el documento');
+    }
+  }
 
   async function downloadCertificate() {
     try {
@@ -176,7 +196,14 @@ export default function StudentCoursePage() {
 
       {modules.map((m) => (
         <div className="card" key={m.id} style={{ marginBottom: 16 }}>
-          <div className="card-header"><div className="card-title">{m.title}</div></div>
+          <div className="card-header">
+            <div className="card-title">
+              {m.title}
+              {m.activities.length > 0 && (m.activities.every((x) => x.completed)
+                ? <span className="badge badge-success" style={{ marginLeft: 8, fontSize: 10.5 }}>Módulo completado ✓</span>
+                : <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{m.activities.filter((x) => x.completed).length}/{m.activities.length}</span>)}
+            </div>
+          </div>
           {m.activities.length === 0 ? (
             <div className="muted">Este módulo aún no tiene contenido.</div>
           ) : (
@@ -195,16 +222,17 @@ export default function StudentCoursePage() {
                 ) : a.type === 'video' ? (
                   <div>
                     <div style={{ fontWeight: 600, marginBottom: 8 }}>{TYPE_ICON.video} {a.title}</div>
-                    {/* El vídeo se reproduce aquí mismo: el alumno no sale del campus. */}
-                    <VideoEmbed url={a.url} title={a.title} />
+                    {/* El vídeo se reproduce aquí mismo: el alumno no sale del campus.
+                        Al darle play se marca la actividad como hecha. */}
+                    <VideoEmbed url={a.url} title={a.title} onPlay={() => marcarHecho(a)} />
                   </div>
                 ) : (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>{TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}</span>
                     {a.type === 'enlace' && a.url ? (
-                      <a className="btn btn-primary btn-small" href={a.url} target="_blank" rel="noreferrer">Abrir</a>
+                      <a className="btn btn-primary btn-small" href={a.url} target="_blank" rel="noreferrer" onClick={() => marcarHecho(a)}>Abrir</a>
                     ) : a.type === 'documento' ? (
-                      <span className="badge badge-primary">Documento</span>
+                      <button className="btn btn-primary btn-small" onClick={() => verDocumento(a)}>Ver documento</button>
                     ) : (a.type === 'test' || a.type === 'examen') && a.exam_id ? (
                       <Link className="btn btn-primary btn-small" href={`/student/curso/${courseId}/examen/${a.exam_id}`}>Realizar</Link>
                     ) : null}
