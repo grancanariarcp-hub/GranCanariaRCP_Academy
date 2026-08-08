@@ -67,29 +67,30 @@ export function PerfilDocenteEditor({ onGuardado }: { onGuardado?: () => void })
       {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
 
       <form onSubmit={guardar}>
-        <div className="form-group">
-          <label className="form-label" htmlFor="pd-headline">Titular profesional</label>
-          <input id="pd-headline" className="form-input" maxLength={160} value={headline}
-            onChange={(e) => setHeadline(e.target.value)}
-            placeholder="Enfermero de UCI · Instructor de SVA" />
-          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            Una línea. Es lo primero que lee quien se plantea matricularse en tu curso.
-          </p>
+        <div className="grid grid-2" style={{ gap: 12 }}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="pd-headline">Titular profesional</label>
+            <input id="pd-headline" className="form-input" maxLength={160} value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              placeholder="Enfermero de UCI · Instructor de SVA" />
+            <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              Una línea. Lo primero que lee quien se plantea matricularse.
+            </p>
+          </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="pd-prof">Profesión sanitaria</label>
+            <input id="pd-prof" className="form-input" maxLength={120} value={profession}
+              onChange={(e) => setProfession(e.target.value)}
+              placeholder="Médico · Enfermero · Técnico de emergencias" />
+          </div>
         </div>
 
         <div className="form-group">
-          <label className="form-label" htmlFor="pd-prof">Profesión sanitaria</label>
-          <input id="pd-prof" className="form-input" maxLength={120} value={profession}
-            onChange={(e) => setProfession(e.target.value)}
-            placeholder="Médico · Enfermero · Técnico de emergencias" />
-        </div>
-
-        <div className="form-group">
-          <label className="form-label" htmlFor="pd-dni">Documento (DNI, NIE o pasaporte)</label>
+          <label className="form-label" htmlFor="pd-dni">Documento (DNI, NIE o pasaporte) <span className="muted" style={{ fontWeight: 400 }}>· privado</span></label>
           <input id="pd-dni" className="form-input" maxLength={30} value={dni}
             onChange={(e) => setDni(e.target.value)} placeholder="Figura en las actas que firmas" />
           <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            Se usa en las actas y, en cursos con práctica, para identificarte en PÚLSAR.
+            <strong>No lo ven los alumnos.</strong> Se usa en las actas y, en cursos con práctica, para identificarte en PÚLSAR.
           </p>
         </div>
 
