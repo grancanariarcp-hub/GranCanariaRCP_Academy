@@ -1312,15 +1312,27 @@ summary:focus-visible,
   border: none;
   border-bottom: 3px solid transparent;
   margin-bottom: -2px;
-  background: transparent;
-  color: var(--gray-600);
+  border-radius: 8px 8px 0 0;
+  background: rgba(var(--tab-c, 74, 85, 104), 0.11);
+  color: var(--gray-700);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
-.ficha-tab:hover { color: var(--primary-dark); }
+/* Cada pestaña un color de fondo distinto (paleta corporativa apagada) para
+   reconocerlas de un vistazo sin recargar. El tono se cicla cada 8 pestañas. */
+.ficha-tab:nth-child(8n+1) { --tab-c: 44, 82, 130; }   /* azul */
+.ficha-tab:nth-child(8n+2) { --tab-c: 44, 122, 123; }  /* verde azulado */
+.ficha-tab:nth-child(8n+3) { --tab-c: 39, 103, 73; }   /* verde */
+.ficha-tab:nth-child(8n+4) { --tab-c: 151, 90, 22; }   /* ámbar */
+.ficha-tab:nth-child(8n+5) { --tab-c: 85, 60, 154; }   /* púrpura */
+.ficha-tab:nth-child(8n+6) { --tab-c: 155, 44, 44; }   /* granate */
+.ficha-tab:nth-child(8n+7) { --tab-c: 8, 111, 131; }   /* cian */
+.ficha-tab:nth-child(8n)   { --tab-c: 74, 85, 104; }   /* pizarra */
+.ficha-tab:hover { background: rgba(var(--tab-c, 74, 85, 104), 0.20); color: rgb(var(--tab-c, 44, 82, 130)); }
 .ficha-tab-on {
-  color: var(--primary-dark);
-  border-bottom-color: var(--primary-dark);
+  background: rgba(var(--tab-c, 44, 82, 130), 0.22);
+  color: rgb(var(--tab-c, 44, 82, 130));
+  border-bottom-color: rgb(var(--tab-c, 44, 82, 130));
 }
 .ficha-dot {
   display: inline-block;
