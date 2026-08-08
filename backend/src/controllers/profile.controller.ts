@@ -46,6 +46,19 @@ export async function misInvitaciones(req: Request, res: Response): Promise<void
 export async function responderInvitacion(req: Request, res: Response): Promise<void> {
   if (req.auth!.role === 'student') throw badRequest('No disponible', 'NOT_ALLOWED');
   const { accion } = z.object({ accion: z.enum(['aceptar', 'rechazar']) }).parse(req.body);
+  // Red de seguridad: aunque al invitar ya se exige el perfil completo, una
+  // invitación antigua podría seguir pendiente. Para ACEPTAR y entrar como
+  // docente, el perfil debe estar completo; rechazar siempre se puede.
+  if (accion === 'aceptar') {
+    const perfil = await estadoPerfilDocente(req.auth!.sub);
+    if (!perfil.completo) {
+      throw badRequest(
+        `Completa tu perfil docente para aceptar: te falta ${perfil.faltan.join(', ')}. `
+        + 'Es lo que verán los alumnos del curso.',
+        'PERFIL_INCOMPLETO',
+      );
+    }
+  }
   const nuevo = accion === 'aceptar' ? 'aceptado' : 'rechazado';
   const { rows } = await query<{ role: string }>(
     `UPDATE course_staff SET status = $1

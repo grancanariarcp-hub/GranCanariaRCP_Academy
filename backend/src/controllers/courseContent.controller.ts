@@ -454,6 +454,19 @@ export async function inviteStaff(req: Request, res: Response): Promise<void> {
   if (u.rows.length === 0) throw notFound('No hay un profesor con ese email (¿está registrado y aprobado?)');
   if (u.rows[0].status !== 'active') throw badRequest('Ese profesor aún no está activo/validado', 'NOT_ACTIVE');
 
+  // Solo se invita a quien tiene el perfil docente completo: así ningún curso
+  // acaba con un profesor a medias (es lo que ve el alumno y lo que exige la
+  // comisión). El director no puede completar el perfil de otro; se le avisa
+  // para que se lo pida al invitado.
+  const perfilInv = await estadoPerfilDocente(u.rows[0].id);
+  if (!perfilInv.completo) {
+    throw badRequest(
+      `${u.rows[0].name} todavía no tiene el perfil docente completo (le falta: ${perfilInv.faltan.join(', ')}). `
+      + 'Pídele que lo complete desde su perfil y vuelve a añadirlo.',
+      'PERFIL_INVITADO_INCOMPLETO',
+    );
+  }
+
   // El invitado nace 'pendiente' (default): no participa hasta que lo acepte.
   // Al reinvitar no se pisa un estado ya resuelto sin querer, salvo que estuviera
   // rechazado, en cuyo caso vuelve a quedar pendiente para que pueda reconsiderar.

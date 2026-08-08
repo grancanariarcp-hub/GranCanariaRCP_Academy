@@ -1229,7 +1229,8 @@ export default function CourseDetailPage() {
               </div>
 
               <div className="info-box" style={{ marginBottom: 12, fontSize: 13 }}>
-                Invita a un profesor <strong>ya registrado y aprobado</strong> por su email.
+                Invita a un profesor <strong>ya registrado, aprobado y con su perfil docente completo</strong> por su email.
+                Si le falta el perfil, tendrá que completarlo antes de poder añadirlo.
               </div>
               {inviteMsg && <div className={`alert ${inviteMsg.ok ? 'alert-success' : 'alert-error'}`}>{inviteMsg.text}</div>}
               <form onSubmit={invite}>
