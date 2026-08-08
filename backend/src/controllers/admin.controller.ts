@@ -213,6 +213,35 @@ export async function setProfessorStatus(req: Request, res: Response): Promise<v
   res.json({ professor: rows[0] });
 }
 
+const updateProfessorSchema = z.object({
+  name: z.string().min(2).max(160).optional(),
+  headline: z.string().max(160).nullish(),
+});
+
+/** PATCH /api/admin/professors/:id — corregir nombre y titular del profesor. */
+export async function updateProfessor(req: Request, res: Response): Promise<void> {
+  const data = updateProfessorSchema.parse(req.body);
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  if (data.name !== undefined) { params.push(data.name); sets.push(`name = $${params.length}`); }
+  if ('headline' in data) { params.push(data.headline || null); sets.push(`headline = $${params.length}`); }
+  if (sets.length === 0) throw badRequest('Nada que actualizar', 'NO_CHANGES');
+  params.push(req.params.id);
+  const { rows } = await query(
+    `UPDATE users SET ${sets.join(', ')}, updated_at = NOW()
+     WHERE id = $${params.length} AND role = 'profesor'
+     RETURNING id, email, name, headline, status, last_login_at, created_at`,
+    params,
+  );
+  if (rows.length === 0) throw notFound('Profesor no encontrado');
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role,
+    action: 'PROFESSOR_UPDATE', entity: 'user', entityId: req.params.id, ip: clientIp(req),
+  });
+  res.json({ professor: rows[0] });
+}
+
 const createProfessorSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2).max(160),

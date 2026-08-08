@@ -13,6 +13,7 @@ import {
   listProfessors,
   setProfessorStatus,
   createProfessor,
+  updateProfessor,
   listAuditLogs,
 } from '../controllers/admin.controller.js';
 import { uploadDocument, listDocuments, getDocumentUrl } from '../controllers/document.controller.js';
@@ -87,6 +88,7 @@ router.post('/admins', asyncHandler(createAdmin));
 
 router.get('/professors', asyncHandler(listProfessors));
 router.post('/professors', asyncHandler(createProfessor));
+router.patch('/professors/:id', asyncHandler(updateProfessor));
 router.post('/professors/:id/:action', asyncHandler(setProfessorStatus));
 
 
