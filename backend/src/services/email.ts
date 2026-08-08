@@ -32,17 +32,28 @@ export function emailTemplate(title: string, body: string | null, url?: string |
   </div>`;
 }
 
-/** Envía un email. Devuelve true si Resend lo aceptó. */
-export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
-  if (!KEY) return false;
+/**
+ * Envía un email y devuelve el detalle: si Resend lo aceptó y, si no, el motivo
+ * exacto (código + cuerpo). Sirve para diagnosticar sin adivinar (dominio sin
+ * verificar, remitente no permitido, clave inválida…).
+ */
+export async function sendEmailResult(to: string, subject: string, html: string): Promise<{ ok: boolean; error?: string }> {
+  if (!KEY) return { ok: false, error: 'Falta RESEND_API_KEY en el servidor' };
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: FROM, to, subject, html }),
     });
-    return res.ok;
-  } catch {
-    return false;
+    if (res.ok) return { ok: true };
+    const cuerpo = await res.text().catch(() => '');
+    return { ok: false, error: `Resend ${res.status}: ${cuerpo.slice(0, 400)}` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'Error de red al contactar con Resend' };
   }
+}
+
+/** Envía un email. Devuelve true si Resend lo aceptó. */
+export async function sendEmail(to: string, subject: string, html: string): Promise<boolean> {
+  return (await sendEmailResult(to, subject, html)).ok;
 }

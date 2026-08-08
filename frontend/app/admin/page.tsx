@@ -152,12 +152,12 @@ export default function AdminDashboard() {
     setMailMsg(null);
     setMailProbando(true);
     try {
-      const r = await api<{ configurado: boolean; enviado: boolean; to?: string; mensaje?: string }>(
+      const r = await api<{ configurado: boolean; enviado: boolean; to?: string; mensaje?: string; error?: string }>(
         '/api/admin/email-test', { method: 'POST', auth: true },
       );
       if (!r.configurado) setMailMsg({ ok: false, text: r.mensaje ?? 'El correo no está configurado en el servidor todavía.' });
       else if (r.enviado) setMailMsg({ ok: true, text: `Enviado a ${r.to}. Revisa tu bandeja (y spam).` });
-      else setMailMsg({ ok: false, text: 'Resend no aceptó el envío. Revisa la clave y que el dominio esté verificado.' });
+      else setMailMsg({ ok: false, text: `Resend rechazó el envío. Motivo: ${r.error ?? 'desconocido'}` });
     } catch (err) {
       setMailMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
     } finally {

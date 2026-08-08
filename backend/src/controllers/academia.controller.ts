@@ -5,7 +5,7 @@ import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { relacionConCurso } from '../services/courseAuth.js';
-import { sendEmail, emailTemplate, emailConfigured } from '../services/email.js';
+import { sendEmailResult, emailTemplate, emailConfigured } from '../services/email.js';
 
 /**
  * Servicios extras: configuración (aún no se cobra). Un valor global de la
@@ -51,12 +51,12 @@ export async function enviarCorreoPrueba(req: Request, res: Response): Promise<v
     'Si lees esto, el envío de correos de la academia funciona correctamente. Puedes ignorar este mensaje.',
     null,
   );
-  const enviado = await sendEmail(to, 'Prueba de correo · GranCanaria RCP', html);
+  const r = await sendEmailResult(to, 'Prueba de correo · GranCanaria RCP', html);
   await audit({
     actorId: req.auth!.sub, actorType: req.auth!.role, action: 'EMAIL_TEST',
-    entity: 'academy', entityId: null, ip: clientIp(req), metadata: { to, enviado },
+    entity: 'academy', entityId: null, ip: clientIp(req), metadata: { to, enviado: r.ok, error: r.error },
   }).catch(() => { /* no bloquear */ });
-  res.json({ configurado: true, enviado, to });
+  res.json({ configurado: true, enviado: r.ok, to, error: r.error });
 }
 
 /** GET /api/admin/academia — configuración global (super admin). */
