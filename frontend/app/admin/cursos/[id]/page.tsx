@@ -30,6 +30,8 @@ interface Activity {
   is_mandatory: boolean;
   document_title: string | null;
   exam_id: string | null;
+  evaluable?: boolean;
+  metodo_eval?: 'examen' | 'finalizacion' | 'manual' | null;
 }
 interface Module {
   id: string;
@@ -178,6 +180,9 @@ export default function CourseDetailPage() {
   const [actDuracion, setActDuracion] = useState(''); // minutos, sobre todo para vídeos (CFC)
   const [actEvaluable, setActEvaluable] = useState(false);
   const [actMetodo, setActMetodo] = useState<'finalizacion' | 'manual'>('finalizacion');
+  // Panel de calificación manual de una actividad
+  const [gradeAct, setGradeAct] = useState<{ id: string; title: string } | null>(null);
+  const [gradeAlumnos, setGradeAlumnos] = useState<Array<{ student_id: string; nombre: string; nota: number | string | null; apto: boolean | null }>>([]);
   const [examAttempts, setExamAttempts] = useState('1');
   const [examPass, setExamPass] = useState('60');
   const [examTime, setExamTime] = useState('');
@@ -493,6 +498,32 @@ export default function CourseDetailPage() {
   async function deleteActivity(activityId: string) {
     await api(`/api/courses/${courseId}/activities/${activityId}`, { method: 'DELETE', auth: true });
     load();
+  }
+  // Marcar/cambiar si una actividad es evaluable y con qué método.
+  async function cambiarEval(a: Activity, valor: string) {
+    const evaluable = valor !== 'no';
+    try {
+      await api(`/api/courses/${courseId}/activities/${a.id}/eval`, {
+        method: 'PATCH', auth: true,
+        body: JSON.stringify({ evaluable, metodoEval: evaluable ? valor : undefined }),
+      });
+      load();
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'Error'); }
+  }
+  async function abrirCalificar(a: Activity) {
+    try {
+      const r = await api<{ alumnos: typeof gradeAlumnos }>(`/api/courses/${courseId}/activities/${a.id}/grades`, { auth: true });
+      setGradeAlumnos(r.alumnos); setGradeAct({ id: a.id, title: a.title });
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'Error'); }
+  }
+  async function guardarNota(studentId: string, nota: string, apto: boolean | null) {
+    if (!gradeAct) return;
+    try {
+      await api(`/api/courses/${courseId}/activities/${gradeAct.id}/grades/${studentId}`, {
+        method: 'PUT', auth: true,
+        body: JSON.stringify({ nota: nota === '' ? null : Number(nota), apto }),
+      });
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'Error'); }
   }
   async function invite(e: React.FormEvent) {
     e.preventDefault();
@@ -1085,7 +1116,18 @@ export default function CourseDetailPage() {
                           {TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}
                           {a.type === 'imagen' && a.image_url && <img src={a.image_url} alt="" style={{ height: 24, marginLeft: 8, borderRadius: 4, verticalAlign: 'middle' }} />}
                         </span>
-                        <span style={{ display: 'flex', gap: 6 }}>
+                        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {['documento', 'video', 'enlace', 'texto', 'imagen'].includes(a.type) && (
+                            <select className="form-select" style={{ width: 'auto', height: 28, fontSize: 12, padding: '0 6px' }}
+                              value={a.evaluable ? (a.metodo_eval ?? 'finalizacion') : 'no'} onChange={(e) => cambiarEval(a, e.target.value)} title="¿Cuenta como calificación?">
+                              <option value="no">No evaluable</option>
+                              <option value="finalizacion">Eval: finalización</option>
+                              <option value="manual">Eval: nota manual</option>
+                            </select>
+                          )}
+                          {a.evaluable && a.metodo_eval === 'manual' && (
+                            <button className="btn btn-outline btn-small" onClick={() => abrirCalificar(a)}>Calificar</button>
+                          )}
                           {a.exam_id && (
                             <Link className="btn btn-outline btn-small" href={`/admin/cursos/${courseId}/examen/${a.exam_id}`}>Editar</Link>
                           )}
@@ -1357,6 +1399,43 @@ export default function CourseDetailPage() {
             )}
           </div>
         </>
+      )}
+
+      {/* Panel de calificación manual de una actividad */}
+      {gradeAct && (
+        <div className="modal-backdrop" onClick={() => setGradeAct(null)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Calificar actividad" style={{ maxWidth: 560 }}>
+            <div className="card-header">
+              <div className="card-title">Calificar · {gradeAct.title}</div>
+              <div className="card-subtitle">Pon la nota (0–100) y/o marca apto. Se guarda al salir de cada casilla.</div>
+            </div>
+            {gradeAlumnos.length === 0 ? (
+              <p className="empty-state">No hay alumnos matriculados todavía.</p>
+            ) : (
+              <div className="table-responsive" style={{ maxHeight: 420, overflowY: 'auto' }}>
+                <table>
+                  <thead><tr><th>Alumno</th><th style={{ width: 90 }}>Nota</th><th style={{ width: 70 }}>Apto</th></tr></thead>
+                  <tbody>
+                    {gradeAlumnos.map((al, i) => (
+                      <tr key={al.student_id}>
+                        <td style={{ fontSize: 13 }}>{al.nombre}</td>
+                        <td>
+                          <input className="form-input" type="number" min="0" max="100" step="0.5" style={{ height: 32, padding: '0 8px' }}
+                            defaultValue={al.nota ?? ''} onBlur={(e) => guardarNota(al.student_id, e.target.value, gradeAlumnos[i].apto ?? null)} />
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <input type="checkbox" defaultChecked={!!al.apto}
+                            onChange={(e) => { gradeAlumnos[i].apto = e.target.checked; guardarNota(al.student_id, String(gradeAlumnos[i].nota ?? ''), e.target.checked); }} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <button className="btn btn-primary btn-small" style={{ marginTop: 12 }} onClick={() => setGradeAct(null)}>Cerrar</button>
+          </div>
+        </div>
       )}
     </AppShell>
   );
