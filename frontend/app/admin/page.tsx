@@ -54,6 +54,7 @@ export default function AdminDashboard() {
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pestana, setPestana] = useState('resumen'); // pestaña visible del panel
 
   // New-institution form
   const [name, setName] = useState('');
@@ -139,17 +140,29 @@ export default function AdminDashboard() {
     >
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* Captación por la zona gratuita: cuánta gente prueba y cuánta se queda */}
-      <AnonPracticeStats />
+      {/* Pestañas del panel: se reparte el contenido para no hacer scroll */}
+      <div className="ficha-tabs">
+        {([
+          ['resumen', 'Resumen'], ['captacion', 'Captación'], ['instituciones', 'Instituciones'],
+          ['comunidad', 'Comunidad'], ['seguridad', 'Seguridad'],
+        ] as Array<[string, string]>).map(([id, label]) => (
+          <button key={id} className={`ficha-tab ${pestana === id ? 'ficha-tab-on' : ''}`} onClick={() => setPestana(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
 
-      {/* Lo que la plataforma recoge y hay que mirar: interesados, indicios de
-          uso compartido y estado de la pasarela. */}
-      <AdminPendientes />
+      {/* Lo que hay que mirar: interesados, indicios de uso compartido y pasarela. */}
+      {pestana === 'resumen' && <AdminPendientes />}
+
+      {/* Captación por la zona gratuita: cuánta gente prueba y cuánta se queda */}
+      {pestana === 'captacion' && <AnonPracticeStats />}
 
       {/* Venta cruzada con PÚLSAR (marketing, no toca cursos ni matrículas). */}
-      <PartnerBannerEditor />
+      {pestana === 'captacion' && <PartnerBannerEditor />}
 
       {/* KPIs */}
+      {pestana === 'resumen' && (<>
       <div className="grid grid-4" data-tour="resumen" style={{ marginBottom: 16 }}>
         <Kpi value={dash?.personasRegistradas.total ?? '—'} label="Personas registradas" />
         <Kpi value={dash?.actividad.alumnos_con_curso ?? '—'} label="Alumnos matriculados" />
@@ -199,7 +212,9 @@ export default function AdminDashboard() {
           Las cancelaciones de suscripción se sumarán a «bajas» cuando activemos el módulo de pagos.
         </p>
       </div>
+      </>)}
 
+      {pestana === 'instituciones' && (
       <div className="grid grid-2">
         {/* Institutions table */}
         <div className="card animate-in">
@@ -278,9 +293,11 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+      )}
 
-      {/* Audit logs */}
-      <div className="card animate-in" style={{ marginTop: 24 }}>
+      {/* Grupo de WhatsApp de la comunidad */}
+      {pestana === 'comunidad' && (
+      <div className="card animate-in">
         <div className="card-header">
           <div className="card-title">Grupo de WhatsApp de la comunidad</div>
           <div className="card-subtitle">Se ofrece a los alumnos al entrar; unirse es voluntario</div>
@@ -291,8 +308,11 @@ export default function AdminDashboard() {
           <button className="btn btn-primary">Guardar</button>
         </form>
       </div>
+      )}
 
-      <div className="card" style={{ marginTop: 24 }}>
+      {/* Auditoría / seguridad */}
+      {pestana === 'seguridad' && (
+      <div className="card">
         <div className="card-header">
           <div className="card-title">Actividad reciente (auditoría)</div>
           <div className="card-subtitle">Últimos eventos de seguridad</div>
@@ -321,6 +341,7 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+      )}
     </AppShell>
   );
 }
