@@ -144,7 +144,7 @@ export default function CursosPage() {
 
   return (
     <AppShell user={user} title="Cursos" nav={nav}>
-      <div className="grid grid-2">
+      <div className="grid">
         {/* Crear */}
         <div className="card" data-tour="crear-curso-form">
           <div className="card-header">

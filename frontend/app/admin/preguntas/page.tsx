@@ -208,11 +208,11 @@ export default function PreguntasPage() {
       nav={adminNav(user.role, '/admin/preguntas')}
     >
       {/* ---------------- Carga masiva ---------------- */}
-      <div className="card" style={{ marginBottom: 24 }}>
-        <div className="card-header">
-          <div className="card-title">Carga masiva de preguntas</div>
-          <div className="card-subtitle">Sube muchas preguntas de golpe (Excel o JSON)</div>
-        </div>
+      <details className="card" style={{ marginBottom: 20 }}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 16, color: 'var(--gray-900)' }}>
+          Carga masiva de preguntas <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}>· sube muchas de golpe (Excel o JSON)</span>
+        </summary>
+        <div style={{ marginTop: 14 }}>
 
         <div className="info-box" style={{ marginBottom: 16 }}>
           1) Descarga la plantilla · 2) rellénala (una fila/objeto por pregunta; la columna
@@ -280,9 +280,10 @@ export default function PreguntasPage() {
             )}
           </div>
         )}
-      </div>
+        </div>
+      </details>
 
-      <div className="grid grid-2">
+      <div className="grid">
         {/* ---------------- Form ---------------- */}
         <div className="card">
           <div className="card-header">

@@ -181,6 +181,11 @@ h3 {
 .card:hover {
   box-shadow: var(--shadow-md);
 }
+/* Tarjetas apiladas en una columna: se alterna un tono suave para que se
+   distingan de un vistazo unas de otras sin recargar (filosofía de Federico). */
+.grid > .card:nth-child(even) {
+  background: #f3f6fb;
+}
 .card-header {
   border-bottom: 1px solid var(--gray-200);
   padding-bottom: 16px;

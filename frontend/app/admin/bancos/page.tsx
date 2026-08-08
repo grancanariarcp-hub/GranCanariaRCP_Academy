@@ -267,7 +267,7 @@ export default function BancosPage() {
       title="Bancos de preguntas"
       nav={adminNav(user.role, '/admin/bancos')}
     >
-      <div className="grid grid-2">
+      <div className="grid">
         {/* Crear / editar */}
         <div className="card animate-in">
           <div className="card-header">

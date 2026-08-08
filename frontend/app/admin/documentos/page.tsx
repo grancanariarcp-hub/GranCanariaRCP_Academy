@@ -216,7 +216,7 @@ export default function DocumentosPage() {
       title="Documentos"
       nav={adminNav(user.role, '/admin/documentos')}
     >
-      <div className="grid grid-2">
+      <div className="grid">
         <div className="card">
           <div className="card-header">
             <div className="card-title">Subir guía / manual (PDF)</div>
