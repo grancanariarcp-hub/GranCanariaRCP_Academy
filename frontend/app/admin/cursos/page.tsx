@@ -20,6 +20,7 @@ interface Course {
   ends_at: string | null;
   acta_closed_at: string | null;
   es_ope: boolean;
+  codigo_curso: string | null;
 }
 
 /** Un curso «pasado»: archivado o cuya fecha de fin ya quedó atrás. */
@@ -374,6 +375,7 @@ export default function CursosPage() {
                       <td style={rojo ? { borderLeft: '3px solid var(--danger)' } : undefined}>
                         {c.es_ope && <span className="badge badge-ope" style={{ marginRight: 6, fontSize: 10.5 }}>OPE</span>}
                         <Link href={`/admin/cursos/${c.id}`}>{c.title}</Link>
+                        {c.codigo_curso && <div className="muted" style={{ fontSize: 11 }}><code>{c.codigo_curso}</code></div>}
                         {rojo && <span className="badge badge-danger" style={{ marginLeft: 8, fontSize: 10.5 }}>Falta el acta</span>}
                       </td>
                       <td style={{ fontSize: 12 }}>{[c.tema, c.subtema].filter(Boolean).join(' · ') || '—'}</td>

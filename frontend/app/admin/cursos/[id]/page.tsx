@@ -55,6 +55,7 @@ interface Course {
   title: string;
   tema: string | null;
   subtema: string | null;
+  codigo_curso: string | null;
   modality: string;
   status: string;
   enrollment_open: boolean;
@@ -157,6 +158,7 @@ export default function CourseDetailPage() {
   // Clasificación temática (tema → subtema), con sugerencias de lo ya usado.
   const [fTema, setFTema] = useState('');
   const [fSubtema, setFSubtema] = useState('');
+  const [fCodigo, setFCodigo] = useState('');
   const [taxonomia, setTaxonomia] = useState<{ temas: string[]; porTema: Record<string, string[]> }>({ temas: [], porTema: {} });
   // Datos de la parte práctica (para PÚLSAR)
   const [fTipoClinico, setFTipoClinico] = useState('');
@@ -219,6 +221,7 @@ export default function CourseDetailPage() {
       setFTelegram(c.course.telegram_url ?? '');
       setFTema(c.course.tema ?? '');
       setFSubtema(c.course.subtema ?? '');
+      setFCodigo(c.course.codigo_curso ?? '');
       api<typeof taxonomia>('/api/courses/taxonomia', { auth: true })
         .then((r) => setTaxonomia(r)).catch(() => {});
       setFTipoClinico(c.course.tipo_clinico ?? '');
@@ -327,7 +330,7 @@ export default function CourseDetailPage() {
   async function saveFicha() {
     setFichaMsg(null);
     try {
-      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats, telegramUrl: fTelegram, tema: fTema.trim(), subtema: fSubtema.trim(), tipoClinico: fTipoClinico, empresa: fEmpresa, lugar: fLugar }) });
+      await api(`/api/courses/${courseId}`, { method: 'PATCH', auth: true, body: JSON.stringify({ resumen: fResumen, acreditacion: fAcred, cfc: fCfc, whatsappUrl: fWhats, telegramUrl: fTelegram, tema: fTema.trim(), subtema: fSubtema.trim(), codigoCurso: fCodigo.trim(), tipoClinico: fTipoClinico, empresa: fEmpresa, lugar: fLugar }) });
       setFichaMsg('Ficha guardada ✅');
       load();
     } catch (err) {
@@ -823,6 +826,11 @@ export default function CourseDetailPage() {
                 </div>
                 {/* Clasificación temática: dos niveles (tema → subtema). Texto
                     libre con sugerencias de lo ya usado en la academia. */}
+                <div className="form-group">
+                  <label className="form-label">Código del curso</label>
+                  <input className="form-input" value={fCodigo} onChange={(e) => setFCodigo(e.target.value)} placeholder="SVA-ONL-2026-01" />
+                  <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>Se genera solo al crear el curso; puedes ajustarlo. Sirve para buscarlo en auditoría y vincular la comisión CFC.</p>
+                </div>
                 <div className="grid grid-2" style={{ gap: 12 }}>
                   <div className="form-group">
                     <label className="form-label">Tema</label>

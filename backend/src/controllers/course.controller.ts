@@ -37,16 +37,28 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
   const userId = req.auth!.sub;
 
   const course = await withTransaction(async (client) => {
+    // Código legible del curso: PREFIJO-Modalidad-AÑO-NN. El prefijo sale del
+    // tema (o el título); NN es el nº de curso de ese año.
+    const year = new Date().getFullYear();
+    const cnt = await client.query<{ n: number }>(
+      "SELECT COUNT(*)::int AS n FROM courses WHERE date_part('year', created_at) = $1", [year],
+    );
+    const nn = String((cnt.rows[0]?.n ?? 0) + 1).padStart(2, '0');
+    const base = ((data.tema || data.title || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 4)) || (data.esOpe ? 'OPE' : 'CUR');
+    const mod = data.modality === 'online' ? 'ONL' : data.modality === 'presencial' ? 'PRE' : 'MIX';
+    const codigo = `${base}-${mod}-${year}-${nn}`;
+
     const { rows } = await client.query(
       `INSERT INTO courses
          (title, tema, subtema, duration_hours, modality, objetivo_general,
-          objetivos_especificos, publico_objetivo, price_cents, resumen, acreditacion, cfc, cfc_en_tramite, es_ope, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-       RETURNING id, title, tema, subtema, status, es_ope, created_at`,
+          objetivos_especificos, publico_objetivo, price_cents, resumen, acreditacion, cfc, cfc_en_tramite, es_ope, created_by, codigo_curso)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       RETURNING id, title, tema, subtema, status, es_ope, created_at, codigo_curso`,
       [
         data.title, data.tema ?? null, data.subtema ?? null, data.durationHours ?? null,
         data.modality, data.objetivoGeneral ?? null, data.objetivosEspecificos ?? null,
-        data.publicoObjetivo, data.priceCents, data.resumen ?? null, data.acreditacion ?? null, data.cfc ?? null, data.cfcEnTramite, data.esOpe, userId,
+        data.publicoObjetivo, data.priceCents, data.resumen ?? null, data.acreditacion ?? null, data.cfc ?? null, data.cfcEnTramite, data.esOpe, userId, codigo,
       ],
     );
     const created = rows[0];
@@ -185,7 +197,7 @@ export async function listCourses(req: Request, res: Response): Promise<void> {
   if (rol === 'auditor') {
     const { rows } = await query(
       `SELECT c.id, c.title, c.tema, c.subtema, c.status, c.enrollment_open, c.modality,
-              c.price_cents, c.created_at, c.cfc_en_tramite,
+              c.price_cents, c.created_at, c.cfc_en_tramite, c.codigo_curso,
               (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.id) AS modules
          FROM courses c
         WHERE c.status = 'publicado' OR c.cfc_en_tramite
@@ -198,13 +210,13 @@ export async function listCourses(req: Request, res: Response): Promise<void> {
   const { rows } = isSuper
     ? await query(
         `SELECT c.id, c.title, c.tema, c.subtema, c.status, c.enrollment_open, c.modality,
-                c.price_cents, c.created_at, c.cfc_en_tramite, c.ends_at, c.acta_closed_at, c.es_ope,
+                c.price_cents, c.created_at, c.cfc_en_tramite, c.ends_at, c.acta_closed_at, c.es_ope, c.codigo_curso,
                 (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.id) AS modules
          FROM courses c ORDER BY c.created_at DESC`,
       )
     : await query(
         `SELECT c.id, c.title, c.tema, c.subtema, c.status, c.enrollment_open, c.modality,
-                c.price_cents, c.created_at, c.ends_at, c.acta_closed_at, c.es_ope,
+                c.price_cents, c.created_at, c.ends_at, c.acta_closed_at, c.es_ope, c.codigo_curso,
                 (SELECT COUNT(*) FROM modules m WHERE m.course_id = c.id) AS modules,
                 cs.role AS my_role
          FROM courses c

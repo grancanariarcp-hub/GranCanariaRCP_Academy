@@ -76,6 +76,7 @@ export default function AdminDashboard() {
   const [aAction, setAAction] = useState('');
   const [aDesde, setADesde] = useState('');
   const [aHasta, setAHasta] = useState('');
+  const [aCurso, setACurso] = useState('');
   const [aPagina, setAPagina] = useState(1);
   const [logsTotal, setLogsTotal] = useState(0);
   const [acciones, setAcciones] = useState<string[]>([]);
@@ -88,6 +89,7 @@ export default function AdminDashboard() {
     if (aAction) qs.set('action', aAction);
     if (aDesde) qs.set('desde', aDesde);
     if (aHasta) qs.set('hasta', aHasta);
+    if (aCurso) qs.set('curso', aCurso);
     qs.set('limit', String(A_POR_PAGINA));
     qs.set('offset', String((aPagina - 1) * A_POR_PAGINA));
     try {
@@ -103,7 +105,7 @@ export default function AdminDashboard() {
     const t = setTimeout(loadLogs, aq ? 350 : 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, pestana, aq, aActor, aAction, aDesde, aHasta, aPagina]);
+  }, [user, pestana, aq, aActor, aAction, aDesde, aHasta, aCurso, aPagina]);
 
   async function loadAll() {
     try {
@@ -404,8 +406,9 @@ export default function AdminDashboard() {
           </select>
           <input className="form-input" style={{ width: 'auto' }} type="date" title="Desde" value={aDesde} onChange={(e) => { setADesde(e.target.value); setAPagina(1); }} />
           <input className="form-input" style={{ width: 'auto' }} type="date" title="Hasta" value={aHasta} onChange={(e) => { setAHasta(e.target.value); setAPagina(1); }} />
-          {(aq || aActor || aAction || aDesde || aHasta) && (
-            <button className="btn btn-outline btn-small" onClick={() => { setAq(''); setAActor(''); setAAction(''); setADesde(''); setAHasta(''); setAPagina(1); }}>Limpiar</button>
+          <input className="form-input" style={{ width: 150 }} placeholder="Código de curso" value={aCurso} onChange={(e) => { setACurso(e.target.value); setAPagina(1); }} />
+          {(aq || aActor || aAction || aDesde || aHasta || aCurso) && (
+            <button className="btn btn-outline btn-small" onClick={() => { setAq(''); setAActor(''); setAAction(''); setADesde(''); setAHasta(''); setACurso(''); setAPagina(1); }}>Limpiar</button>
           )}
         </div>
 

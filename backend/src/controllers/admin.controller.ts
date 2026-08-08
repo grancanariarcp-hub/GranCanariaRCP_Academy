@@ -408,6 +408,16 @@ export async function listAuditLogs(req: Request, res: Response): Promise<void> 
 
   const conds: string[] = [];
   const params: unknown[] = [];
+  // Buscar por curso: se admite el código de curso (o su id). Filtra los eventos
+  // de ese curso (entity='course') y también los que lo referencian en metadata.
+  if (f.curso) {
+    const cur = await query<{ id: string }>(
+      'SELECT id FROM courses WHERE codigo_curso ILIKE $1 OR id::text = $2', [`%${f.curso}%`, f.curso],
+    );
+    const ids = cur.rows.map((r) => r.id);
+    if (ids.length === 0) { res.json({ logs: [], total: 0, acciones: [], actores: [] }); return; }
+    params.push(ids); conds.push(`(entity = 'course' AND entity_id = ANY($${params.length}))`);
+  }
   if (f.actorType) { params.push(f.actorType); conds.push(`actor_type = $${params.length}`); }
   if (f.action) { params.push(f.action); conds.push(`action = $${params.length}`); }
   if (f.desde) { params.push(f.desde); conds.push(`created_at >= $${params.length}::date`); }
