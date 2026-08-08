@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
-import { PageNav } from '@/components/PageNav';
 import { useSession } from '@/hooks/useSession';
 import { adminNav } from '@/lib/nav';
 import { api, ApiError } from '@/lib/api';
@@ -109,7 +108,6 @@ export default function ConvocatoriasPage() {
 
   return (
     <AppShell user={user} title="Convocatorias de oposición" nav={adminNav(user.role, '/admin/convocatorias')}>
-      <PageNav backHref="/admin" backLabel="Volver al panel" />
 
       {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
 

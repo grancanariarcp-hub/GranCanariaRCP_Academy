@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '@/components/AppShell';
-import { PageNav } from '@/components/PageNav';
 import { useSession } from '@/hooks/useSession';
 import { adminNav } from '@/lib/nav';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
@@ -135,7 +134,6 @@ export default function ReconocimientosPage() {
 
   return (
     <AppShell user={user} title="Diplomas" nav={adminNav(user.role, '/admin/reconocimientos')}>
-      <PageNav backHref="/admin" backLabel="Volver al panel" />
 
       <div className="grid grid-2">
         <div className="card">

@@ -12,7 +12,7 @@ import { REDES, redInfo, type EnlaceSocial } from '@/lib/social';
  * podían llegar desde el formulario de registro, y quien no los pusiera
  * entonces no podía corregirlo nunca.
  */
-export function PerfilDocenteEditor({ onGuardado }: { onGuardado?: () => void }) {
+export function PerfilDocenteEditor({ onGuardado, embedded = false, previewId }: { onGuardado?: () => void; embedded?: boolean; previewId?: string }) {
   const [headline, setHeadline] = useState('');
   const [profession, setProfession] = useState('');
   const [dni, setDni] = useState('');
@@ -57,12 +57,26 @@ export function PerfilDocenteEditor({ onGuardado }: { onGuardado?: () => void })
     }
   }
 
-  return (
-    <div className="card" style={{ marginBottom: 20 }}>
-      <div className="card-header">
-        <div className="card-title">Cómo te ven tus alumnos <Ayuda tema="profesor-perfil" /></div>
-        <div className="card-subtitle">Aparece junto a tus cursos y en tu ficha pública</div>
-      </div>
+  const cabecera = embedded ? (
+    // Fusionado dentro de «Mis datos»: separador y botón para ver la ficha
+    // pública tal cual la ven los alumnos.
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '18px 0 12px', paddingTop: 16, borderTop: '1px solid var(--gray-200)' }}>
+      <strong style={{ fontSize: 15 }}>Cómo te ven tus alumnos <Ayuda tema="profesor-perfil" /></strong>
+      {previewId && (
+        <a className="btn btn-outline btn-small" href={`/profesor/${previewId}`} target="_blank" rel="noreferrer" title="Abre tu ficha pública en otra pestaña">
+          👁 Cómo te ven
+        </a>
+      )}
+    </div>
+  ) : (
+    <div className="card-header">
+      <div className="card-title">Cómo te ven tus alumnos <Ayuda tema="profesor-perfil" /></div>
+    </div>
+  );
+
+  const cuerpo = (
+    <>
+      {cabecera}
 
       {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
 
@@ -128,6 +142,9 @@ export function PerfilDocenteEditor({ onGuardado }: { onGuardado?: () => void })
           {guardando ? 'Guardando…' : 'Guardar'}
         </button>
       </form>
-    </div>
+    </>
   );
+
+  // Embebido: se integra dentro de la tarjeta «Mis datos». Suelto: su propia tarjeta.
+  return embedded ? cuerpo : <div className="card" style={{ marginBottom: 20 }}>{cuerpo}</div>;
 }

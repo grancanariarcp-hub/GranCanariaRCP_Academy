@@ -5,7 +5,6 @@ import { AppShell } from '@/components/AppShell';
 import { ProfilePanel } from '@/components/ProfilePanel';
 import { adminNav } from '@/lib/nav';
 import { PerfilDocenteAviso } from '@/components/PerfilDocenteAviso';
-import { PerfilDocenteEditor } from '@/components/PerfilDocenteEditor';
 import { InvitacionesDocente } from '@/components/InvitacionesDocente';
 import { MisDatos } from '@/components/MisDatos';
 import { ServiciosExtrasGlobal } from '@/components/ServiciosExtrasGlobal';
@@ -21,9 +20,10 @@ export default function AdminProfilePage() {
   return (
     <AppShell user={user} title="Perfil" nav={nav}>
       {user.role === 'profesor' && <PerfilDocenteAviso />}
-      {(user.role === 'profesor' || user.role === 'super_admin' || user.role === 'institution_admin') && <InvitacionesDocente />}
-      {user.role === 'profesor' && <PerfilDocenteEditor />}
+      {/* «Mis datos» es lo primero que ve el profesor; el editor «Cómo te ven»
+          va fusionado dentro de esa tarjeta (ver ProfilePanel). */}
       <ProfilePanel user={user} />
+      {(user.role === 'profesor' || user.role === 'super_admin' || user.role === 'institution_admin') && <InvitacionesDocente />}
       {user.role === 'super_admin' && <ServiciosExtrasGlobal />}
       {user.role !== 'auditor' && <MisDatos esAlumno={false} />}
     </AppShell>

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { ServiceWorker } from '@/components/ServiceWorker';
 import { InstallButton } from '@/components/InstallButton';
+import { ScrollTop } from '@/components/ScrollTop';
 
 export const metadata: Metadata = {
   // Base para resolver las imágenes de vista previa al compartir el enlace.
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <ServiceWorker />
         <InstallButton />
+        <ScrollTop />
       </body>
     </html>
   );

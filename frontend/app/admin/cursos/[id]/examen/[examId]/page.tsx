@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, uploadFile } from '@/lib/api';
-import { PageNav } from '@/components/PageNav';
 import { adminNav } from '@/lib/nav';
 import { CalidadPreguntas } from '@/components/CalidadPreguntas';
 
@@ -191,7 +190,6 @@ export default function ExamEditorPage() {
 
   return (
     <AppShell user={user} title={exam?.title ?? 'Examen'} nav={nav}>
-      <PageNav backHref={`/admin/cursos/${courseId}`} backLabel="Volver al curso" />
       {error && <div className="alert alert-error">{error}</div>}
 
       <CalidadPreguntas courseId={courseId} examId={examId} />

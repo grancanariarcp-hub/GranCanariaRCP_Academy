@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 import type { SessionUser } from '@/lib/auth';
 import { SocialLinks } from '@/components/SocialLinks';
+import { PerfilDocenteEditor } from '@/components/PerfilDocenteEditor';
 import type { EnlaceSocial } from '@/lib/social';
 
 interface Course {
@@ -14,6 +15,7 @@ interface Course {
   publico_objetivo: string[] | null;
 }
 interface Profile {
+  id?: string;
   name: string;
   email?: string | null;
   headline?: string | null;
@@ -146,84 +148,107 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
   }
 
   const courses = isStaff ? taught : received;
+  const esProfesor = user.role === 'profesor';
+
+  // Datos + foto + legajo. En el profesorado incorpora («fusiona») el editor de
+  // «Cómo te ven tus alumnos» y el botón para ver la ficha pública.
+  const cardMisDatos = (
+    <div className="card">
+      <div className="card-header"><div className="card-title">Mis datos</div></div>
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--gray-200)', overflow: 'hidden', flexShrink: 0 }}>
+          {profile?.photo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 28 }}>👤</div>
+          )}
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>{profile?.name}</div>
+          {profile?.headline && <div className="muted" style={{ fontSize: 13 }}>{profile.headline}</div>}
+          {profile?.email && <div className="muted" style={{ fontSize: 13 }}>{profile.email}</div>}
+          {profile?.social_links && profile.social_links.length > 0 && (
+            <div style={{ marginTop: 8 }}><SocialLinks enlaces={profile.social_links} size={16} /></div>
+          )}
+          {isStaff && (
+            <label className="btn btn-outline btn-small" style={{ cursor: 'pointer', marginTop: 8 }}>
+              Cambiar foto
+              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+            </label>
+          )}
+        </div>
+      </div>
+
+      <button className="btn btn-primary btn-full" onClick={legajo} disabled={downloading}>
+        {downloading ? 'Generando…' : '📄 Generar legajo (PDF)'}
+      </button>
+      <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+        Se genera al momento y se descarga; no se guarda en el sistema.
+      </p>
+
+      {esProfesor && <PerfilDocenteEditor embedded previewId={profile?.id ?? user.id} onGuardado={load} />}
+    </div>
+  );
+
+  const cardPassword = (
+    <div className="card">
+      <div className="card-header"><div className="card-title">Cambiar contraseña</div></div>
+      {pwMsg && <div className={`alert ${pwMsg.ok ? 'alert-success' : 'alert-error'}`}>{pwMsg.text}</div>}
+      <form onSubmit={changePw}>
+        <div className="form-group">
+          <label className="form-label">Contraseña actual</label>
+          <input className="form-input" type="password" value={cur} onChange={(e) => setCur(e.target.value)} required />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Nueva contraseña (mín. 8)</label>
+          <input className="form-input" type="password" value={nw} onChange={(e) => setNw(e.target.value)} required />
+        </div>
+        <button className="btn btn-primary btn-full">Actualizar contraseña</button>
+      </form>
+    </div>
+  );
+
+  const cardEmail = (
+    <div className="card">
+      <div className="card-header"><div className="card-title">Cambiar correo</div></div>
+      {emMsg && <div className={`alert ${emMsg.ok ? 'alert-success' : 'alert-error'}`}>{emMsg.text}</div>}
+      <form onSubmit={changeEmail}>
+        <div className="form-group">
+          <label className="form-label">Nuevo correo</label>
+          <input className="form-input" type="email" value={emNew} onChange={(e) => setEmNew(e.target.value)} required />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Tu contraseña (para confirmar)</label>
+          <input className="form-input" type="password" value={emCur} onChange={(e) => setEmCur(e.target.value)} required />
+        </div>
+        <button className="btn btn-outline btn-full">Actualizar correo</button>
+      </form>
+    </div>
+  );
 
   return (
     <>
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* Tres columnas cortas (datos · contraseña · correo) para usar el ancho y
-          no dejar una tarjeta el doble de alta que las otras. */}
-      <div className="grid grid-3" style={{ alignItems: 'start' }}>
-        {/* Datos + foto + legajo */}
-        <div className="card">
-          <div className="card-header"><div className="card-title">Mis datos</div></div>
-          <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 16 }}>
-            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'var(--gray-200)', overflow: 'hidden', flexShrink: 0 }}>
-              {profile?.photo_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={profile.photo_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: 28 }}>👤</div>
-              )}
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>{profile?.name}</div>
-              {profile?.headline && <div className="muted" style={{ fontSize: 13 }}>{profile.headline}</div>}
-              {profile?.email && <div className="muted" style={{ fontSize: 13 }}>{profile.email}</div>}
-              {profile?.social_links && profile.social_links.length > 0 && (
-                <div style={{ marginTop: 8 }}><SocialLinks enlaces={profile.social_links} size={16} /></div>
-              )}
-              {isStaff && (
-                <label className="btn btn-outline btn-small" style={{ cursor: 'pointer', marginTop: 8 }}>
-                  Cambiar foto
-                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => { uploadPhoto(e.target.files?.[0]); e.target.value = ''; }} />
-                </label>
-              )}
-            </div>
+      {esProfesor ? (
+        // El profesor ve primero «Mis datos» a todo el ancho (con «Cómo te ven»
+        // fusionado); contraseña y correo van debajo, del mismo tamaño.
+        <>
+          {cardMisDatos}
+          <div className="grid grid-2" style={{ alignItems: 'stretch', marginTop: 16 }}>
+            {cardPassword}
+            {cardEmail}
           </div>
-
-          <button className="btn btn-primary btn-full" onClick={legajo} disabled={downloading}>
-            {downloading ? 'Generando…' : '📄 Generar legajo (PDF)'}
-          </button>
-          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-            Se genera al momento y se descarga; no se guarda en el sistema.
-          </p>
+        </>
+      ) : (
+        // Tres tarjetas de la misma altura (stretch): datos · contraseña · correo.
+        <div className="grid grid-3" style={{ alignItems: 'stretch' }}>
+          {cardMisDatos}
+          {cardPassword}
+          {cardEmail}
         </div>
-
-        {/* Cambiar contraseña */}
-        <div className="card">
-          <div className="card-header"><div className="card-title">Cambiar contraseña</div></div>
-          {pwMsg && <div className={`alert ${pwMsg.ok ? 'alert-success' : 'alert-error'}`}>{pwMsg.text}</div>}
-          <form onSubmit={changePw}>
-            <div className="form-group">
-              <label className="form-label">Contraseña actual</label>
-              <input className="form-input" type="password" value={cur} onChange={(e) => setCur(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Nueva contraseña (mín. 8)</label>
-              <input className="form-input" type="password" value={nw} onChange={(e) => setNw(e.target.value)} required />
-            </div>
-            <button className="btn btn-primary btn-full">Actualizar contraseña</button>
-          </form>
-        </div>
-
-        {/* Cambiar correo de acceso */}
-        <div className="card">
-          <div className="card-header"><div className="card-title">Cambiar correo</div></div>
-          {emMsg && <div className={`alert ${emMsg.ok ? 'alert-success' : 'alert-error'}`}>{emMsg.text}</div>}
-          <form onSubmit={changeEmail}>
-            <div className="form-group">
-              <label className="form-label">Nuevo correo</label>
-              <input className="form-input" type="email" value={emNew} onChange={(e) => setEmNew(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Tu contraseña (para confirmar)</label>
-              <input className="form-input" type="password" value={emCur} onChange={(e) => setEmCur(e.target.value)} required />
-            </div>
-            <button className="btn btn-outline btn-full">Actualizar correo</button>
-          </form>
-        </div>
-      </div>
+      )}
 
       {/* Cursos — el super admin es un puesto administrativo: no imparte ni tiene CV. */}
       {user.role !== 'super_admin' && (

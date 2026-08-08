@@ -8,7 +8,6 @@ import { AppShell } from '@/components/AppShell';
 import { CourseForum } from '@/components/CourseForum';
 import { ExamWizard } from '@/components/ExamWizard';
 import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
-import { PageNav } from '@/components/PageNav';
 import { AttendancePanel } from '@/components/AttendancePanel';
 import { adminNav } from '@/lib/nav';
 import { CoursePricing } from '@/components/CoursePricing';
@@ -574,7 +573,6 @@ export default function CourseDetailPage() {
 
   return (
     <AppShell user={user} title={course?.title ?? 'Curso'} nav={nav}>
-      <PageNav backHref="/admin/cursos" backLabel="Volver a cursos" />
       {user.role === 'profesor' && <PerfilDocenteAviso compacto />}
       {error && <div className="alert alert-error">{error}</div>}
       {!course ? (

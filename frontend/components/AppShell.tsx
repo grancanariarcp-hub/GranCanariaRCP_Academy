@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { clearSession, type SessionUser } from '@/lib/auth';
+import { clearSession, homeForRole, type SessionUser } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { AppVersion } from '@/components/AppVersion';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -29,6 +29,14 @@ export function AppShell({
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const home = homeForRole(user.role);
+
+  // Vuelve a la pantalla anterior real; si se llegó por enlace directo (sin
+  // historial) cae al inicio del rol para no quedar en un callejón sin salida.
+  function goBack() {
+    if (typeof window !== 'undefined' && window.history.length > 1) router.back();
+    else router.push(home);
+  }
 
   async function logout() {
     try {
@@ -87,6 +95,8 @@ export function AppShell({
         <div className="topbar">
           <div className="topbar-left">
             <button className="menu-toggle" aria-label="Menú" onClick={() => setMenuOpen((v) => !v)}>☰</button>
+            <button type="button" className="btn btn-outline btn-small topbar-nav-btn" onClick={goBack} title="Volver a la pantalla anterior">← <span className="nav-txt">Atrás</span></button>
+            <a href={home} className="btn btn-outline btn-small topbar-nav-btn" title="Ir al inicio">⌂ <span className="nav-txt">Inicio</span></a>
             <h2>{title}</h2>
           </div>
           <div className="topbar-actions">
