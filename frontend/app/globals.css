@@ -70,6 +70,7 @@
   --secondary-dark: #2c5282;
 
   /* Steel greys */
+  --gray-50: #fbfcfe;
   --gray-100: #f7fafc;
   --gray-200: #edf2f7;
   --gray-300: #e2e8f0;
@@ -252,6 +253,16 @@ h3 {
   background: transparent;
   border: 1px solid var(--gray-300);
   color: var(--gray-700);
+}
+/* Acción destructiva (borrar). Faltaba y los botones «Borrar» salían como texto
+   plano; se define aquí para que se vean claramente rojos en toda la app. */
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-danger:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.12));
 }
 .btn-full {
   width: 100%;
