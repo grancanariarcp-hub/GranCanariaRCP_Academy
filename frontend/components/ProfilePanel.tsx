@@ -151,9 +151,9 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
     <>
       {error && <div className="alert alert-error">{error}</div>}
 
-      {/* align-items:start evita que la tarjeta corta (datos/foto) se estire a la
-          altura de la de al lado (contraseña + correo) y deje un hueco enorme. */}
-      <div className="grid grid-2" style={{ alignItems: 'start' }}>
+      {/* Tres columnas cortas (datos · contraseña · correo) para usar el ancho y
+          no dejar una tarjeta el doble de alta que las otras. */}
+      <div className="grid grid-3" style={{ alignItems: 'start' }}>
         {/* Datos + foto + legajo */}
         <div className="card">
           <div className="card-header"><div className="card-title">Mis datos</div></div>
@@ -205,9 +205,11 @@ export function ProfilePanel({ user }: { user: SessionUser }) {
             </div>
             <button className="btn btn-primary btn-full">Actualizar contraseña</button>
           </form>
+        </div>
 
-          <div style={{ borderTop: '1px solid var(--gray-200)', margin: '18px 0 14px' }} />
-          <div className="card-title" style={{ marginBottom: 10 }}>Cambiar correo de acceso</div>
+        {/* Cambiar correo de acceso */}
+        <div className="card">
+          <div className="card-header"><div className="card-title">Cambiar correo</div></div>
           {emMsg && <div className={`alert ${emMsg.ok ? 'alert-success' : 'alert-error'}`}>{emMsg.text}</div>}
           <form onSubmit={changeEmail}>
             <div className="form-group">

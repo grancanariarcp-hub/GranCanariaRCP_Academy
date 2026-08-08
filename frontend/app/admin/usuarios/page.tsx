@@ -66,7 +66,7 @@ export default function UsuariosPage() {
 
   return (
     <AppShell user={user} title="Usuarios" nav={adminNav(user.role, '/admin/usuarios')}>
-      <div className="card" style={{ maxWidth: 760 }}>
+      <div className="card" style={{ maxWidth: 1100, margin: '0 auto' }}>
         <div className="card-header">
           <div className="card-title">Buscar cuentas <Ayuda tema="admin-usuarios" /></div>
           <div className="card-subtitle">Profesores, alumnos e instituciones. Busca por nombre, correo o documento.</div>

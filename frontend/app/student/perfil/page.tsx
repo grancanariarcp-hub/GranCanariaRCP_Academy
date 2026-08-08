@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { ProfilePanel } from '@/components/ProfilePanel';
@@ -10,7 +11,14 @@ import { MisDatosPersonales } from '@/components/MisDatosPersonales';
 
 export default function StudentProfilePage() {
   const user = useSession(['student'], '/login/menor');
+  const [tab, setTab] = useState('perfil');
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
+
+  // El perfil apilaba cinco bloques pesados; se reparten en pestañas para no
+  // tener que hacer scroll hasta abajo.
+  const TABS: Array<[string, string]> = [
+    ['perfil', 'Perfil'], ['datos', 'Mis datos'], ['reconocimientos', 'Reconocimientos'], ['sesiones', 'Sesiones'],
+  ];
 
   return (
     <AppShell
@@ -21,11 +29,16 @@ export default function StudentProfilePage() {
         { label: 'Perfil', href: '/student/perfil', active: true },
       ]}
     >
-      <ProfilePanel user={user} />
-      <MisDatosPersonales />
-      <MisDatos esAlumno={true} />
-      <MyRecognitions />
-      <MySessions />
+      <div className="ficha-tabs">
+        {TABS.map(([id, label]) => (
+          <button key={id} className={`ficha-tab ${tab === id ? 'ficha-tab-on' : ''}`} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+
+      {tab === 'perfil' && <ProfilePanel user={user} />}
+      {tab === 'datos' && <><MisDatosPersonales /><MisDatos esAlumno={true} /></>}
+      {tab === 'reconocimientos' && <MyRecognitions />}
+      {tab === 'sesiones' && <MySessions />}
     </AppShell>
   );
 }
