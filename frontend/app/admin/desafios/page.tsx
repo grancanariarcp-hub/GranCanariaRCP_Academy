@@ -29,6 +29,11 @@ export default function AdminDesafiosPage() {
   const [list, setList] = useState<Challenge[]>([]);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  // Filtros del listado
+  const [fArea, setFArea] = useState('');
+  const [fKind, setFKind] = useState('');
+  const [fAud, setFAud] = useState('');
 
   const [title, setTitle] = useState('');
   const [area, setArea] = useState('SVB');
@@ -83,6 +88,7 @@ export default function AdminDesafiosPage() {
     setSelBanks(c.bank_ids ?? []);
     setStartsAt(c.starts_at ? String(c.starts_at).slice(0, 10) : '');
     setEndsAt(c.ends_at ? String(c.ends_at).slice(0, 10) : '');
+    setFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -119,6 +125,12 @@ export default function AdminDesafiosPage() {
     }
   }
 
+  const listaFiltrada = list.filter((c) =>
+    (!fArea || c.area === fArea) &&
+    (!fKind || c.kind === fKind) &&
+    (!fAud || (c.audience ?? 'todos') === fAud),
+  );
+
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
   return (
@@ -127,13 +139,14 @@ export default function AdminDesafiosPage() {
       title="Desafíos"
       nav={adminNav(user.role, '/admin/desafios')}
     >
-      <div className="grid">
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{editandoId ? 'Editar desafío' : 'Nuevo desafío'}</div>
-            {editandoId && <button type="button" className="btn btn-outline btn-small" onClick={resetForm}>Cancelar edición</button>}
-            <div className="card-subtitle">Permanente o temporal, dirigido a un público concreto</div>
-          </div>
+      <details className="card" style={{ marginBottom: 16 }} open={formOpen}
+        onToggle={(e) => setFormOpen((e.target as HTMLDetailsElement).open)}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 16 }}>
+          {editandoId ? '✏️ Editar desafío' : 'Nuevo desafío'}
+          <span className="muted" style={{ fontWeight: 400, fontSize: 13 }}> · permanente o temporal, para un público concreto</span>
+        </summary>
+        <div style={{ marginTop: 14 }}>
+          {editandoId && <button type="button" className="btn btn-outline btn-small" style={{ marginBottom: 10 }} onClick={resetForm}>Cancelar edición</button>}
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
           <form onSubmit={create}>
             <div className="form-group"><label className="form-label">Título</label><input className="form-input" value={title} onChange={(e) => setTitle(e.target.value)} required /></div>
@@ -208,14 +221,37 @@ export default function AdminDesafiosPage() {
             <button className="btn btn-primary btn-full">{editandoId ? 'Guardar cambios' : 'Crear desafío'}</button>
           </form>
         </div>
+      </details>
 
-        <div className="card">
-          <div className="card-header"><div className="card-title">Desafíos</div><div className="card-subtitle">{list.length}</div></div>
+      <div className="card">
+          <div className="card-header"><div className="card-title">Desafíos</div></div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+            <select className="form-select" style={{ width: 'auto', minWidth: 120 }} value={fArea} onChange={(e) => setFArea(e.target.value)}>
+              <option value="">Área: todas</option>
+              <option value="SVB">SVB</option>
+              <option value="PA">Primeros auxilios</option>
+              <option value="mixto">Mixto</option>
+            </select>
+            <select className="form-select" style={{ width: 'auto', minWidth: 120 }} value={fKind} onChange={(e) => setFKind(e.target.value)}>
+              <option value="">Tipo: todos</option>
+              <option value="permanente">Permanente</option>
+              <option value="temporal">Temporal</option>
+            </select>
+            <select className="form-select" style={{ width: 'auto', minWidth: 130 }} value={fAud} onChange={(e) => setFAud(e.target.value)}>
+              <option value="">Público: todos</option>
+              <option value="ninos">Niños</option>
+              <option value="jovenes">Jóvenes</option>
+              <option value="adultos">Adultos</option>
+              <option value="todos">Todos</option>
+            </select>
+            {(fArea || fKind || fAud) && <button type="button" className="link-action" onClick={() => { setFArea(''); setFKind(''); setFAud(''); }}>Limpiar</button>}
+            <span className="muted" style={{ fontSize: 13, marginLeft: 'auto' }}>{listaFiltrada.length} de {list.length}</span>
+          </div>
           <div className="table-responsive">
             <table>
-              <thead><tr><th>Título</th><th>Tipo</th><th>Participantes</th><th></th></tr></thead>
+              <thead><tr><th>Título</th><th>Preguntas</th><th>Tipo</th><th>Público</th><th>Participantes</th><th></th></tr></thead>
               <tbody>
-                {list.map((c) => (
+                {listaFiltrada.map((c) => (
                   <tr key={c.id}>
                     <td>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -226,9 +262,11 @@ export default function AdminDesafiosPage() {
                         <span>{c.title}</span>
                       </div>
                       <div className="muted" style={{ fontSize: 12 }}>
-                      {c.area} · {c.num_questions}p × {c.seconds_per_question ?? '—'}s · {c.audience ?? 'todos'}
+                      {c.area} · {c.seconds_per_question ?? '—'}s/pregunta
                     </div></td>
+                    <td><strong>{c.num_questions}</strong> <span className="muted" style={{ fontSize: 12 }}>preg.</span></td>
                     <td><span className={`badge ${c.kind === 'permanente' ? 'badge-primary' : 'badge-warning'}`}>{c.kind}</span></td>
+                    <td style={{ fontSize: 12 }}>{c.audience ?? 'todos'}</td>
                     <td>{c.participants}</td>
                     <td>
                       <div className="row-actions">
@@ -244,12 +282,11 @@ export default function AdminDesafiosPage() {
                     </td>
                   </tr>
                 ))}
-                {list.length === 0 && <tr><td colSpan={4} className="muted">Sin desafíos</td></tr>}
+                {listaFiltrada.length === 0 && <tr><td colSpan={6} className="muted">{list.length === 0 ? 'Sin desafíos' : 'Ninguno coincide con el filtro'}</td></tr>}
               </tbody>
             </table>
           </div>
         </div>
-      </div>
     </AppShell>
   );
 }

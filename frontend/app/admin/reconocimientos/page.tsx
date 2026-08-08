@@ -54,6 +54,9 @@ export default function ReconocimientosPage() {
   const [form, setForm] = useState({ ...VACIA });
   const [editando, setEditando] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  // Imagen de fondo elegida en el propio formulario (se sube al guardar).
+  const [bgFile, setBgFile] = useState<File | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -79,6 +82,8 @@ export default function ReconocimientosPage() {
       maxPosition: p.max_position ? String(p.max_position) : '',
       thresholdHours: p.threshold_hours ? String(Number(p.threshold_hours)) : '',
     });
+    setBgFile(null);
+    setFormOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -99,14 +104,19 @@ export default function ReconocimientosPage() {
       thresholdHours: form.kind === 'horas' && form.thresholdHours ? Number(form.thresholdHours) : null,
     };
     try {
+      let id = editando;
       if (editando) {
         await api(`/api/admin/recognition-templates/${editando}`, { method: 'PATCH', auth: true, body: JSON.stringify(cuerpo) });
       } else {
-        await api('/api/admin/recognition-templates', { method: 'POST', auth: true, body: JSON.stringify(cuerpo) });
+        const r = await api<{ id: string }>('/api/admin/recognition-templates', { method: 'POST', auth: true, body: JSON.stringify(cuerpo) });
+        id = r.id;
       }
+      // Si se eligió imagen de fondo en el formulario, se sube ya a la plantilla.
+      if (bgFile && id) await uploadFile(`/api/admin/recognition-templates/${id}/background`, bgFile);
       setMsg({ ok: true, text: '✅ Plantilla guardada' });
       setForm({ ...VACIA });
       setEditando(null);
+      setBgFile(null);
       cargar();
     } catch (err) {
       setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'No se pudo guardar' });
@@ -135,16 +145,17 @@ export default function ReconocimientosPage() {
   return (
     <AppShell user={user} title="Diplomas" nav={adminNav(user.role, '/admin/reconocimientos')}>
 
-      <div className="grid grid-2">
-        <div className="card">
-          <div className="card-header">
-            <div className="card-title">{editando ? 'Editar plantilla' : 'Nueva plantilla'}</div>
-            {editando && (
-              <button className="btn btn-outline btn-small" onClick={() => { setEditando(null); setForm({ ...VACIA }); }}>
-                Cancelar edición
-              </button>
-            )}
-          </div>
+      <details className="card" style={{ marginBottom: 16 }} open={formOpen}
+        onToggle={(e) => setFormOpen((e.target as HTMLDetailsElement).open)}>
+        <summary style={{ cursor: 'pointer', fontWeight: 600, fontSize: 16 }}>
+          {editando ? '✏️ Editar plantilla' : 'Nueva plantilla de diploma'}
+        </summary>
+        <div style={{ marginTop: 14 }}>
+          {editando && (
+            <button className="btn btn-outline btn-small" style={{ marginBottom: 10 }} onClick={() => { setEditando(null); setForm({ ...VACIA }); setBgFile(null); }}>
+              Cancelar edición
+            </button>
+          )}
 
           {msg && <div className={`alert ${msg.ok ? 'alert-success' : 'alert-error'}`}>{msg.text}</div>}
 
@@ -228,14 +239,24 @@ export default function ReconocimientosPage() {
               </div>
             </div>
 
+            <div className="form-group">
+              <label className="form-label">Imagen de fondo (opcional)</label>
+              <input type="file" accept="image/*" className="form-input"
+                onChange={(e) => setBgFile(e.target.files?.[0] ?? null)} />
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Se aplica al diseño del diploma al guardar.{bgFile ? ` Seleccionada: ${bgFile.name}.` : ''}
+                {editando ? ' Sustituye la actual si eliges una nueva.' : ''}
+              </p>
+            </div>
+
             <button className="btn btn-primary btn-full">{editando ? 'Guardar cambios' : 'Crear plantilla'}</button>
           </form>
         </div>
+      </details>
 
-        <div className="card">
+      <div className="card">
           <div className="card-header">
             <div className="card-title">Plantillas</div>
-            <div className="card-subtitle">{items.length} configuradas</div>
           </div>
 
           {items.length === 0 ? (
@@ -283,7 +304,6 @@ export default function ReconocimientosPage() {
             </div>
           )}
         </div>
-      </div>
     </AppShell>
   );
 }
