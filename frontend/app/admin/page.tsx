@@ -62,6 +62,10 @@ export default function AdminDashboard() {
   const [code, setCode] = useState('');
   const [creating, setCreating] = useState(false);
   const [formMsg, setFormMsg] = useState<string | null>(null);
+  // Ficha editable de una institución (modal)
+  const [editInst, setEditInst] = useState<Institution | null>(null);
+  const [editMsg, setEditMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [guardandoInst, setGuardandoInst] = useState(false);
 
   // Grupo de WhatsApp general de la plataforma
   const [waUrl, setWaUrl] = useState('');
@@ -129,6 +133,31 @@ export default function AdminDashboard() {
     if (user) loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function guardarInstitucion(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editInst) return;
+    setEditMsg(null);
+    setGuardandoInst(true);
+    try {
+      await api(`/api/admin/institutions/${editInst.id}`, {
+        method: 'PATCH', auth: true,
+        body: JSON.stringify({
+          name: editInst.name,
+          contactName: editInst.contact_name ?? '',
+          contactEmail: editInst.contact_email ?? '',
+          contactPhone: editInst.contact_phone ?? '',
+          address: editInst.address ?? '',
+        }),
+      });
+      setEditInst(null);
+      loadAll();
+    } catch (err) {
+      setEditMsg({ ok: false, text: err instanceof ApiError ? err.message : 'No se pudo guardar' });
+    } finally {
+      setGuardandoInst(false);
+    }
+  }
 
   async function setInstitutionStatus(id: string, action: 'approve' | 'reject') {
     try {
@@ -295,7 +324,9 @@ export default function AdminDashboard() {
                 {institutions.map((i) => (
                   <tr key={i.id}>
                     <td>
-                      {i.name}
+                      <button className="link-action" style={{ fontWeight: 600 }} onClick={() => { setEditInst(i); setEditMsg(null); }} title="Abrir ficha para editar">
+                        {i.name}
+                      </button>
                       <div className="muted" style={{ fontSize: 12 }}>
                         {i.code}{i.contact_name ? ` · ${i.contact_name}` : ''}{i.contact_phone ? ` · ${i.contact_phone}` : ''}{i.contact_email ? ` · ${i.contact_email}` : ''}
                       </div>
@@ -307,12 +338,15 @@ export default function AdminDashboard() {
                     </td>
                     <td>{i.student_count}</td>
                     <td>
-                      {i.status === 'pending' && (
-                        <span style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn btn-primary btn-small" onClick={() => setInstitutionStatus(i.id, 'approve')}>Aprobar</button>
-                          <button className="btn btn-outline btn-small" onClick={() => setInstitutionStatus(i.id, 'reject')}>Rechazar</button>
-                        </span>
-                      )}
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {i.status === 'pending' && (
+                          <>
+                            <button className="btn btn-primary btn-small" onClick={() => setInstitutionStatus(i.id, 'approve')}>Aprobar</button>
+                            <button className="btn btn-outline btn-small" onClick={() => setInstitutionStatus(i.id, 'reject')}>Rechazar</button>
+                          </>
+                        )}
+                        <button className="btn btn-outline btn-small" onClick={() => { setEditInst(i); setEditMsg(null); }}>Editar</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -352,6 +386,50 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+      )}
+
+      {/* Ficha editable de institución */}
+      {editInst && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setEditInst(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="card-header" style={{ marginBottom: 12 }}>
+              <div className="card-title">Ficha de {editInst.name}</div>
+            </div>
+            {editMsg && <div className={`alert ${editMsg.ok ? 'alert-success' : 'alert-error'}`}>{editMsg.text}</div>}
+            <form onSubmit={guardarInstitucion}>
+              <div className="form-group">
+                <label className="form-label">Nombre</label>
+                <input className="form-input" value={editInst.name} onChange={(e) => setEditInst({ ...editInst, name: e.target.value })} required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Código <span className="muted" style={{ fontWeight: 400 }}>· no editable</span></label>
+                <input className="form-input" value={editInst.code} disabled />
+              </div>
+              <div className="grid grid-2" style={{ gap: 12 }}>
+                <div className="form-group">
+                  <label className="form-label">Persona de contacto</label>
+                  <input className="form-input" value={editInst.contact_name ?? ''} onChange={(e) => setEditInst({ ...editInst, contact_name: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Teléfono</label>
+                  <input className="form-input" value={editInst.contact_phone ?? ''} onChange={(e) => setEditInst({ ...editInst, contact_phone: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Correo de contacto</label>
+                <input className="form-input" type="email" value={editInst.contact_email ?? ''} onChange={(e) => setEditInst({ ...editInst, contact_email: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Dirección</label>
+                <input className="form-input" value={editInst.address ?? ''} onChange={(e) => setEditInst({ ...editInst, address: e.target.value })} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setEditInst(null)}>Cancelar</button>
+                <button className="btn btn-primary" disabled={guardandoInst}>{guardandoInst ? 'Guardando…' : 'Guardar cambios'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {/* Grupo de WhatsApp de la comunidad */}

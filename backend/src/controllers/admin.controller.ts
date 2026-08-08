@@ -84,6 +84,47 @@ export async function createInstitution(req: Request, res: Response): Promise<vo
   res.status(201).json({ institution: rows[0] });
 }
 
+const updateInstitutionSchema = z.object({
+  name: z.string().min(2).max(160).optional(),
+  contactName: z.string().max(160).nullish(),
+  contactEmail: z.string().email().or(z.literal('')).nullish(),
+  contactPhone: z.string().max(40).nullish(),
+  address: z.string().max(300).nullish(),
+});
+
+/** PATCH /api/admin/institutions/:id — editar la ficha (datos de contacto). */
+export async function updateInstitution(req: Request, res: Response): Promise<void> {
+  const data = updateInstitutionSchema.parse(req.body);
+  const map: Record<string, string> = {
+    name: 'name', contactName: 'contact_name', contactEmail: 'contact_email',
+    contactPhone: 'contact_phone', address: 'address',
+  };
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const [k, col] of Object.entries(map)) {
+    if (k in data && data[k as keyof typeof data] !== undefined) {
+      params.push((data[k as keyof typeof data] as string) || null);
+      sets.push(`${col} = $${params.length}`);
+    }
+  }
+  if (sets.length === 0) { throw badRequest('Nada que actualizar', 'NO_CHANGES'); }
+  params.push(req.params.id);
+  const { rows } = await query(
+    `UPDATE institutions SET ${sets.join(', ')} WHERE id = $${params.length}
+     RETURNING id, name, code, contact_email, contact_name, contact_phone, address, status, is_active`,
+    params,
+  );
+  if (rows.length === 0) throw badRequest('Institución no encontrada', 'NOT_FOUND');
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role,
+    action: 'INSTITUTION_UPDATE', entity: 'institution', entityId: req.params.id,
+    ip: clientIp(req), metadata: { campos: sets.length },
+  });
+
+  res.json({ institution: rows[0] });
+}
+
 // ---------------------------------------------------------------------------
 // Admins (institution_admin accounts) - create + list
 // ---------------------------------------------------------------------------

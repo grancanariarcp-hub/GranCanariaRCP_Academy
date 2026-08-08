@@ -4,6 +4,7 @@ import {
   getStats,
   listInstitutions,
   createInstitution,
+  updateInstitution,
   listAdmins,
   createAdmin,
   createQuestion,
@@ -78,6 +79,7 @@ router.get('/dashboard', asyncHandler(adminDashboard));
 
 router.get('/institutions', asyncHandler(listInstitutions));
 router.post('/institutions', asyncHandler(createInstitution));
+router.patch('/institutions/:id', asyncHandler(updateInstitution));
 router.post('/institutions/:id/:action', asyncHandler(setInstitutionStatus));
 
 router.get('/admins', asyncHandler(listAdmins));
