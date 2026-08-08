@@ -13,12 +13,13 @@ import { PageNav } from '@/components/PageNav';
 import { MyAttendance } from '@/components/MyAttendance';
 import { PaymentGate } from '@/components/PaymentGate';
 import { VideoEmbed } from '@/components/VideoEmbed';
+import { VideoSala } from '@/components/VideoSala';
 import { MySubscription } from '@/components/MySubscription';
 
 interface Activity {
   id: string;
   completed?: boolean;
-  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen' | 'texto' | 'imagen';
+  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen' | 'texto' | 'imagen' | 'videoconferencia';
   title: string;
   url: string | null;
   body: string | null;
@@ -41,7 +42,7 @@ interface Course {
   es_ope?: boolean;
 }
 
-const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
+const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️', videoconferencia: '📹' };
 
 export default function StudentCoursePage() {
   const params = useParams();
@@ -55,6 +56,7 @@ export default function StudentCoursePage() {
   const [progress, setProgress] = useState<{ total: number; completed: number; pct: number } | null>(null);
   const [time, setTime] = useState<{ activeHours: number; sessionHours: number; focusPct: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [videoAct, setVideoAct] = useState<string | null>(null); // sala de clase abierta
 
   useEffect(() => {
     if (!user) return;
@@ -226,6 +228,11 @@ export default function StudentCoursePage() {
                         Al darle play se marca la actividad como hecha. */}
                     <VideoEmbed url={a.url} title={a.title} onPlay={() => marcarHecho(a)} />
                   </div>
+                ) : a.type === 'videoconferencia' ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                    <span style={{ fontWeight: 600 }}>{TYPE_ICON.videoconferencia} {a.title} <span className="muted" style={{ fontWeight: 400, fontSize: 12.5 }}>· clase en directo</span></span>
+                    <button className="btn btn-primary btn-small" onClick={() => { setVideoAct(a.id); marcarHecho(a); }}>Entrar a la clase</button>
+                  </div>
                 ) : (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>{TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}</span>
@@ -259,6 +266,8 @@ export default function StudentCoursePage() {
       <div className="card" style={{ marginTop: 24 }}>
         <CourseForum courseId={courseId} />
       </div>
+
+      {videoAct && <VideoSala activityId={videoAct} onClose={() => setVideoAct(null)} />}
     </AppShell>
   );
 }

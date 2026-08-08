@@ -9,6 +9,7 @@ import { CourseForum } from '@/components/CourseForum';
 import { ExamWizard } from '@/components/ExamWizard';
 import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
 import { AttendancePanel } from '@/components/AttendancePanel';
+import { VideoSala } from '@/components/VideoSala';
 import { adminNav } from '@/lib/nav';
 import { CoursePricing } from '@/components/CoursePricing';
 import { ActaPanel } from '@/components/ActaPanel';
@@ -21,7 +22,7 @@ import { Ayuda } from '@/components/ayuda/Ayuda';
 
 interface Activity {
   id: string;
-  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen' | 'texto' | 'imagen';
+  type: 'documento' | 'video' | 'enlace' | 'test' | 'examen' | 'texto' | 'imagen' | 'videoconferencia';
   title: string;
   url: string | null;
   body: string | null;
@@ -88,7 +89,7 @@ interface Course {
   price_anual_cents: number | null;
 }
 
-const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️' };
+const TYPE_ICON: Record<string, string> = { documento: '📄', video: '🎬', enlace: '🔗', test: '📝', examen: '🎓', texto: '📝', imagen: '🖼️', videoconferencia: '📹' };
 
 // Fila del panel de Resumen: verde si está listo, ámbar si falta.
 function ResumenItem({ ok, label, hint }: { ok: boolean; label: string; hint: string }) {
@@ -175,7 +176,8 @@ export default function CourseDetailPage() {
   const [certMsg, setCertMsg] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null); // moduleId
   const [subiendoDoc, setSubiendoDoc] = useState(false);
-  const [actType, setActType] = useState<'documento' | 'video' | 'enlace' | 'texto' | 'imagen' | 'test' | 'examen'>('documento');
+  const [actType, setActType] = useState<'documento' | 'video' | 'enlace' | 'texto' | 'imagen' | 'test' | 'examen' | 'videoconferencia'>('documento');
+  const [videoAct, setVideoAct] = useState<string | null>(null); // sala de clase abierta
   const [actTitle, setActTitle] = useState('');
   const [actUrl, setActUrl] = useState('');
   const [actDoc, setActDoc] = useState('');
@@ -1136,6 +1138,9 @@ export default function CourseDetailPage() {
                           {a.type === 'imagen' && a.image_url && <img src={a.image_url} alt="" style={{ height: 24, marginLeft: 8, borderRadius: 4, verticalAlign: 'middle' }} />}
                         </span>
                         <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          {a.type === 'videoconferencia' && (
+                            <button className="btn btn-primary btn-small" onClick={() => setVideoAct(a.id)} title="Abrir la sala como profesor">Entrar a la clase</button>
+                          )}
                           {['documento', 'video', 'enlace', 'texto', 'imagen'].includes(a.type) && (
                             <select className="form-select" style={{ width: 'auto', height: 28, fontSize: 12, padding: '0 6px' }}
                               value={a.evaluable ? (a.metodo_eval ?? 'finalizacion') : 'no'} onChange={(e) => cambiarEval(a, e.target.value)} title="¿Cuenta como calificación?">
@@ -1162,14 +1167,20 @@ export default function CourseDetailPage() {
                   {addingTo === m.id && (
                     <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--gray-300)' }}>
                       <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
-                        {(['documento', 'texto', 'imagen', 'video', 'enlace', 'test', 'examen'] as const).map((t) => (
+                        {(['documento', 'texto', 'imagen', 'video', 'enlace', 'videoconferencia', 'test', 'examen'] as const).map((t) => (
                           <button key={t} type="button" className={`tab ${actType === t ? 'active' : ''}`} style={{ flex: 'unset', padding: '6px 10px' }} onClick={() => setActType(t)}>
-                            {TYPE_ICON[t]} {t}
+                            {TYPE_ICON[t]} {t === 'videoconferencia' ? 'clase en directo' : t}
                           </button>
                         ))}
                       </div>
                       {actType !== 'test' && actType !== 'examen' && (
                         <input className="form-input" placeholder="Título de la actividad" value={actTitle} onChange={(e) => setActTitle(e.target.value)} style={{ marginBottom: 8 }} />
+                      )}
+                      {actType === 'videoconferencia' && (
+                        <p className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                          Crea la sala de clase en directo. Tú y los alumnos entráis desde aquí con el botón «Entrar a la clase»;
+                          podrás compartir pantalla y ver la asistencia. (La grabación llegará con LiveKit.)
+                        </p>
                       )}
                       {actType === 'documento' && (
                         <div style={{ marginBottom: 8 }}>
@@ -1481,6 +1492,8 @@ export default function CourseDetailPage() {
           </div>
         </div>
       )}
+
+      {videoAct && <VideoSala activityId={videoAct} onClose={() => setVideoAct(null)} />}
     </AppShell>
   );
 }

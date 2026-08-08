@@ -50,6 +50,22 @@ async function accesoActividad(req: Request): Promise<Acceso> {
   return { courseId, camaraObligatoria: rows[0].camara_obligatoria, salaAbierta: rows[0].sala_abierta, esProfesor: true };
 }
 
+/**
+ * GET /api/video/:activityId/sala — datos de la sala para el reproductor
+ * (Jitsi en la fase 1). No necesita LiveKit; solo comprueba el acceso.
+ */
+export async function videoSala(req: Request, res: Response): Promise<void> {
+  const acc = await accesoActividad(req);
+  if (!acc.salaAbierta && !acc.esProfesor) throw forbidden('La sala está cerrada por el profesor');
+  res.json({
+    // Nombre de sala único y difícil de adivinar (incluye el id de la actividad).
+    room: `grancanariarcp-${req.params.activityId}`,
+    rol: acc.esProfesor ? 'profesor' : 'alumno',
+    nombre: req.auth!.name || 'Participante',
+    camaraObligatoria: acc.camaraObligatoria,
+  });
+}
+
 /** POST /api/video/:activityId/token — token de acceso a la sala. */
 export async function videoToken(req: Request, res: Response): Promise<void> {
   if (!env.livekit.configured) {

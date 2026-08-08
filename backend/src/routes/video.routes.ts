@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { videoToken, videoHeartbeat, videoAsistencia } from '../controllers/video.controller.js';
+import { videoSala, videoToken, videoHeartbeat, videoAsistencia } from '../controllers/video.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -10,6 +10,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 const router = Router();
 
 router.use(requireAuth);
+router.get('/:activityId/sala', asyncHandler(videoSala));
 router.post('/:activityId/token', asyncHandler(videoToken));
 router.post('/:activityId/heartbeat', asyncHandler(videoHeartbeat));
 router.get('/:activityId/asistencia', asyncHandler(videoAsistencia));
