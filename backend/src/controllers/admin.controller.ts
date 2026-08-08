@@ -402,13 +402,37 @@ export async function createQuestionWithImage(req: Request, res: Response): Prom
 // ---------------------------------------------------------------------------
 export async function listAuditLogs(req: Request, res: Response): Promise<void> {
   if (req.auth!.role !== 'super_admin') throw forbidden();
-  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const f = req.query as Record<string, string | undefined>;
+  const limit = Math.min(Number(f.limit) || 25, 200);
+  const offset = Math.max(0, Number(f.offset) || 0);
+
+  const conds: string[] = [];
+  const params: unknown[] = [];
+  if (f.actorType) { params.push(f.actorType); conds.push(`actor_type = $${params.length}`); }
+  if (f.action) { params.push(f.action); conds.push(`action = $${params.length}`); }
+  if (f.desde) { params.push(f.desde); conds.push(`created_at >= $${params.length}::date`); }
+  if (f.hasta) { params.push(f.hasta); conds.push(`created_at < ($${params.length}::date + 1)`); }
+  if (f.q) {
+    params.push(`%${f.q}%`);
+    conds.push(`(action ILIKE $${params.length} OR entity ILIKE $${params.length} OR actor_type ILIKE $${params.length} OR ip ILIKE $${params.length} OR entity_id::text ILIKE $${params.length})`);
+  }
+  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+
   const { rows } = await query(
     `SELECT id, actor_id, actor_type, action, entity, entity_id, ip, metadata, created_at
-     FROM audit_logs
+     FROM audit_logs ${where}
      ORDER BY created_at DESC
-     LIMIT $1`,
-    [limit],
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
   );
-  res.json({ logs: rows });
+  const tot = await query<{ n: string }>(`SELECT COUNT(*) AS n FROM audit_logs ${where}`, params);
+  // Valores existentes para los desplegables de filtro (no ofrecer lo que no hay).
+  const acc = await query<{ action: string }>('SELECT DISTINCT action FROM audit_logs ORDER BY action');
+  const act = await query<{ actor_type: string }>('SELECT DISTINCT actor_type FROM audit_logs ORDER BY actor_type');
+  res.json({
+    logs: rows,
+    total: Number(tot.rows[0].n),
+    acciones: acc.rows.map((r) => r.action),
+    actores: act.rows.map((r) => r.actor_type),
+  });
 }

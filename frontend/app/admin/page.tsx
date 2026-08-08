@@ -43,6 +43,7 @@ interface AuditLog {
   id: string;
   actor_type: string;
   action: string;
+  entity: string | null;
   ip: string | null;
   created_at: string;
 }
@@ -68,6 +69,41 @@ export default function AdminDashboard() {
   // Prueba de correo saliente (Resend)
   const [mailMsg, setMailMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [mailProbando, setMailProbando] = useState(false);
+  // Filtros del registro de auditoría (pestaña Seguridad)
+  const A_POR_PAGINA = 25;
+  const [aq, setAq] = useState('');
+  const [aActor, setAActor] = useState('');
+  const [aAction, setAAction] = useState('');
+  const [aDesde, setADesde] = useState('');
+  const [aHasta, setAHasta] = useState('');
+  const [aPagina, setAPagina] = useState(1);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [acciones, setAcciones] = useState<string[]>([]);
+  const [actores, setActores] = useState<string[]>([]);
+
+  async function loadLogs() {
+    const qs = new URLSearchParams();
+    if (aq) qs.set('q', aq);
+    if (aActor) qs.set('actorType', aActor);
+    if (aAction) qs.set('action', aAction);
+    if (aDesde) qs.set('desde', aDesde);
+    if (aHasta) qs.set('hasta', aHasta);
+    qs.set('limit', String(A_POR_PAGINA));
+    qs.set('offset', String((aPagina - 1) * A_POR_PAGINA));
+    try {
+      const r = await api<{ logs: AuditLog[]; total: number; acciones: string[]; actores: string[] }>(
+        `/api/admin/audit-logs?${qs.toString()}`, { auth: true },
+      );
+      setLogs(r.logs); setLogsTotal(r.total); setAcciones(r.acciones); setActores(r.actores);
+    } catch { /* ignore */ }
+  }
+  // Carga con filtros al abrir Seguridad o cambiarlos (con retraso para el texto).
+  useEffect(() => {
+    if (!user || pestana !== 'seguridad') return;
+    const t = setTimeout(loadLogs, aq ? 350 : 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, pestana, aq, aActor, aAction, aDesde, aHasta, aPagina]);
 
   async function loadAll() {
     try {
@@ -349,9 +385,29 @@ export default function AdminDashboard() {
       {pestana === 'seguridad' && (
       <div className="card">
         <div className="card-header">
-          <div className="card-title">Actividad reciente (auditoría)</div>
-          <div className="card-subtitle">Últimos eventos de seguridad</div>
+          <div className="card-title">Registro de auditoría</div>
+          <div className="card-subtitle">{logsTotal} eventos · busca y filtra</div>
         </div>
+
+        {/* Buscador + filtros del registro */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Buscar (acción, entidad, IP…)"
+            value={aq} onChange={(e) => { setAq(e.target.value); setAPagina(1); }} />
+          <select className="form-select" style={{ width: 'auto' }} value={aActor} onChange={(e) => { setAActor(e.target.value); setAPagina(1); }}>
+            <option value="">Cualquier actor</option>
+            {actores.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <select className="form-select" style={{ width: 'auto' }} value={aAction} onChange={(e) => { setAAction(e.target.value); setAPagina(1); }}>
+            <option value="">Cualquier acción</option>
+            {acciones.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <input className="form-input" style={{ width: 'auto' }} type="date" title="Desde" value={aDesde} onChange={(e) => { setADesde(e.target.value); setAPagina(1); }} />
+          <input className="form-input" style={{ width: 'auto' }} type="date" title="Hasta" value={aHasta} onChange={(e) => { setAHasta(e.target.value); setAPagina(1); }} />
+          {(aq || aActor || aAction || aDesde || aHasta) && (
+            <button className="btn btn-outline btn-small" onClick={() => { setAq(''); setAActor(''); setAAction(''); setADesde(''); setAHasta(''); setAPagina(1); }}>Limpiar</button>
+          )}
+        </div>
+
         <div className="table-responsive">
           <table>
             <thead>
@@ -359,22 +415,32 @@ export default function AdminDashboard() {
                 <th>Fecha</th>
                 <th>Actor</th>
                 <th>Acción</th>
+                <th>Entidad</th>
                 <th>IP</th>
               </tr>
             </thead>
             <tbody>
               {logs.map((l) => (
                 <tr key={l.id}>
-                  <td className="muted">{new Date(l.created_at).toLocaleString('es-ES')}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>{new Date(l.created_at).toLocaleString('es-ES')}</td>
                   <td>{l.actor_type}</td>
                   <td><span className="badge badge-primary">{l.action}</span></td>
-                  <td className="muted">{l.ip ?? '—'}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>{l.entity ?? '—'}</td>
+                  <td className="muted" style={{ fontSize: 12 }}>{l.ip ?? '—'}</td>
                 </tr>
               ))}
-              {logs.length === 0 && <tr><td colSpan={4} className="muted">Sin eventos</td></tr>}
+              {logs.length === 0 && <tr><td colSpan={5} className="muted">Sin eventos que coincidan</td></tr>}
             </tbody>
           </table>
         </div>
+
+        {logsTotal > A_POR_PAGINA && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 12 }}>
+            <button className="btn btn-outline btn-small" disabled={aPagina <= 1} onClick={() => setAPagina(aPagina - 1)}>← Anterior</button>
+            <span className="muted" style={{ fontSize: 13 }}>Página {aPagina} de {Math.max(1, Math.ceil(logsTotal / A_POR_PAGINA))}</span>
+            <button className="btn btn-outline btn-small" disabled={aPagina >= Math.ceil(logsTotal / A_POR_PAGINA)} onClick={() => setAPagina(aPagina + 1)}>Siguiente →</button>
+          </div>
+        )}
       </div>
       )}
     </AppShell>

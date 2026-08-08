@@ -219,6 +219,34 @@ export async function cambiosCfc(req: Request, res: Response): Promise<void> {
   res.json({ cambios: rows });
 }
 
+/**
+ * GET /api/courses/:id/auditoria — historial completo del curso para la comisión
+ * CFC: el registro de cambios acreditables + los eventos del propio curso
+ * (publicación, ficha, temario, profesorado, solicitud CFC). SIN datos de
+ * alumnos: la comisión audita el curso, no a las personas (hay menores).
+ * Lo ven super admin, el profesorado del curso y el auditor (via assertEditor).
+ */
+export async function auditoriaCurso(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const cambios = await query(
+    `SELECT c.campo, c.valor_antes, c.valor_nuevo, c.changed_at, u.name AS quien
+       FROM course_field_changes c LEFT JOIN users u ON u.id = c.changed_by
+      WHERE c.course_id = $1 ORDER BY c.changed_at DESC LIMIT 500`,
+    [req.params.id],
+  );
+  // Eventos del curso desde el registro de auditoría. Solo acciones sobre el
+  // propio curso; nada de alumnos (matrículas, pagos, notas se excluyen).
+  const eventos = await query(
+    `SELECT a.action, a.actor_type, a.created_at, u.name AS quien
+       FROM audit_logs a LEFT JOIN users u ON u.id = a.actor_id
+      WHERE a.entity = 'course' AND a.entity_id = $1
+        AND a.action NOT LIKE '%STUDENT%' AND a.action NOT LIKE '%PAYMENT%' AND a.action NOT LIKE '%ENROLL%'
+      ORDER BY a.created_at DESC LIMIT 500`,
+    [req.params.id],
+  );
+  res.json({ cambios: cambios.rows, eventos: eventos.rows });
+}
+
 // ---------------------------------------------------------------------------
 // Modules
 // ---------------------------------------------------------------------------

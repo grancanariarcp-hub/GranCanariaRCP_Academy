@@ -5,7 +5,7 @@ import multer from 'multer';
 import {
   updateCourse, deleteCourse, cambiarTipoCurso, solicitarCfc, cambiosCfc, uploadCourseThumbnail, addModule, updateModule, deleteModule,
   addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
-  addCourseImage, deleteCourseImage, setActivityDuration,
+  addCourseImage, deleteCourseImage, setActivityDuration, auditoriaCurso,
 } from '../controllers/courseContent.controller.js';
 import {
   createExam, getExam, updateExam, addExamQuestion, importExamQuestions, addExamQuestionsFromBank, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts,
@@ -45,6 +45,7 @@ router.get('/:id/extras', asyncHandler(getCourseExtras));
 router.put('/:id/extras', asyncHandler(updateCourseExtras));
 router.post('/:id/solicitar-cfc', asyncHandler(solicitarCfc));
 router.get('/:id/cambios-cfc', asyncHandler(cambiosCfc));
+router.get('/:id/auditoria', asyncHandler(auditoriaCurso));
 router.post('/:id/thumbnail', upload.single('file'), asyncHandler(uploadCourseThumbnail));
 router.post('/:id/gallery', upload.single('file'), asyncHandler(addCourseImage));
 router.delete('/:id/gallery/:imageId', asyncHandler(deleteCourseImage));

@@ -138,6 +138,10 @@ export default function CourseDetailPage() {
   const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
   const [error, setError] = useState<string | null>(null);
   const [pestana, setPestana] = useState('resumen'); // pestaña visible de la ficha
+  const [auditoria, setAuditoria] = useState<{
+    cambios: Array<{ campo: string; valor_antes: string | null; valor_nuevo: string | null; changed_at: string; quien: string | null }>;
+    eventos: Array<{ action: string; actor_type: string; created_at: string; quien: string | null }>;
+  } | null>(null);
 
   const [newModule, setNewModule] = useState('');
 
@@ -238,6 +242,15 @@ export default function CourseDetailPage() {
     window.addEventListener('curso-pestana', abrirPestana);
     return () => window.removeEventListener('curso-pestana', abrirPestana);
   }, []);
+
+  // Auditoría del curso: se carga la primera vez que se abre esa pestaña.
+  useEffect(() => {
+    if (pestana === 'auditoria' && course && !auditoria) {
+      api<typeof auditoria>(`/api/courses/${courseId}/auditoria`, { auth: true })
+        .then(setAuditoria).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pestana, course]);
 
   async function patchCourse(body: object) {
     try {
@@ -504,6 +517,9 @@ export default function CourseDetailPage() {
   const TABS: Array<[string, string]> = esOpe
     ? [['resumen', 'Resumen'], ['ficha', 'Ficha'], ['precio', 'Precio'], ['alumnos', 'Alumnos']]
     : [['resumen', 'Resumen'], ['ficha', 'Ficha'], ['contenido', 'Contenido'], ['precio', 'Precio'], ['alumnos', 'Alumnos'], ['profesorado', 'Profesorado'], ['cierre', 'Cierre'], ['foro', 'Foro']];
+  // La comisión CFC (auditor) y el super admin ven una pestaña de auditoría del
+  // curso: historial de cambios acreditables + eventos, sin datos de alumnos.
+  if (user.role === 'super_admin' || user.role === 'auditor') TABS.push(['auditoria', 'Auditoría']);
   const tabEstado: Record<string, 'ok' | 'falta' | undefined> = {
     contenido: modules.length ? 'ok' : 'falta',
     profesorado: staff.some((s) => s.status === 'pendiente') ? 'falta' : (staff.length ? 'ok' : 'falta'),
@@ -1266,6 +1282,63 @@ export default function CourseDetailPage() {
         <div className="card" style={{ marginTop: 24 }}>
           <CourseForum courseId={courseId} />
         </div>
+      )}
+
+      {/* Auditoría del curso (super admin / comisión CFC): historial sin datos de alumnos */}
+      {course && pestana === 'auditoria' && (
+        <>
+          <div className="card" style={{ marginBottom: 24 }}>
+            <div className="card-header">
+              <div className="card-title">Cambios en campos acreditables</div>
+              <div className="card-subtitle">Qué se cambió tras registrar la solicitud de CFC (la prueba de que lo impartido coincide con lo acreditado)</div>
+            </div>
+            {!auditoria ? <div className="muted">Cargando…</div> : auditoria.cambios.length === 0 ? (
+              <div className="info-box" style={{ fontSize: 13 }}>Sin cambios registrados. (El registro empieza al pulsar «Registrar solicitud de CFC».)</div>
+            ) : (
+              <div className="table-responsive">
+                <table>
+                  <thead><tr><th>Fecha</th><th>Campo</th><th>Antes</th><th>Después</th><th>Quién</th></tr></thead>
+                  <tbody>
+                    {auditoria.cambios.map((c, i) => (
+                      <tr key={i}>
+                        <td className="muted" style={{ fontSize: 12 }}>{new Date(c.changed_at).toLocaleString('es-ES')}</td>
+                        <td><strong>{c.campo}</strong></td>
+                        <td className="muted" style={{ fontSize: 12 }}>{c.valor_antes ?? '—'}</td>
+                        <td style={{ fontSize: 12 }}>{c.valor_nuevo ?? '—'}</td>
+                        <td className="muted" style={{ fontSize: 12 }}>{c.quien ?? '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Eventos del curso</div>
+              <div className="card-subtitle">Publicación, ficha, temario, profesorado, solicitud CFC… (no incluye datos de alumnos)</div>
+            </div>
+            {!auditoria ? <div className="muted">Cargando…</div> : auditoria.eventos.length === 0 ? (
+              <div className="muted">Sin eventos registrados.</div>
+            ) : (
+              <div className="table-responsive">
+                <table>
+                  <thead><tr><th>Fecha</th><th>Acción</th><th>Quién</th></tr></thead>
+                  <tbody>
+                    {auditoria.eventos.map((e, i) => (
+                      <tr key={i}>
+                        <td className="muted" style={{ fontSize: 12 }}>{new Date(e.created_at).toLocaleString('es-ES')}</td>
+                        <td><span className="badge badge-primary">{e.action}</span></td>
+                        <td className="muted" style={{ fontSize: 12 }}>{e.quien ?? e.actor_type}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </AppShell>
   );
