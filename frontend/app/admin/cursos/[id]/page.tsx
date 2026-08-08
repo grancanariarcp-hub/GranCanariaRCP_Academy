@@ -71,6 +71,7 @@ interface Course {
   firmante2_cargo: string | null;
   cert_bg_url?: string;
   cfc_image_url?: string;
+  cert_programa_reverso?: boolean;
   price_cents: number;
   early_bird_until: string | null;
   late_surcharge_pct: number | string | null;
@@ -169,6 +170,7 @@ export default function CourseDetailPage() {
   const [f1c, setF1c] = useState('');
   const [f2n, setF2n] = useState('');
   const [f2c, setF2c] = useState('');
+  const [certPrograma, setCertPrograma] = useState(false);
   const [certMsg, setCertMsg] = useState<string | null>(null);
   const [addingTo, setAddingTo] = useState<string | null>(null); // moduleId
   const [subiendoDoc, setSubiendoDoc] = useState(false);
@@ -227,6 +229,7 @@ export default function CourseDetailPage() {
       setF1c(c.course.firmante1_cargo ?? '');
       setF2n(c.course.firmante2_nombre ?? '');
       setF2c(c.course.firmante2_cargo ?? '');
+      setCertPrograma(!!c.course.cert_programa_reverso);
       setModules(c.modules);
       setStaff(c.staff);
       setDocs(d.documents);
@@ -389,7 +392,7 @@ export default function CourseDetailPage() {
     try {
       await api(`/api/courses/${courseId}`, {
         method: 'PATCH', auth: true,
-        body: JSON.stringify({ certifica, firmante1Nombre: f1n, firmante1Cargo: f1c, firmante2Nombre: f2n, firmante2Cargo: f2c }),
+        body: JSON.stringify({ certifica, firmante1Nombre: f1n, firmante1Cargo: f1c, firmante2Nombre: f2n, firmante2Cargo: f2c, certProgramaReverso: certPrograma }),
       });
       setCertMsg('Datos del certificado guardados ✅');
       load();
@@ -1067,6 +1070,11 @@ export default function CourseDetailPage() {
               </div>
             </div>
             <p className="muted" style={{ fontSize: 12, marginBottom: 10 }}>Si un firmante queda vacío, no aparece en el certificado. Los CFC y las fechas se toman de la ficha del curso.</p>
+
+            <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, cursor: 'pointer', marginBottom: 12 }}>
+              <input type="checkbox" checked={certPrograma} style={{ marginTop: 3 }} onChange={(e) => setCertPrograma(e.target.checked)} />
+              <span><strong>Imprimir el programa del curso en el reverso</strong> — el certificado llevará una segunda página con el temario completo (módulos y actividades).</span>
+            </label>
 
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
               <label className="btn btn-outline btn-small" style={{ cursor: 'pointer' }}>

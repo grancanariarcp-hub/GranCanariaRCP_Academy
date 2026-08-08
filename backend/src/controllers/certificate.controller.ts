@@ -8,7 +8,7 @@ import { assertDirector } from '../services/courseAuth.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { r2Configured, getObjectBuffer, buildKey, uploadObject } from '../services/r2.js';
-import { renderCertificate, type CertData } from '../services/certificatePdf.js';
+import { renderCertificate, renderPrograma, type CertData } from '../services/certificatePdf.js';
 import { hasAnsweredSurvey, hasFinalExam } from '../services/surveyGate.js';
 
 function fmt(d: string | Date | null): string {
@@ -29,12 +29,31 @@ function courseUrl(courseId: string): string {
 async function courseCertData(courseId: string, studentName: string, qrUrlOverride?: string): Promise<CertData> {
   const { rows } = await query<Record<string, string | null | number>>(
     `SELECT title, modality, duration_hours, starts_at, ends_at, cfc, certifica, acreditacion,
-            firmante1_nombre, firmante1_cargo, firmante2_nombre, firmante2_cargo, cert_bg_key, cfc_image_key
+            firmante1_nombre, firmante1_cargo, firmante2_nombre, firmante2_cargo, cert_bg_key, cfc_image_key,
+            cert_programa_reverso
      FROM courses WHERE id = $1`,
     [courseId],
   );
   if (rows.length === 0) throw notFound('Curso no encontrado');
   const c = rows[0];
+
+  // Programa para el reverso (solo si el curso lo tiene activado).
+  let programa: Array<{ modulo: string; actividades: string[] }> | undefined;
+  if (c.cert_programa_reverso) {
+    const prog = await query<{ modulo: string; actividad: string | null }>(
+      `SELECT m.title AS modulo, a.title AS actividad
+         FROM modules m LEFT JOIN activities a ON a.module_id = m.id
+        WHERE m.course_id = $1
+        ORDER BY m.sort_order, a.sort_order`,
+      [courseId],
+    );
+    const mapa = new Map<string, string[]>();
+    for (const r of prog.rows) {
+      if (!mapa.has(r.modulo)) mapa.set(r.modulo, []);
+      if (r.actividad) mapa.get(r.modulo)!.push(r.actividad);
+    }
+    programa = Array.from(mapa, ([modulo, actividades]) => ({ modulo, actividades }));
+  }
 
   const start = c.starts_at as string | null;
   const end = c.ends_at as string | null;
@@ -71,6 +90,7 @@ async function courseCertData(courseId: string, studentName: string, qrUrlOverri
     cfcImgBuffer,
     qrBuffer,
     qrCaption: 'Programa y verificación',
+    programa,
   };
 }
 
@@ -104,6 +124,11 @@ function streamCert(res: Response, data: CertData): void {
   res.setHeader('Content-Disposition', 'attachment; filename="certificado-grancanaria-rcp.pdf"');
   doc.pipe(res);
   renderCertificate(doc, data);
+  // Reverso opcional con el programa del curso.
+  if (data.programa && data.programa.length > 0) {
+    doc.addPage({ size: 'A4', layout: 'landscape', margin: 0 });
+    renderPrograma(doc, data.courseTitle, data.programa);
+  }
   doc.end();
 }
 

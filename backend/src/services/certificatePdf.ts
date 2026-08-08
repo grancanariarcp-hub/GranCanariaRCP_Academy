@@ -16,6 +16,58 @@ export interface CertData {
   cfcImgBuffer?: Buffer; // imagen de los CFC (opcional)
   qrBuffer?: Buffer;     // QR (PNG) a la ficha pública del curso (opcional)
   qrCaption?: string;    // texto bajo el QR
+  // Programa del curso para el reverso (opcional). Si viene, se imprime una
+  // segunda página con el temario.
+  programa?: Array<{ modulo: string; actividades: string[] }>;
+}
+
+/**
+ * Segunda página (reverso): el programa completo del curso. Se llama solo si el
+ * curso tiene activada la opción y hay temario. Página A4 apaisada, sobria.
+ */
+export function renderPrograma(doc: PDFKit.PDFDocument, courseTitle: string, programa: Array<{ modulo: string; actividades: string[] }>): void {
+  const W = doc.page.width;
+  const H = doc.page.height;
+  const NAVY = '#1a365d';
+  const cx = 60;
+  const cw = W - 120;
+
+  doc.save().lineWidth(1).strokeColor('#9fb3c8').rect(30, 30, W - 60, H - 60).stroke().restore();
+  doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(20).text('PROGRAMA DEL CURSO', cx, 50, { width: cw, align: 'center', characterSpacing: 1 });
+  doc.fillColor('#333').font('Helvetica-Oblique').fontSize(12).text(courseTitle, cx, 80, { width: cw, align: 'center' });
+  doc.moveTo(W / 2 - 70, 104).lineTo(W / 2 + 70, 104).lineWidth(1).strokeColor('#c41e3a').stroke();
+
+  // Dos columnas para aprovechar el ancho apaisado y evitar páginas de sobra.
+  const colGap = 30;
+  const colW = (cw - colGap) / 2;
+  const colX = [cx, cx + colW + colGap];
+  const top = 124;
+  const bottom = H - 50;
+  let col = 0;
+  let y = top;
+
+  const nueva = (alto: number) => {
+    if (y + alto <= bottom) return;
+    if (col === 0) { col = 1; y = top; } else { doc.addPage(); col = 0; y = top; }
+  };
+
+  programa.forEach((m, i) => {
+    nueva(26);
+    doc.fillColor(NAVY).font('Helvetica-Bold').fontSize(12).text(`${i + 1}. ${m.modulo}`, colX[col], y, { width: colW });
+    y += 18;
+    if (m.actividades.length === 0) {
+      nueva(14);
+      doc.fillColor('#888').font('Helvetica-Oblique').fontSize(9.5).text('—', colX[col] + 12, y, { width: colW - 12 });
+      y += 14;
+    }
+    for (const a of m.actividades) {
+      const h = doc.heightOfString(`• ${a}`, { width: colW - 12 });
+      nueva(h + 4);
+      doc.fillColor('#333').font('Helvetica').fontSize(9.5).text(`• ${a}`, colX[col] + 12, y, { width: colW - 12 });
+      y += h + 4;
+    }
+    y += 8;
+  });
 }
 
 /** A4 landscape certificate. Doc must be created with layout: 'landscape'. */
