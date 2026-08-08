@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
-import { assertEditor } from '../services/courseAuth.js';
+import { assertEditor, assertEditaModulo } from '../services/courseAuth.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { r2Configured, buildKey, uploadObject, withImageUrls } from '../services/r2.js';
@@ -32,7 +32,7 @@ const createExamSchema = z.object({
 });
 
 export async function createExam(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaModulo(req, req.params.moduleId);
   const d = createExamSchema.parse(req.body);
 
   const mod = await query('SELECT 1 FROM modules WHERE id = $1 AND course_id = $2', [req.params.moduleId, req.params.id]);
@@ -354,7 +354,7 @@ const wizardSchema = z.object({
 
 /** Crea el examen y lo llena de preguntas en un solo paso. */
 export async function createExamWizard(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaModulo(req, req.params.moduleId);
   const d = wizardSchema.parse(req.body);
 
   const mod = await query('SELECT 1 FROM modules WHERE id = $1 AND course_id = $2', [req.params.moduleId, req.params.id]);

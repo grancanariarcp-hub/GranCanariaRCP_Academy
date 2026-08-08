@@ -194,6 +194,8 @@ export default function CourseDetailPage() {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'director' | 'instructor'>('instructor');
   const [inviteParte, setInviteParte] = useState<'teorica' | 'practica' | 'ambas'>('ambas');
+  const [inviteAlcance, setInviteAlcance] = useState<'todo' | 'modulos'>('todo');
+  const [inviteModulos, setInviteModulos] = useState<string[]>([]);
   const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   async function load() {
@@ -535,7 +537,10 @@ export default function CourseDetailPage() {
     e.preventDefault();
     setInviteMsg(null);
     try {
-      await api(`/api/courses/${courseId}/staff`, { method: 'POST', auth: true, body: JSON.stringify({ email: inviteEmail, role: inviteRole, parte: inviteParte }) });
+      await api(`/api/courses/${courseId}/staff`, { method: 'POST', auth: true, body: JSON.stringify({
+        email: inviteEmail, role: inviteRole, parte: inviteParte,
+        modulos: inviteRole === 'instructor' && inviteAlcance === 'modulos' ? inviteModulos : undefined,
+      }) });
       setInviteMsg({ ok: true, text: 'Profesor añadido ✅' });
       setInviteEmail('');
       load();
@@ -1349,6 +1354,29 @@ export default function CourseDetailPage() {
                     </select>
                   </div>
                 </div>
+                {inviteRole === 'instructor' && (
+                  <div className="form-group">
+                    <label className="form-label">Alcance de edición</label>
+                    <select className="form-select" value={inviteAlcance} onChange={(e) => setInviteAlcance(e.target.value as 'todo' | 'modulos')}>
+                      <option value="todo">Todo el curso (puede editar todos los módulos)</option>
+                      <option value="modulos">Solo módulos concretos</option>
+                    </select>
+                    {inviteAlcance === 'modulos' && (
+                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {modules.length === 0 ? (
+                          <span className="muted" style={{ fontSize: 12.5 }}>Crea antes algún módulo para poder asignarlo.</span>
+                        ) : modules.map((m) => (
+                          <label key={m.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}>
+                            <input type="checkbox" checked={inviteModulos.includes(m.id)}
+                              onChange={(e) => setInviteModulos((prev) => e.target.checked ? [...prev, m.id] : prev.filter((x) => x !== m.id))} />
+                            {m.title}
+                          </label>
+                        ))}
+                        <p className="muted" style={{ fontSize: 12, marginTop: 2 }}>Solo podrá añadir/editar actividades en los módulos marcados; no podrá crear módulos.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button className="btn btn-primary btn-full">Añadir al curso</button>
               </form>
             </div>

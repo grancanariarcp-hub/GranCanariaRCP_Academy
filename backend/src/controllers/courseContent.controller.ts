@@ -4,7 +4,7 @@ import { query, withTransaction } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
-import { assertEditor, assertDirector, relacionConCurso } from '../services/courseAuth.js';
+import { assertEditor, assertDirector, relacionConCurso, assertCreaModulo, assertEditaModulo, assertEditaActividad } from '../services/courseAuth.js';
 import { notify, notifyCourseStudents } from '../services/notify.js';
 import { r2Configured, buildKey, uploadObject, presignedGetUrl, deleteObject } from '../services/r2.js';
 import { estadoPerfilDocente } from '../services/perfilDocente.js';
@@ -266,7 +266,7 @@ async function assertAcreditableAbierto(courseId: string, que: string): Promise<
 }
 
 export async function addModule(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertCreaModulo(req);
   await assertAcreditableAbierto(req.params.id, 'el temario');
   const { title } = z.object({ title: z.string().min(2).max(200) }).parse(req.body);
   const { rows } = await query(
@@ -279,7 +279,7 @@ export async function addModule(req: Request, res: Response): Promise<void> {
 }
 
 export async function updateModule(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaModulo(req, req.params.moduleId);
   await assertAcreditableAbierto(req.params.id, 'el temario');
   const d = z.object({ title: z.string().min(2).max(200).optional(), isMandatory: z.boolean().optional() }).parse(req.body);
   const fields: string[] = [];
@@ -296,7 +296,7 @@ export async function updateModule(req: Request, res: Response): Promise<void> {
 }
 
 export async function deleteModule(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaModulo(req, req.params.moduleId);
   await assertAcreditableAbierto(req.params.id, 'el temario');
   await query('DELETE FROM modules WHERE id = $1 AND course_id = $2', [req.params.moduleId, req.params.id]);
   res.json({ ok: true });
@@ -340,7 +340,7 @@ async function avisarContenidoNuevo(courseId: string, titulo: string, tipoLabel:
 }
 
 export async function addActivity(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaModulo(req, req.params.moduleId);
   const d = addActivitySchema.parse(req.body);
 
   // Make sure the module belongs to this course.
@@ -378,7 +378,7 @@ export async function addActivity(req: Request, res: Response): Promise<void> {
 
 /** Duración manual de una actividad (minutos). Útil sobre todo para vídeos. */
 export async function setActivityDuration(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaActividad(req, req.params.activityId);
   const { minutes } = z.object({ minutes: z.number().int().min(0).max(1000).nullable() }).parse(req.body);
   const { rows } = await query(
     `UPDATE activities SET duration_min = $1
@@ -395,7 +395,7 @@ export async function setActivityDuration(req: Request, res: Response): Promise<
  * evaluable y con qué método. El profesor decide qué cuenta como calificación.
  */
 export async function setActivityEval(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaActividad(req, req.params.activityId);
   const d = z.object({
     evaluable: z.boolean(),
     metodoEval: z.enum(['examen', 'finalizacion', 'manual', 'foro']).nullable().optional(),
@@ -435,7 +435,7 @@ export async function listActivityGrades(req: Request, res: Response): Promise<v
  * la nota manual de un alumno en una actividad.
  */
 export async function setActivityGrade(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaActividad(req, req.params.activityId);
   const d = z.object({
     nota: z.number().min(0).max(100).nullable().optional(),
     apto: z.boolean().nullable().optional(),
@@ -498,7 +498,7 @@ export async function deleteCourseImage(req: Request, res: Response): Promise<vo
 
 /** Add an image activity (multipart: file + title). Stores the image in R2. */
 export async function addImageActivity(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaModulo(req, req.params.moduleId);
   if (!r2Configured()) throw badRequest('El almacén de imágenes no está configurado', 'R2_NOT_CONFIGURED');
   const file = req.file;
   if (!file) throw badRequest('Falta la imagen', 'NO_FILE');
@@ -522,7 +522,7 @@ export async function addImageActivity(req: Request, res: Response): Promise<voi
 }
 
 export async function deleteActivity(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
+  await assertEditaActividad(req, req.params.activityId);
   // Ensure the activity is within a module of this course before deleting.
   await query(
     `DELETE FROM activities WHERE id = $1
@@ -538,11 +538,13 @@ export async function deleteActivity(req: Request, res: Response): Promise<void>
 export async function inviteStaff(req: Request, res: Response): Promise<void> {
   await assertDirector(req);
   await assertAcreditableAbierto(req.params.id, 'el profesorado');
-  const { email, role, parte } = z.object({
+  const { email, role, parte, modulos } = z.object({
     email: z.string().email(),
     role: z.enum(['director', 'instructor']).default('instructor'),
     // En qué parte participa: teórica (academia), práctica (PÚLSAR) o ambas.
     parte: z.enum(['teorica', 'practica', 'ambas']).default('ambas'),
+    // Alcance por módulo: vacío/ausente = todo el curso; con ids = solo esos.
+    modulos: z.array(z.string().uuid()).optional(),
   }).parse(req.body);
 
   const u = await query<{ id: string; name: string; status: string }>(
@@ -574,6 +576,21 @@ export async function inviteStaff(req: Request, res: Response): Promise<void> {
        status = CASE WHEN course_staff.status = 'rechazado' THEN 'pendiente' ELSE course_staff.status END`,
     [req.params.id, u.rows[0].id, role, parte],
   );
+
+  // Alcance por módulo. Un director nunca se limita. Para un instructor: si vienen
+  // módulos, se restringe a ellos; si no, se limpia (acceso a todo el curso).
+  await query('DELETE FROM staff_module_scope WHERE course_id = $1 AND user_id = $2', [req.params.id, u.rows[0].id]);
+  if (role === 'instructor' && modulos && modulos.length > 0) {
+    for (const mid of modulos) {
+      await query(
+        `INSERT INTO staff_module_scope (course_id, user_id, module_id)
+         SELECT $1, $2, $3 WHERE EXISTS (SELECT 1 FROM modules WHERE id = $3 AND course_id = $1)
+         ON CONFLICT DO NOTHING`,
+        [req.params.id, u.rows[0].id, mid],
+      );
+    }
+  }
+
   const ct = await query<{ title: string }>('SELECT title FROM courses WHERE id = $1', [req.params.id]);
   await notify({ id: u.rows[0].id, type: 'user' }, 'Invitación a un curso',
     `Te han invitado a participar como ${role} en «${ct.rows[0]?.title ?? 'un curso'}». Acéptala desde tu perfil.`,
