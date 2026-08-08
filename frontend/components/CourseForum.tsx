@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 
-interface Thread { id: string; title: string; author_name: string; closed: boolean; created_at: string; updated_at: string; posts: string }
+interface Thread { id: string; title: string; author_name: string; closed: boolean; created_at: string; updated_at: string; posts: string; module_id: string | null; module_title: string | null }
 interface Post { id: string; author_id: string; author_type: string; author_name: string; body: string; created_at: string }
+interface Modulo { id: string; title: string }
 
 const fmt = (s: string) => new Date(s).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -19,15 +20,19 @@ export function CourseForum({ courseId }: { courseId: string }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [reply, setReply] = useState('');
+  const [modulos, setModulos] = useState<Modulo[]>([]);
+  const [filtroMod, setFiltroMod] = useState('');   // filtrar la lista por módulo
+  const [nuevoMod, setNuevoMod] = useState('');       // módulo del hilo nuevo
 
   async function loadThreads() {
     setError(null);
     try {
-      const r = await api<{ threads: Thread[]; canModerate: boolean }>(`/api/forum/${courseId}/threads`, { auth: true });
-      setThreads(r.threads); setCanModerate(r.canModerate);
+      const qs = filtroMod ? `?moduleId=${filtroMod}` : '';
+      const r = await api<{ threads: Thread[]; modulos: Modulo[]; canModerate: boolean }>(`/api/forum/${courseId}/threads${qs}`, { auth: true });
+      setThreads(r.threads); setModulos(r.modulos); setCanModerate(r.canModerate);
     } catch (err) { setError(err instanceof ApiError ? err.message : 'Error al cargar el foro'); }
   }
-  useEffect(() => { loadThreads(); /* eslint-disable-next-line */ }, [courseId]);
+  useEffect(() => { loadThreads(); /* eslint-disable-next-line */ }, [courseId, filtroMod]);
 
   async function openThread(id: string) {
     setError(null);
@@ -40,8 +45,8 @@ export function CourseForum({ courseId }: { courseId: string }) {
   async function createThread() {
     if (title.trim().length < 3 || !body.trim()) return;
     try {
-      await api(`/api/forum/${courseId}/threads`, { method: 'POST', auth: true, body: JSON.stringify({ title, body }) });
-      setTitle(''); setBody(''); setShowNew(false); loadThreads();
+      await api(`/api/forum/${courseId}/threads`, { method: 'POST', auth: true, body: JSON.stringify({ title, body, moduleId: nuevoMod || null }) });
+      setTitle(''); setBody(''); setNuevoMod(''); setShowNew(false); loadThreads();
     } catch (err) { setError(err instanceof ApiError ? err.message : 'Error'); }
   }
 
@@ -83,21 +88,41 @@ export function CourseForum({ courseId }: { courseId: string }) {
           {showNew && (
             <div className="card" style={{ marginBottom: 12, background: 'var(--gray-50, #f7fafc)' }}>
               <div className="form-group"><label className="form-label">Título</label><input className="form-input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200} /></div>
+              {modulos.length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">Módulo <span className="muted" style={{ fontWeight: 400 }}>(opcional)</span></label>
+                  <select className="form-select" value={nuevoMod} onChange={(e) => setNuevoMod(e.target.value)}>
+                    <option value="">General (sin módulo)</option>
+                    {modulos.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="form-group"><label className="form-label">Mensaje</label><textarea className="form-input" style={{ height: 90, padding: 10 }} value={body} onChange={(e) => setBody(e.target.value)} maxLength={5000} /></div>
               <button className="btn btn-primary btn-small" onClick={createThread} disabled={title.trim().length < 3 || !body.trim()}>Publicar</button>
             </div>
           )}
 
+          {/* Filtro por módulo: mantiene un solo foro pero organizado */}
+          {modulos.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              <select className="form-select" style={{ width: 'auto' }} value={filtroMod} onChange={(e) => setFiltroMod(e.target.value)}>
+                <option value="">Todos los módulos</option>
+                {modulos.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+              </select>
+            </div>
+          )}
+
           {threads.length === 0 ? (
-            <p className="muted" style={{ fontSize: 14 }}>Aún no hay hilos. ¡Abre el primero!</p>
+            <p className="muted" style={{ fontSize: 14 }}>{filtroMod ? 'No hay hilos en este módulo.' : 'Aún no hay hilos. ¡Abre el primero!'}</p>
           ) : (
             <div className="table-responsive">
               <table>
-                <thead><tr><th>Hilo</th><th>Mensajes</th><th>Última actividad</th></tr></thead>
+                <thead><tr><th>Hilo</th><th>Módulo</th><th>Mensajes</th><th>Última actividad</th></tr></thead>
                 <tbody>
                   {threads.map((t) => (
                     <tr key={t.id} style={{ cursor: 'pointer' }} onClick={() => openThread(t.id)}>
                       <td>{t.closed && '🔒 '}<strong>{t.title}</strong><div className="muted" style={{ fontSize: 12 }}>por {t.author_name}</div></td>
+                      <td>{t.module_title ? <span className="badge badge-primary" style={{ fontSize: 10.5 }}>{t.module_title}</span> : <span className="muted" style={{ fontSize: 12 }}>General</span>}</td>
                       <td>{t.posts}</td>
                       <td style={{ fontSize: 12 }}>{fmt(t.updated_at)}</td>
                     </tr>

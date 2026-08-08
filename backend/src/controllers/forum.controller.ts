@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
-import { notify, type UserType } from '../services/notify.js';
+import { notify, notifyCourseStaff, type UserType } from '../services/notify.js';
 
 /**
  * Foro por curso. Accesible a cualquier usuario autenticado que forme parte del
@@ -39,33 +39,49 @@ async function assertForumAccess(courseId: string, req: Request): Promise<void> 
   if (!(await isCourseStaff(courseId, req))) throw forbidden('No formas parte de este curso');
 }
 
-// GET /api/forum/:courseId/threads
+// GET /api/forum/:courseId/threads?moduleId=
 export async function listThreads(req: Request, res: Response): Promise<void> {
   const courseId = req.params.courseId;
   await assertForumAccess(courseId, req);
+  const params: unknown[] = [courseId];
+  let filtro = '';
+  if (req.query.moduleId) { params.push(req.query.moduleId); filtro = `AND t.module_id = $${params.length}`; }
   const { rows } = await query(
-    `SELECT t.id, t.title, t.author_name, t.closed, t.created_at, t.updated_at,
+    `SELECT t.id, t.title, t.author_name, t.closed, t.created_at, t.updated_at, t.module_id, m.title AS module_title,
             (SELECT COUNT(*) FROM forum_posts p WHERE p.thread_id = t.id) AS posts
-     FROM forum_threads t WHERE t.course_id = $1 ORDER BY t.updated_at DESC`,
-    [courseId],
+     FROM forum_threads t LEFT JOIN modules m ON m.id = t.module_id
+     WHERE t.course_id = $1 ${filtro} ORDER BY t.updated_at DESC`,
+    params,
   );
-  res.json({ threads: rows, canModerate: await isCourseStaff(courseId, req) });
+  // Módulos del curso para el selector/filtro del foro.
+  const mods = await query('SELECT id, title FROM modules WHERE course_id = $1 ORDER BY sort_order', [courseId]);
+  res.json({ threads: rows, modulos: mods.rows, canModerate: await isCourseStaff(courseId, req) });
 }
 
-// POST /api/forum/:courseId/threads  { title, body }
-const createThreadSchema = z.object({ title: z.string().min(3).max(200), body: z.string().min(1).max(5000) });
+// POST /api/forum/:courseId/threads  { title, body, moduleId? }
+const createThreadSchema = z.object({
+  title: z.string().min(3).max(200),
+  body: z.string().min(1).max(5000),
+  moduleId: z.string().uuid().nullable().optional(),
+});
 export async function createThread(req: Request, res: Response): Promise<void> {
   const courseId = req.params.courseId;
   await assertForumAccess(courseId, req);
-  const { title, body } = createThreadSchema.parse(req.body);
+  const { title, body, moduleId } = createThreadSchema.parse(req.body);
   const at = authorType(req);
   const name = req.auth!.name;
 
+  // Si viene módulo, tiene que ser de este curso (no colar un id de otro).
+  if (moduleId) {
+    const m = await query('SELECT 1 FROM modules WHERE id = $1 AND course_id = $2', [moduleId, courseId]);
+    if (m.rows.length === 0) throw badRequest('Ese módulo no es de este curso', 'BAD_MODULE');
+  }
+
   const thread = await withTransaction(async (client) => {
     const t = await client.query(
-      `INSERT INTO forum_threads (course_id, author_id, author_type, author_name, title)
-       VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-      [courseId, req.auth!.sub, at, name, title],
+      `INSERT INTO forum_threads (course_id, author_id, author_type, author_name, title, module_id)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+      [courseId, req.auth!.sub, at, name, title, moduleId ?? null],
     );
     const threadId = t.rows[0].id;
     await client.query(
@@ -75,6 +91,15 @@ export async function createThread(req: Request, res: Response): Promise<void> {
     );
     return threadId;
   });
+
+  // Avisar al profesorado del curso: es lo que garantiza que una duda no quede
+  // sin respuesta. (Si quien abre el hilo es del staff, no se autoavisa.)
+  notifyCourseStaff(
+    courseId, 'Nuevo tema en el foro',
+    `${name} abrió «${title}» en el foro del curso.`,
+    `/admin/cursos/${courseId}`, { excluir: req.auth!.sub },
+  ).catch(() => { /* el aviso no debe romper la creación */ });
+
   res.status(201).json({ id: thread });
 }
 
@@ -83,7 +108,9 @@ export async function getThread(req: Request, res: Response): Promise<void> {
   const { courseId, threadId } = req.params;
   await assertForumAccess(courseId, req);
   const t = await query(
-    'SELECT id, title, author_name, closed, created_at FROM forum_threads WHERE id = $1 AND course_id = $2',
+    `SELECT t.id, t.title, t.author_name, t.closed, t.created_at, t.module_id, m.title AS module_title
+       FROM forum_threads t LEFT JOIN modules m ON m.id = t.module_id
+      WHERE t.id = $1 AND t.course_id = $2`,
     [threadId, courseId],
   );
   if (t.rows.length === 0) throw notFound('Hilo no encontrado');

@@ -53,11 +53,15 @@ export async function notifyCourseStaff(
   title: string,
   body: string | null,
   link: string | null,
+  opts?: { excluir?: string },
 ): Promise<void> {
+  const params: unknown[] = [courseId, title, body, link];
+  let extra = '';
+  if (opts?.excluir) { params.push(opts.excluir); extra = `AND cs.user_id <> $${params.length}`; }
   await query(
     `INSERT INTO notifications (user_id, user_type, title, body, link)
-     SELECT cs.user_id, 'user', $2, $3, $4 FROM course_staff cs WHERE cs.course_id = $1`,
-    [courseId, title, body, link],
+     SELECT cs.user_id, 'user', $2, $3, $4 FROM course_staff cs WHERE cs.course_id = $1 ${extra}`,
+    params,
   );
 }
 
