@@ -108,6 +108,72 @@ export async function borrarAuditor(req: Request, res: Response): Promise<void> 
   res.json({ ok: true });
 }
 
+// ---------------------------------------------------------------------------
+// Cursos que evalúa la comisión (vínculo auditor ↔ curso por código)
+// ---------------------------------------------------------------------------
+
+/** GET /api/admin/auditores/:id/cursos — cursos CFC vinculados a este auditor. */
+export async function cursosAuditor(req: Request, res: Response): Promise<void> {
+  const { rows } = await query(
+    `SELECT c.id, c.title, c.codigo_curso, ca.starts_at, ca.ends_at
+       FROM course_auditors ca JOIN courses c ON c.id = ca.course_id
+      WHERE ca.user_id = $1
+      ORDER BY ca.created_at DESC`,
+    [req.params.id],
+  );
+  res.json({ cursos: rows });
+}
+
+const vincularSchema = z.object({
+  codigo: z.string().min(2).max(40),
+  // Ventana opcional; si falta, se toman las fechas del curso.
+  startsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+  endsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+});
+
+/** POST /api/admin/auditores/:id/cursos — vincular por código de curso. */
+export async function vincularCursoAuditor(req: Request, res: Response): Promise<void> {
+  const d = vincularSchema.parse(req.body);
+
+  const esAuditor = await query("SELECT 1 FROM users WHERE id = $1 AND role = 'auditor'", [req.params.id]);
+  if (esAuditor.rows.length === 0) throw notFound('Auditor no encontrado');
+
+  const curso = await query<{ id: string; title: string; codigo_curso: string | null; starts_at: string | null; ends_at: string | null }>(
+    'SELECT id, title, codigo_curso, starts_at, ends_at FROM courses WHERE codigo_curso ILIKE $1',
+    [d.codigo.trim()],
+  );
+  if (curso.rows.length === 0) throw badRequest('No hay ningún curso con ese código', 'CURSO_NO_ENCONTRADO');
+  const c = curso.rows[0];
+
+  // Ventana: la indicada o, por defecto, las fechas del curso.
+  const starts = d.startsAt ?? c.starts_at;
+  const ends = d.endsAt ?? c.ends_at;
+
+  await query(
+    `INSERT INTO course_auditors (course_id, user_id, starts_at, ends_at, created_by)
+     VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (course_id, user_id) DO UPDATE SET starts_at = EXCLUDED.starts_at, ends_at = EXCLUDED.ends_at`,
+    [c.id, req.params.id, starts, ends, req.auth!.sub],
+  );
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role, action: 'AUDITOR_CURSO_VINCULADO',
+    entity: 'course', entityId: c.id, ip: clientIp(req), metadata: { auditor: req.params.id, codigo: c.codigo_curso },
+  }).catch(() => { /* no bloquear */ });
+
+  res.status(201).json({ curso: { id: c.id, title: c.title, codigo_curso: c.codigo_curso, starts_at: starts, ends_at: ends } });
+}
+
+/** DELETE /api/admin/auditores/:id/cursos/:courseId — desvincular. */
+export async function desvincularCursoAuditor(req: Request, res: Response): Promise<void> {
+  const { rowCount } = await query(
+    'DELETE FROM course_auditors WHERE user_id = $1 AND course_id = $2',
+    [req.params.id, req.params.courseId],
+  );
+  if (rowCount === 0) throw notFound('Vínculo no encontrado');
+  res.json({ ok: true });
+}
+
 /** GET /api/admin/auditores/:id/actividad — qué ha consultado. */
 export async function actividadAuditor(req: Request, res: Response): Promise<void> {
   const { rows } = await query(

@@ -33,7 +33,7 @@ import { listLeads } from '../controllers/lead.controller.js';
 import { listTemplates, createTemplate, updateTemplate, deleteTemplate, uploadTemplateBackground, previewTemplate } from '../controllers/recognition.controller.js';
 import { anonStats } from '../controllers/anonPractice.controller.js';
 import { listConvocatorias, createConvocatoria, updateConvocatoria, deleteConvocatoria, setConvocatoriaBanks } from '../controllers/convocatoria.controller.js';
-import { listAuditores, crearAuditor, editarAuditor, borrarAuditor, actividadAuditor } from '../controllers/auditor.controller.js';
+import { listAuditores, crearAuditor, editarAuditor, borrarAuditor, actividadAuditor, cursosAuditor, vincularCursoAuditor, desvincularCursoAuditor } from '../controllers/auditor.controller.js';
 import { usoCompartido } from '../controllers/sesion.controller.js';
 import { getAcademySettings, updateAcademySettings, enviarCorreoPrueba } from '../controllers/academia.controller.js';
 
@@ -61,6 +61,9 @@ router.post('/auditores', asyncHandler(crearAuditor));
 router.patch('/auditores/:id', asyncHandler(editarAuditor));
 router.delete('/auditores/:id', asyncHandler(borrarAuditor));
 router.get('/auditores/:id/actividad', asyncHandler(actividadAuditor));
+router.get('/auditores/:id/cursos', asyncHandler(cursosAuditor));
+router.post('/auditores/:id/cursos', asyncHandler(vincularCursoAuditor));
+router.delete('/auditores/:id/cursos/:courseId', asyncHandler(desvincularCursoAuditor));
 
 // Convocatorias de oposición
 router.get('/convocatorias', asyncHandler(listConvocatorias));
