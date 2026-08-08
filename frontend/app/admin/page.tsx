@@ -65,6 +65,9 @@ export default function AdminDashboard() {
   // Grupo de WhatsApp general de la plataforma
   const [waUrl, setWaUrl] = useState('');
   const [waMsg, setWaMsg] = useState<string | null>(null);
+  // Prueba de correo saliente (Resend)
+  const [mailMsg, setMailMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [mailProbando, setMailProbando] = useState(false);
 
   async function loadAll() {
     try {
@@ -106,6 +109,23 @@ export default function AdminDashboard() {
       setWaMsg('Enlace guardado ✅');
     } catch (err) {
       setWaMsg(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
+
+  async function probarCorreo() {
+    setMailMsg(null);
+    setMailProbando(true);
+    try {
+      const r = await api<{ configurado: boolean; enviado: boolean; to?: string; mensaje?: string }>(
+        '/api/admin/email-test', { method: 'POST', auth: true },
+      );
+      if (!r.configurado) setMailMsg({ ok: false, text: r.mensaje ?? 'El correo no está configurado en el servidor todavía.' });
+      else if (r.enviado) setMailMsg({ ok: true, text: `Enviado a ${r.to}. Revisa tu bandeja (y spam).` });
+      else setMailMsg({ ok: false, text: 'Resend no aceptó el envío. Revisa la clave y que el dominio esté verificado.' });
+    } catch (err) {
+      setMailMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error' });
+    } finally {
+      setMailProbando(false);
     }
   }
 
@@ -307,6 +327,21 @@ export default function AdminDashboard() {
           <input className="form-input" style={{ flex: 1, minWidth: 260 }} placeholder="https://chat.whatsapp.com/..." value={waUrl} onChange={(e) => setWaUrl(e.target.value)} />
           <button className="btn btn-primary">Guardar</button>
         </form>
+      </div>
+      )}
+
+      {/* Prueba de correo saliente: se envía a ti mismo, no molesta a alumnos */}
+      {pestana === 'comunidad' && (
+      <div className="card animate-in" style={{ marginTop: 24 }}>
+        <div className="card-header">
+          <div className="card-title">Correo saliente</div>
+          <div className="card-subtitle">Comprueba que los emails salen (recordatorios, avisos…) sin molestar a nadie</div>
+        </div>
+        {mailMsg && <div className={`alert ${mailMsg.ok ? 'alert-success' : 'alert-error'}`}>{mailMsg.text}</div>}
+        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Se enviará un correo de prueba a tu propia dirección.</p>
+        <button className="btn btn-outline btn-small" onClick={probarCorreo} disabled={mailProbando}>
+          {mailProbando ? 'Enviando…' : 'Enviar correo de prueba'}
+        </button>
       </div>
       )}
 

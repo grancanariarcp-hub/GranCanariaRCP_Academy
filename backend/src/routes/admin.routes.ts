@@ -33,7 +33,7 @@ import { anonStats } from '../controllers/anonPractice.controller.js';
 import { listConvocatorias, createConvocatoria, updateConvocatoria, deleteConvocatoria, setConvocatoriaBanks } from '../controllers/convocatoria.controller.js';
 import { listAuditores, crearAuditor, editarAuditor, borrarAuditor, actividadAuditor } from '../controllers/auditor.controller.js';
 import { usoCompartido } from '../controllers/sesion.controller.js';
-import { getAcademySettings, updateAcademySettings } from '../controllers/academia.controller.js';
+import { getAcademySettings, updateAcademySettings, enviarCorreoPrueba } from '../controllers/academia.controller.js';
 
 const router = Router();
 
@@ -45,6 +45,7 @@ router.use(requireAuth, requireRole('super_admin'));
 
 router.get('/academia', asyncHandler(getAcademySettings));
 router.put('/academia', asyncHandler(updateAcademySettings));
+router.post('/email-test', asyncHandler(enviarCorreoPrueba));
 
 router.get('/stats', asyncHandler(getStats));
 router.get('/stripe-status', asyncHandler(stripeStatus));

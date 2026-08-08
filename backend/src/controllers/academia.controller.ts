@@ -5,6 +5,7 @@ import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { relacionConCurso } from '../services/courseAuth.js';
+import { sendEmail, emailTemplate, emailConfigured } from '../services/email.js';
 
 /**
  * Servicios extras: configuración (aún no se cobra). Un valor global de la
@@ -30,6 +31,33 @@ const settingsSchema = z.object({
   ia_paquete_creditos: z.number().int().min(1).max(1_000_000),
   ia_paquete_cents: z.number().int().min(0).max(10_000_00),
 }).partial();
+
+/**
+ * POST /api/admin/email-test — envía un correo de prueba al propio super admin.
+ *
+ * Sirve para verificar que Resend está bien configurado sin molestar a ningún
+ * alumno: el destinatario es siempre el email de quien pulsa el botón.
+ */
+export async function enviarCorreoPrueba(req: Request, res: Response): Promise<void> {
+  if (!emailConfigured()) {
+    res.json({ configurado: false, enviado: false, mensaje: 'Falta RESEND_API_KEY en el servidor.' });
+    return;
+  }
+  const u = await query<{ email: string; name: string }>('SELECT email, name FROM users WHERE id = $1', [req.auth!.sub]);
+  const to = u.rows[0]?.email;
+  if (!to) { res.json({ configurado: true, enviado: false, mensaje: 'Tu cuenta no tiene email.' }); return; }
+  const html = emailTemplate(
+    'Correo de prueba ✅',
+    'Si lees esto, el envío de correos de la academia funciona correctamente. Puedes ignorar este mensaje.',
+    null,
+  );
+  const enviado = await sendEmail(to, 'Prueba de correo · GranCanaria RCP', html);
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role, action: 'EMAIL_TEST',
+    entity: 'academy', entityId: null, ip: clientIp(req), metadata: { to, enviado },
+  }).catch(() => { /* no bloquear */ });
+  res.json({ configurado: true, enviado, to });
+}
 
 /** GET /api/admin/academia — configuración global (super admin). */
 export async function getAcademySettings(_req: Request, res: Response): Promise<void> {
