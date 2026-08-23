@@ -32,6 +32,7 @@ const metaSchema = z.object({
   pages: z.coerce.number().int().positive().optional(),
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal('')).optional(),
   visibility: z.enum(['privado', 'publico', 'restringido']).optional(),
+  courseId: z.string().uuid().or(z.literal('')).optional(),
 });
 
 /**
@@ -76,7 +77,7 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
     throw badRequest('El archivo debe ser un PDF', 'NOT_PDF');
   }
 
-  const { title, kind, pages, validUntil, visibility } = metaSchema.parse(req.body);
+  const { title, kind, pages, validUntil, visibility, courseId } = metaSchema.parse(req.body);
   // Un profesor sube en privado salvo que indique otra cosa; la plataforma
   // (super admin) sube en público, como hasta ahora.
   const vis = visibility ?? (req.auth!.role === 'super_admin' ? 'publico' : 'privado');
@@ -101,10 +102,10 @@ export async function uploadDocument(req: Request, res: Response): Promise<void>
   await uploadObject(key, file.buffer, file.mimetype);
 
   const { rows } = await query(
-    `INSERT INTO documents (title, kind, storage_key, content_type, size_bytes, pages, uploaded_by, valid_until, visibility)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING id, title, kind, size_bytes, pages, created_at, to_char(valid_until, 'YYYY-MM-DD') AS valid_until, visibility`,
-    [title, kind, key, file.mimetype, file.size, paginas, req.auth!.sub, validUntil || null, vis],
+    `INSERT INTO documents (title, kind, storage_key, content_type, size_bytes, pages, uploaded_by, valid_until, visibility, course_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING id, title, kind, size_bytes, pages, created_at, to_char(valid_until, 'YYYY-MM-DD') AS valid_until, visibility, course_id`,
+    [title, kind, key, file.mimetype, file.size, paginas, req.auth!.sub, validUntil || null, vis, courseId || null],
   );
 
   await audit({
@@ -133,12 +134,12 @@ export async function listDocuments(req: Request, res: Response): Promise<void> 
   const { rows } = await query(
     esSuper
       ? `SELECT d.id, d.title, d.kind, d.size_bytes, d.pages, (d.storage_key IS NOT NULL) AS has_file,
-                d.created_at, d.uploaded_by, d.visibility, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, TRUE AS mio
+                d.created_at, d.uploaded_by, d.visibility, d.course_id, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, TRUE AS mio
            FROM documents d
            LEFT JOIN users u ON u.id = d.uploaded_by
           WHERE d.is_active = TRUE ORDER BY d.created_at DESC`
       : `SELECT d.id, d.title, d.kind, d.size_bytes, d.pages, (d.storage_key IS NOT NULL) AS has_file,
-                d.created_at, d.uploaded_by, d.visibility, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, (d.uploaded_by = $2) AS mio
+                d.created_at, d.uploaded_by, d.visibility, d.course_id, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, (d.uploaded_by = $2) AS mio
            FROM documents d
            LEFT JOIN users u ON u.id = d.uploaded_by
           WHERE d.is_active = TRUE AND ${docVisible('d', '$1', '$2')}

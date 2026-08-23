@@ -139,7 +139,11 @@ export default function CourseDetailPage() {
     sinEstimar: Array<{ id: string; title: string; type: string }>;
   }>(null);
   const [tempPw, setTempPw] = useState<{ name: string; pw: string } | null>(null);
-  const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
+  const [docs, setDocs] = useState<Array<{ id: string; title: string; mio?: boolean; course_id?: string | null }>>([]);
+  // Duración fijada a mano por el director (lo que verán los alumnos).
+  const [horasManual, setHorasManual] = useState('');
+  // Filtro del selector de documentos: todos / míos / de este curso.
+  const [docFiltro, setDocFiltro] = useState<'todos' | 'mios' | 'curso'>('mios');
   const [error, setError] = useState<string | null>(null);
   const [pestana, setPestana] = useState('resumen'); // pestaña visible de la ficha
   const [auditoria, setAuditoria] = useState<{
@@ -203,14 +207,14 @@ export default function CourseDetailPage() {
     try {
       const [c, d] = await Promise.all([
         api<{ course: Course; modules: Module[]; staff: Staff[]; gallery: Array<{ id: string; url: string }> }>(`/api/courses/${courseId}`, { auth: true }),
-        api<{ documents: Array<{ id: string; title: string }> }>('/api/documents', { auth: true }).catch(() => ({ documents: [] })),
+        api<{ documents: Array<{ id: string; title: string; mio?: boolean; course_id?: string | null }> }>('/api/documents', { auth: true }).catch(() => ({ documents: [] })),
       ]);
       setCourse(c.course);
       setGallery(c.gallery ?? []);
       api<{ students: typeof students; totalActivities: number }>(`/api/courses/${courseId}/students`, { auth: true })
         .then((r) => { setStudents(r.students); setTotalActivities(r.totalActivities); }).catch(() => {});
       api<typeof dur>(`/api/courses/${courseId}/duration`, { auth: true })
-        .then((r) => setDur(r)).catch(() => {});
+        .then((r) => { setDur(r); if (r?.horasDeclaradas != null) setHorasManual(String(r.horasDeclaradas)); }).catch(() => {});
       api<typeof cdash>(`/api/courses/${courseId}/dashboard`, { auth: true })
         .then((r) => setCdash(r)).catch(() => {});
       api<typeof cfc>(`/api/courses/${courseId}/cfc`, { auth: true })
@@ -362,7 +366,29 @@ export default function CourseDetailPage() {
 
   async function applyDeclaredHours() {
     if (!dur) return;
+    setHorasManual(String(dur.totalHoras));
     await patchCourse({ durationHours: dur.totalHoras });
+  }
+
+  // El director fija la duración a mano; es la que ven los alumnos. La estimada
+  // sigue mostrándose como aviso si difiere.
+  async function guardarHorasManual() {
+    const h = Number(horasManual);
+    if (Number.isNaN(h) || h <= 0) { setError('Indica un número de horas válido'); return; }
+    await patchCourse({ durationHours: h });
+  }
+
+  async function renombrarModulo(m: { id: string; title: string }) {
+    const nuevo = prompt('Nuevo nombre del módulo:', m.title);
+    if (!nuevo || nuevo.trim() === m.title) return;
+    try {
+      await api(`/api/courses/${courseId}/modules/${m.id}`, {
+        method: 'PATCH', auth: true, body: JSON.stringify({ title: nuevo.trim() }),
+      });
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo renombrar el módulo');
+    }
   }
 
   async function resetStudentPassword(s: { id: string; name: string }) {
@@ -493,9 +519,10 @@ export default function CourseDetailPage() {
     setError(null);
     try {
       const r = await uploadFile<{ document: { id: string; title: string } }>(
-        '/api/documents', file, { title: actTitle.trim() || file.name.replace(/\.pdf$/i, ''), kind: 'otro' },
+        '/api/documents', file, { title: actTitle.trim() || file.name.replace(/\.pdf$/i, ''), kind: 'otro', courseId },
       );
-      setDocs((prev) => [{ id: r.document.id, title: r.document.title }, ...prev]);
+      // Se marca como «de este curso» y como propio para que aparezca en los filtros.
+      setDocs((prev) => [{ id: r.document.id, title: r.document.title, mio: true, course_id: courseId }, ...prev]);
       setActDoc(r.document.id);
       if (!actTitle.trim()) setActTitle(r.document.title);
     } catch (err) {
@@ -957,8 +984,15 @@ export default function CourseDetailPage() {
                     declaradas en la ficha: {dur.horasDeclaradas} h
                   </span>
                 )}
-                <button className="btn btn-outline btn-small" onClick={applyDeclaredHours}>Usar {dur.totalHoras} h como duración del curso</button>
+                <button className="btn btn-outline btn-small" onClick={applyDeclaredHours}>Usar {dur.totalHoras} h</button>
+                <span className="muted" style={{ fontSize: 13 }}>o fija a mano:</span>
+                <input className="form-input" type="number" step="0.5" min="0" style={{ width: 90 }}
+                  value={horasManual} onChange={(e) => setHorasManual(e.target.value)} placeholder="h" />
+                <button className="btn btn-primary btn-small" onClick={guardarHorasManual}>Guardar duración</button>
               </div>
+              <p className="muted" style={{ fontSize: 12.5, marginTop: 0, marginBottom: 8 }}>
+                Lo que fijes aquí es <strong>lo que ven los alumnos</strong>. La estimación de arriba es solo una guía; si difiere, se avisa con la etiqueta.
+              </p>
               {dur.sinEstimar.length > 0 && (
                 <div className="alert alert-warning">
                   <strong>Faltan datos para {dur.sinEstimar.length} actividad(es)</strong>, así que la duración real es mayor:
@@ -1119,9 +1153,12 @@ export default function CourseDetailPage() {
 
               {modules.map((m) => (
                 <div key={m.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong>{m.title}</strong>
-                    <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <strong style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.title}</span>
+                      <button className="link-action" title="Renombrar módulo" onClick={() => renombrarModulo(m)} style={{ flexShrink: 0 }}>✏️</button>
+                    </strong>
+                    <div style={{ flexShrink: 0 }}>
                       <button className="btn btn-outline btn-small" onClick={() => setAddingTo(addingTo === m.id ? null : m.id)}>+ Actividad</button>{' '}
                       {m.title !== 'Bienvenida' && (
                         <button className="btn btn-outline btn-small" onClick={() => deleteModule(m.id)} title="Eliminar módulo">🗑</button>
@@ -1189,15 +1226,29 @@ export default function CourseDetailPage() {
                             <input type="file" accept="application/pdf,.pdf" style={{ display: 'none' }} disabled={subiendoDoc}
                               onChange={(e) => { uploadDocAndSelect(e.target.files?.[0]); e.target.value = ''; }} />
                           </label>
-                          {docs.length > 0 && (
+                          {docs.length > 0 && (() => {
+                            const docsFiltrados = docs.filter((d) =>
+                              docFiltro === 'mios' ? d.mio : docFiltro === 'curso' ? d.course_id === courseId : true);
+                            return (
                             <>
                               <p className="muted" style={{ fontSize: 12, textAlign: 'center', margin: '8px 0 6px' }}>o elige uno ya subido</p>
+                              <div style={{ display: 'flex', gap: 6, marginBottom: 6, fontSize: 12.5 }}>
+                                <span className="muted">Filtrar:</span>
+                                {([['mios', 'Míos'], ['curso', 'De este curso'], ['todos', 'Todos']] as const).map(([v, label]) => (
+                                  <button key={v} type="button" className="link-action"
+                                    style={{ fontWeight: docFiltro === v ? 700 : 400 }}
+                                    onClick={() => setDocFiltro(v)}>{label}</button>
+                                ))}
+                              </div>
                               <select className="form-select" value={actDoc} onChange={(e) => setActDoc(e.target.value)}>
-                                <option value="">Documentos de la biblioteca…</option>
-                                {docs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
+                                <option value="">
+                                  {docsFiltrados.length === 0 ? 'Sin documentos en este filtro…' : 'Documentos de la biblioteca…'}
+                                </option>
+                                {docsFiltrados.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
                               </select>
                             </>
-                          )}
+                            );
+                          })()}
                           {actDoc && <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>✓ Documento seleccionado</p>}
                         </div>
                       )}

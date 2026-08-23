@@ -102,7 +102,8 @@ export default function PreguntasPage() {
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [list, setList] = useState<QuestionRow[]>([]);
-  const [docs, setDocs] = useState<Array<{ id: string; title: string }>>([]);
+  const [docs, setDocs] = useState<Array<{ id: string; title: string; mio?: boolean }>>([]);
+  const [docFiltro, setDocFiltro] = useState<'todos' | 'mios'>('mios');
 
   // Bulk import
   const [importing, setImporting] = useState(false);
@@ -119,7 +120,7 @@ export default function PreguntasPage() {
     try {
       const [q, d, b] = await Promise.all([
         api<{ questions: QuestionRow[] }>(`/api/questions${media ? `?media=${media}` : ''}`, { auth: true }),
-        api<{ documents: Array<{ id: string; title: string }> }>('/api/documents', { auth: true }),
+        api<{ documents: Array<{ id: string; title: string; mio?: boolean }> }>('/api/documents', { auth: true }),
         api<{ banks: Array<{ id: string; name: string; kind: string }> }>('/api/banks', { auth: true }).catch(() => ({ banks: [] })),
       ]);
       setList(q.questions);
@@ -552,10 +553,18 @@ export default function PreguntasPage() {
               </div>
               <div className="grid grid-2" style={{ gap: 12 }}>
                 <div className="form-group">
-                  <label className="form-label">Documento de referencia</label>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Documento de referencia</span>
+                    <span style={{ fontWeight: 400, fontSize: 12 }}>
+                      {([['mios', 'Míos'], ['todos', 'Todos']] as const).map(([v, label]) => (
+                        <button key={v} type="button" className="link-action" style={{ fontWeight: docFiltro === v ? 700 : 400, marginLeft: 6 }}
+                          onClick={() => setDocFiltro(v)}>{label}</button>
+                      ))}
+                    </span>
+                  </label>
                   <select className="form-select" value={refDocumentId} onChange={(e) => setRefDocumentId(e.target.value)}>
                     <option value="">— Ninguno —</option>
-                    {docs.map((d) => (
+                    {docs.filter((d) => docFiltro === 'todos' || d.mio).map((d) => (
                       <option key={d.id} value={d.id}>
                         {d.title}
                       </option>

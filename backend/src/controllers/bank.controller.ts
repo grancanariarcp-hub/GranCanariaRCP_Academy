@@ -47,6 +47,7 @@ const createSchema = z.object({
   simMinutes: z.number().int().min(1).max(600).nullable().optional(),
   simPassPct: z.number().int().min(0).max(100).nullable().optional(),
   visibility: z.enum(['privado', 'publico', 'restringido']).optional(),
+  courseId: z.string().uuid().nullable().optional(),
 });
 
 export async function createBank(req: Request, res: Response): Promise<void> {
@@ -54,11 +55,11 @@ export async function createBank(req: Request, res: Response): Promise<void> {
   // Un profesor crea sus bancos en privado salvo que indique lo contrario.
   const visibility = d.visibility ?? (req.auth!.role === 'super_admin' ? 'publico' : 'privado');
   const { rows } = await query(
-    `INSERT INTO question_banks (name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct, created_by, visibility)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, sim_questions, sim_minutes, sim_pass_pct, visibility`,
+    `INSERT INTO question_banks (name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct, created_by, visibility, course_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, sim_questions, sim_minutes, sim_pass_pct, visibility, course_id`,
     [d.name, d.kind, d.comunidadAutonoma ?? null, d.anio ?? null, d.categoriaProfesional ?? null, d.official, d.descripcion ?? null,
-      d.simQuestions ?? null, d.simMinutes ?? null, d.simPassPct ?? null, req.auth!.sub, visibility],
+      d.simQuestions ?? null, d.simMinutes ?? null, d.simPassPct ?? null, req.auth!.sub, visibility, d.courseId ?? null],
   );
   res.status(201).json({ bank: rows[0] });
 }
@@ -79,6 +80,7 @@ export async function updateBank(req: Request, res: Response): Promise<void> {
     sim_minutes: d.simMinutes,
     sim_pass_pct: d.simPassPct,
     visibility: d.visibility,
+    course_id: d.courseId,
   };
   const fields: string[] = [];
   const params: unknown[] = [];
@@ -89,7 +91,7 @@ export async function updateBank(req: Request, res: Response): Promise<void> {
   params.push(req.params.id);
   const { rows } = await query(
     `UPDATE question_banks SET ${fields.join(', ')} WHERE id = $${params.length}
-     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct, visibility`,
+     RETURNING id, name, kind, comunidad_autonoma, anio, categoria_profesional, official, descripcion, sim_questions, sim_minutes, sim_pass_pct, visibility, course_id`,
     params,
   );
   if (rows.length === 0) throw notFound('Banco no encontrado');
@@ -214,6 +216,7 @@ export async function listBanks(req: Request, res: Response): Promise<void> {
   if (f.visibility) { params.push(f.visibility); conds.push(`b.visibility = $${params.length}`); }
   if (f.official === '1') conds.push('b.official = TRUE');
   if (f.mine === '1' && uid) { params.push(uid); conds.push(`b.created_by = $${params.length}`); }
+  if (f.courseId) { params.push(f.courseId); conds.push(`b.course_id = $${params.length}`); }
   if (f.q) {
     params.push(`%${f.q}%`);
     conds.push(`(b.name ILIKE $${params.length} OR b.descripcion ILIKE $${params.length})`);
@@ -223,10 +226,11 @@ export async function listBanks(req: Request, res: Response): Promise<void> {
 
   const { rows } = await query(
     `SELECT b.id, b.name, b.kind, b.comunidad_autonoma, b.anio, b.categoria_profesional, b.official, b.descripcion,
-            b.sim_questions, b.sim_minutes, b.sim_pass_pct, b.visibility, b.created_by,
+            b.sim_questions, b.sim_minutes, b.sim_pass_pct, b.visibility, b.created_by, b.course_id, c.title AS course_title,
             ($2::uuid IS NOT NULL AND b.created_by = $2) AS mine,
             (SELECT COUNT(*) FROM questions q WHERE q.bank_id = b.id) AS questions
      FROM question_banks b
+     LEFT JOIN courses c ON c.id = b.course_id
      WHERE ${conds.join(' AND ')}
      ORDER BY (b.created_by = $2) DESC NULLS LAST, (b.kind = 'rcp') DESC, b.created_at DESC`,
     params,

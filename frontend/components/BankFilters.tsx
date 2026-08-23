@@ -24,11 +24,14 @@ export interface FiltrosBanco {
   mine: boolean;
   conPreguntas: boolean;
   q: string;
+  cursoId: string;
 }
 
 export const FILTROS_VACIOS: FiltrosBanco = {
-  kind: '', dim1: '', dim2: '', anio: '', visibility: '', mine: false, conPreguntas: false, q: '',
+  kind: '', dim1: '', dim2: '', anio: '', visibility: '', mine: false, conPreguntas: false, q: '', cursoId: '',
 };
+
+export interface CursoRef { id: string; title: string; codigo_curso?: string | null }
 
 const NOMBRE_TIPO: Record<string, string> = {
   rcp: 'RCP', formativo: 'Formativo', ope: 'OPE', mir: 'MIR', otro: 'Otro',
@@ -42,16 +45,17 @@ function rotulos(kind: string): { d1: string; d2: string } {
 }
 
 export function BankFilters({
-  filtros, setFiltros, facetas, total,
+  filtros, setFiltros, facetas, total, cursos = [],
 }: {
   filtros: FiltrosBanco;
   setFiltros: (f: FiltrosBanco) => void;
   facetas: Facetas | null;
   total: number;
+  cursos?: CursoRef[];
 }) {
   const r = useMemo(() => rotulos(filtros.kind), [filtros.kind]);
   const activos = filtros.kind || filtros.dim1 || filtros.dim2 || filtros.anio
-    || filtros.visibility || filtros.mine || filtros.conPreguntas || filtros.q;
+    || filtros.visibility || filtros.mine || filtros.conPreguntas || filtros.q || filtros.cursoId;
 
   const set = (parcial: Partial<FiltrosBanco>) => setFiltros({ ...filtros, ...parcial });
 
@@ -112,6 +116,17 @@ export function BankFilters({
             <option value="privado">Privados</option>
           </select>
         </div>
+
+        {cursos.length > 0 && (
+          <div>
+            <label className="form-label" htmlFor="fb-curso">Curso</label>
+            <select id="fb-curso" className="form-select" value={filtros.cursoId}
+              onChange={(e) => set({ cursoId: e.target.value })}>
+              <option value="">Cualquiera</option>
+              {cursos.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+          </div>
+        )}
 
         <div>
           <span className="form-label">Solo míos</span>

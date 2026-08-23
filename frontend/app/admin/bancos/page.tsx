@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
-import { api, ApiError, downloadFile } from '@/lib/api';
+import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
 import { BankFilters, FILTROS_VACIOS, type FiltrosBanco, type Facetas } from '@/components/BankFilters';
 import { BankQuestionList } from '@/components/BankQuestionList';
@@ -23,9 +23,13 @@ interface Bank {
   sim_minutes: number | null;
   sim_pass_pct: number | null;
   visibility: 'privado' | 'publico' | 'restringido';
+  course_id: string | null;
+  course_title: string | null;
   mine: boolean;
   canManage: boolean;
 }
+
+interface CursoRef { id: string; title: string; codigo_curso: string | null }
 
 const INSTITUCIONES = ['ERC', 'AHA', 'PNRCP', 'ILCOR', 'Cruz Roja', 'Otra'];
 const POBLACIONES = ['Niños de 6 a 12 años', 'Jóvenes de 13 a 17 años', 'Adultos +18 años', 'Sanitarios'];
@@ -64,6 +68,10 @@ export default function BancosPage() {
   const [dim2, setDim2] = useState('');
   const [official, setOfficial] = useState(false);
   const [visibility, setVisibility] = useState<'privado' | 'publico' | 'restringido'>('privado');
+  // Curso al que se vincula el banco (opcional) y archivo a importar al crearlo.
+  const [cursoId, setCursoId] = useState('');
+  const [cursos, setCursos] = useState<CursoRef[]>([]);
+  const [archivoNuevo, setArchivoNuevo] = useState<File | null>(null);
   // Lista de acceso de un banco restringido (solo al editar uno que ya existe).
   const [accesoPersonas, setAccesoPersonas] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [accesoEmail, setAccesoEmail] = useState('');
@@ -91,6 +99,7 @@ export default function BancosPage() {
       if (filtros.anio) qs.set('anio', filtros.anio);
       if (filtros.visibility) qs.set('visibility', filtros.visibility);
       if (filtros.mine) qs.set('mine', '1');
+      if (filtros.cursoId) qs.set('courseId', filtros.cursoId);
       if (filtros.conPreguntas) qs.set('conPreguntas', '1');
       if (filtros.q) qs.set('q', filtros.q);
       const r = await api<{ banks: Bank[]; total: number; facetas: Facetas }>(
@@ -107,10 +116,18 @@ export default function BancosPage() {
   const filtrosEstables = useDebounced(filtros);
   useEffect(() => { if (user) load(); /* eslint-disable-next-line */ }, [user, filtrosEstables]);
 
+  // Cursos del usuario, para vincular un banco y para el filtro por curso.
+  useEffect(() => {
+    if (!user) return;
+    api<{ courses: CursoRef[] }>('/api/courses', { auth: true })
+      .then((r) => setCursos(r.courses)).catch(() => {});
+  }, [user]);
+
   function resetForm() {
     setEditingId(null); setName(''); setKind('rcp'); setAnio('');
     setDim1(''); setDim2(''); setOfficial(false); setSimQ(''); setSimMin(''); setSimPass('');
     setVisibility('privado'); setAccesoPersonas([]); setAccesoEmail(''); setAccesoMsg(null);
+    setCursoId(''); setArchivoNuevo(null);
   }
 
   function startEdit(b: Bank) {
@@ -119,6 +136,7 @@ export default function BancosPage() {
     setDim1(b.comunidad_autonoma ?? ''); setDim2(b.categoria_profesional ?? '');
     setOfficial(b.official);
     setSimQ(b.sim_questions?.toString() ?? ''); setSimMin(b.sim_minutes?.toString() ?? ''); setSimPass(b.sim_pass_pct?.toString() ?? '');
+    setCursoId(b.course_id ?? ''); setArchivoNuevo(null);
     setMsg(null); setAccesoMsg(null); setAccesoEmail('');
     if (b.visibility === 'restringido') cargarAcceso(b.id); else setAccesoPersonas([]);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -154,11 +172,11 @@ export default function BancosPage() {
     e.preventDefault();
     setMsg(null);
     const s = shapeFor(kind);
+    // Si se adjunta archivo al crear y no hay nombre, se usa el del archivo.
+    const nombreArchivo = archivoNuevo ? archivoNuevo.name.replace(/\.(json|xlsx?)$/i, '').replace(/[_-]+/g, ' ').trim() : '';
     // Los campos que no aplican a este tipo se envían en null para limpiarlos.
     const body = {
-      // El servidor exige un nombre; si se deja vacío se marca como pendiente y
-      // se sustituye por el del archivo en cuanto se importe.
-      name: name.trim() || 'Sin nombre',
+      name: name.trim() || nombreArchivo || 'Sin nombre',
       kind,
       anio: anio ? Number(anio) : null,
       comunidadAutonoma: dim1 || null,
@@ -168,14 +186,27 @@ export default function BancosPage() {
       simMinutes: s.sim && simMin ? Number(simMin) : null,
       simPassPct: s.sim && simPass ? Number(simPass) : null,
       visibility,
+      courseId: cursoId || null,
     };
     try {
       if (editingId) {
         await api(`/api/banks/${editingId}`, { method: 'PATCH', auth: true, body: JSON.stringify(body) });
         setMsg({ ok: true, text: 'Banco actualizado ✅' });
       } else {
-        await api('/api/banks', { method: 'POST', auth: true, body: JSON.stringify(body) });
-        setMsg({ ok: true, text: 'Banco creado ✅' });
+        const r = await api<{ bank: { id: string } }>('/api/banks', { method: 'POST', auth: true, body: JSON.stringify(body) });
+        // Si se adjuntó un archivo, se importan sus preguntas de una vez (Excel o
+        // JSON) al banco recién creado: un solo paso, sin ir al importador aparte.
+        if (archivoNuevo) {
+          try {
+            const imp = await uploadFile<{ created: number; total: number }>(
+              '/api/questions/import', archivoNuevo, { bankId: r.bank.id });
+            setMsg({ ok: true, text: `Banco creado ✅ · ${imp.created}/${imp.total} preguntas importadas` });
+          } catch (e) {
+            setMsg({ ok: true, text: `Banco creado ✅, pero el archivo no se pudo importar: ${e instanceof ApiError ? e.message : 'error'}. Usa «Importar» en su fila.` });
+          }
+        } else {
+          setMsg({ ok: true, text: 'Banco creado ✅' });
+        }
       }
       resetForm();
       load();
@@ -398,6 +429,32 @@ export default function BancosPage() {
               </>
             )}
 
+            <div className="form-group">
+              <label className="form-label">Curso vinculado (opcional)</label>
+              <select className="form-select" value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
+                <option value="">— Sin curso —</option>
+                {cursos.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}{c.codigo_curso ? ` · ${c.codigo_curso}` : ''}</option>
+                ))}
+              </select>
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Sirve para filtrar tus bancos por curso. No obliga a nada: el banco puede usarse en cualquier examen.
+              </p>
+            </div>
+
+            {/* Al crear: subir el archivo de preguntas desde el equipo en el mismo
+                paso (Excel o JSON). Al editar, se usa «Importar» en la fila. */}
+            {!editingId && (
+              <div className="form-group">
+                <label className="form-label">Preguntas desde archivo (opcional)</label>
+                <input className="form-input" type="file" accept=".xlsx,.json,application/json"
+                  onChange={(e) => setArchivoNuevo(e.target.files?.[0] ?? null)} />
+                <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Excel o JSON. Se importan al crear el banco. {archivoNuevo && <strong>{archivoNuevo.name}</strong>}
+                </p>
+              </div>
+            )}
+
             <button className="btn btn-primary btn-full">{editingId ? 'Guardar cambios' : 'Crear banco'}</button>
           </form>
         </div>
@@ -406,7 +463,7 @@ export default function BancosPage() {
         <div className="card animate-in">
           <div className="card-header"><div className="card-title">Bancos</div><div className="card-subtitle">{banks.length} de {total}</div></div>
 
-          <BankFilters filtros={filtros} setFiltros={setFiltros} facetas={facetas} total={total} />
+          <BankFilters filtros={filtros} setFiltros={setFiltros} facetas={facetas} total={total} cursos={cursos} />
           <div className="table-responsive">
             <table>
               <thead><tr><th>Banco</th><th>Preguntas</th><th>Acciones</th></tr></thead>
@@ -422,6 +479,7 @@ export default function BancosPage() {
                           b.anio || null,
                           b.comunidad_autonoma,
                           b.categoria_profesional,
+                          b.course_title ? `📚 ${b.course_title}` : null,
                           b.mine ? 'mío' : null,
                           b.mine
                             ? (b.visibility === 'privado' ? 'privado' : b.visibility === 'restringido' ? 'restringido' : 'público')
