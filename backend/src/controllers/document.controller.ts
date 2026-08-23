@@ -134,14 +134,16 @@ export async function listDocuments(req: Request, res: Response): Promise<void> 
   const { rows } = await query(
     esSuper
       ? `SELECT d.id, d.title, d.kind, d.size_bytes, d.pages, (d.storage_key IS NOT NULL) AS has_file,
-                d.created_at, d.uploaded_by, d.visibility, d.course_id, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, TRUE AS mio
+                d.created_at, d.uploaded_by, d.visibility, d.course_id, c.title AS course_title, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, TRUE AS mio
            FROM documents d
            LEFT JOIN users u ON u.id = d.uploaded_by
+           LEFT JOIN courses c ON c.id = d.course_id
           WHERE d.is_active = TRUE ORDER BY d.created_at DESC`
       : `SELECT d.id, d.title, d.kind, d.size_bytes, d.pages, (d.storage_key IS NOT NULL) AS has_file,
-                d.created_at, d.uploaded_by, d.visibility, d.course_id, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, (d.uploaded_by = $2) AS mio
+                d.created_at, d.uploaded_by, d.visibility, d.course_id, c.title AS course_title, to_char(d.valid_until, 'YYYY-MM-DD') AS valid_until, u.name AS autor, ${usos} AS cursos, (d.uploaded_by = $2) AS mio
            FROM documents d
            LEFT JOIN users u ON u.id = d.uploaded_by
+           LEFT JOIN courses c ON c.id = d.course_id
           WHERE d.is_active = TRUE AND ${docVisible('d', '$1', '$2')}
           ORDER BY d.created_at DESC`,
     esSuper ? [] : [false, req.auth!.sub],

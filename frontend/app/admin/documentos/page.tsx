@@ -21,9 +21,13 @@ interface DocRow {
   autor: string | null;
   cursos: number | string;
   visibility: 'privado' | 'publico' | 'restringido';
+  course_id?: string | null;
+  course_title?: string | null;
   /** Subido por mí: solo entonces se puede borrar. */
   mio?: boolean;
 }
+
+interface CursoRef { id: string; title: string; codigo_curso?: string | null }
 
 const KIND_LABEL = { erc: 'ERC 2025', pnrcp: 'PNRCP', otro: 'Otro' } as const;
 const VIS_LABEL: Record<string, string> = { privado: 'privado', publico: 'público', restringido: 'restringido' };
@@ -54,6 +58,8 @@ export default function DocumentosPage() {
   const [kind, setKind] = useState<'erc' | 'pnrcp' | 'otro'>('erc');
   const [validUntil, setValidUntil] = useState('');
   const [visibility, setVisibility] = useState<'privado' | 'publico' | 'restringido'>('privado');
+  const [cursoId, setCursoId] = useState('');
+  const [cursos, setCursos] = useState<CursoRef[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -64,6 +70,7 @@ export default function DocumentosPage() {
   const [fKind, setFKind] = useState<'' | 'erc' | 'pnrcp' | 'otro'>('');
   const [fEstado, setFEstado] = useState<'' | 'vigente' | 'caducado' | 'sin-archivo'>('');
   const [fAutor, setFAutor] = useState('');
+  const [fCurso, setFCurso] = useState('');
   const [soloMios, setSoloMios] = useState(false);
   const [pagina, setPagina] = useState(1);
   // Edición en línea de la caducidad de un documento propio.
@@ -82,6 +89,7 @@ export default function DocumentosPage() {
     (fKind === '' || d.kind === fKind)
     && (fEstado === '' || estadoDoc(d) === fEstado)
     && (fAutor === '' || d.autor === fAutor)
+    && (fCurso === '' || d.course_id === fCurso)
     && (!soloMios || d.mio)
     && (q.trim() === '' || norm(d.title).includes(norm(q))));
   const totalPaginas = Math.max(1, Math.ceil(docsFiltrados.length / POR_PAGINA));
@@ -161,6 +169,13 @@ export default function DocumentosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Cursos del usuario, para vincular al subir y para el filtro por curso.
+  useEffect(() => {
+    if (!user) return;
+    api<{ courses: CursoRef[] }>('/api/courses', { auth: true })
+      .then((r) => setCursos(r.courses)).catch(() => {});
+  }, [user]);
+
   async function onUpload(e: React.FormEvent) {
     e.preventDefault();
     setMsg(null);
@@ -175,6 +190,7 @@ export default function DocumentosPage() {
       fd.append('title', title);
       fd.append('kind', kind);
       fd.append('visibility', visibility);
+      if (cursoId) fd.append('courseId', cursoId);
       if (validUntil) fd.append('validUntil', validUntil);
       const res = await fetch(`${API_URL}/api/documents`, {
         method: 'POST',
@@ -189,6 +205,7 @@ export default function DocumentosPage() {
       setTitle('');
       setValidUntil('');
       setVisibility('privado');
+      setCursoId('');
       setFile(null);
       if (fileRef.current) fileRef.current.value = '';
       loadDocs();
@@ -253,6 +270,14 @@ export default function DocumentosPage() {
               )}
             </div>
             <div className="form-group">
+              <label className="form-label">Curso vinculado <span className="muted" style={{ fontWeight: 400 }}>(opcional)</span></label>
+              <select className="form-select" value={cursoId} onChange={(e) => setCursoId(e.target.value)}>
+                <option value="">— Sin curso —</option>
+                {cursos.map((c) => <option key={c.id} value={c.id}>{c.title}{c.codigo_curso ? ` · ${c.codigo_curso}` : ''}</option>)}
+              </select>
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>Sirve para filtrar tus documentos por curso. No impide enlazarlo en otros cursos.</p>
+            </div>
+            <div className="form-group">
               <label className="form-label">Archivo PDF</label>
               <input ref={fileRef} className="form-input" style={{ paddingTop: 8 }} type="file" accept="application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required />
             </div>
@@ -290,6 +315,12 @@ export default function DocumentosPage() {
               <select className="form-select" style={{ width: 'auto' }} value={fAutor} onChange={(e) => { setFAutor(e.target.value); setPagina(1); }}>
                 <option value="">Cualquier autor</option>
                 {autores.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            )}
+            {cursos.length > 0 && (
+              <select className="form-select" style={{ width: 'auto' }} value={fCurso} onChange={(e) => { setFCurso(e.target.value); setPagina(1); }}>
+                <option value="">Cualquier curso</option>
+                {cursos.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
               </select>
             )}
             <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
@@ -340,7 +371,7 @@ export default function DocumentosPage() {
                   const editando = editId === d.id;
                   return (
                   <tr key={d.id}>
-                    <td style={{ fontSize: 13 }}>{d.title}<div className="muted" style={{ fontSize: 11 }}>{humanSize(d.size_bytes)}{d.pages ? ` · ${d.pages} pág.` : ''}</div></td>
+                    <td style={{ fontSize: 13 }}>{d.title}<div className="muted" style={{ fontSize: 11 }}>{humanSize(d.size_bytes)}{d.pages ? ` · ${d.pages} pág.` : ''}{d.course_title ? ` · 📚 ${d.course_title}` : ''}</div></td>
                     <td>
                       <span className="badge badge-primary">{KIND_LABEL[d.kind]}</span>
                     </td>
