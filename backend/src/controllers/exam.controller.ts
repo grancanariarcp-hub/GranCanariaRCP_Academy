@@ -63,7 +63,7 @@ export async function createExam(req: Request, res: Response): Promise<void> {
 export async function getExam(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
-  const exam = await query('SELECT id, title, kind, attempts_allowed, pass_pct, time_limit_min FROM exams WHERE id = $1', [req.params.examId]);
+  const exam = await query('SELECT id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt FROM exams WHERE id = $1', [req.params.examId]);
   const questions = await query<{ id: string; image_key: string | null }>(
     'SELECT id, format, text, options, correct_index, video_url, image_key, sort_order FROM exam_questions WHERE exam_id = $1 ORDER BY sort_order',
     [req.params.examId],
@@ -79,6 +79,13 @@ const updateExamSchema = z.object({
   attemptsAllowed: z.number().int().min(1).max(50).optional(),
   passPct: z.number().int().min(0).max(100).optional(),
   timeLimitMin: z.number().int().min(1).max(600).nullable().optional(),
+  // Comportamiento por intento:
+  //  shuffle            → baraja el orden de preguntas y opciones en cada intento.
+  //  randomPerStudent   → cada intento sirve un subconjunto aleatorio (N) del examen.
+  //  questionsPerAttempt→ cuántas preguntas por intento cuando es aleatorio.
+  shuffle: z.boolean().optional(),
+  randomPerStudent: z.boolean().optional(),
+  questionsPerAttempt: z.number().int().min(1).max(300).nullable().optional(),
 });
 
 export async function updateExam(req: Request, res: Response): Promise<void> {
@@ -87,6 +94,7 @@ export async function updateExam(req: Request, res: Response): Promise<void> {
   const d = updateExamSchema.parse(req.body);
   const map: Record<string, unknown> = {
     title: d.title, attempts_allowed: d.attemptsAllowed, pass_pct: d.passPct, time_limit_min: d.timeLimitMin,
+    shuffle: d.shuffle, random_per_student: d.randomPerStudent, questions_per_attempt: d.questionsPerAttempt,
   };
   const fields: string[] = [];
   const params: unknown[] = [];
@@ -95,7 +103,7 @@ export async function updateExam(req: Request, res: Response): Promise<void> {
   }
   if (fields.length === 0) throw badRequest('Nada que actualizar');
   params.push(req.params.examId);
-  const { rows } = await query(`UPDATE exams SET ${fields.join(', ')} WHERE id = $${params.length} RETURNING id, title, attempts_allowed, pass_pct, time_limit_min`, params);
+  const { rows } = await query(`UPDATE exams SET ${fields.join(', ')} WHERE id = $${params.length} RETURNING id, title, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt`, params);
   res.json({ exam: rows[0] });
 }
 
@@ -286,6 +294,50 @@ export async function addExamQuestionsFromBank(req: Request, res: Response): Pro
        VALUES ($1, 'test', $2, $3::jsonb, $4,
                COALESCE((SELECT MAX(sort_order) + 1 FROM exam_questions WHERE exam_id = $1), 0))`,
       [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index],
+    );
+    added += 1;
+  }
+  res.status(201).json({ added });
+}
+
+/**
+ * Importa preguntas CONCRETAS de un banco (las que el autor marca), no al azar.
+ * Copia también imagen y vídeo. Mismo criterio de permiso que desde-banco.
+ */
+export async function addExamQuestionsFromBankByIds(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const { bankId, questionIds } = z.object({
+    bankId: z.string().uuid(),
+    questionIds: z.array(z.string().uuid()).min(1).max(300),
+  }).parse(req.body);
+
+  const exam = await query('SELECT 1 FROM exams e JOIN modules m ON m.id = e.module_id WHERE e.id = $1 AND m.course_id = $2',
+    [req.params.examId, req.params.id]);
+  if (exam.rows.length === 0) throw notFound('Examen no encontrado');
+
+  const bank = await query<{ visibility: string; created_by: string | null }>(
+    'SELECT visibility, created_by FROM question_banks WHERE id = $1', [bankId],
+  );
+  if (bank.rows.length === 0) throw notFound('Banco no encontrado');
+  if (req.auth!.role !== 'super_admin' && bank.rows[0].visibility !== 'publico' && bank.rows[0].created_by !== req.auth!.sub) {
+    const acc = await query('SELECT 1 FROM bank_access WHERE bank_id = $1 AND user_id = $2', [bankId, req.auth!.sub]);
+    if (acc.rows.length === 0) throw forbidden('No puedes usar ese banco');
+  }
+
+  const qs = await query<{ text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null }>(
+    `SELECT text, options, correct_index, video_url, image_key FROM questions
+      WHERE bank_id = $1 AND is_active = TRUE AND id = ANY($2::uuid[])`,
+    [bankId, questionIds],
+  );
+  if (qs.rows.length === 0) throw badRequest('Ninguna de las preguntas elegidas está disponible', 'NO_QUESTIONS');
+
+  let added = 0;
+  for (const q of qs.rows) {
+    await query(
+      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, sort_order)
+       VALUES ($1, 'test', $2, $3::jsonb, $4, $5, $6,
+               COALESCE((SELECT MAX(sort_order) + 1 FROM exam_questions WHERE exam_id = $1), 0))`,
+      [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key],
     );
     added += 1;
   }

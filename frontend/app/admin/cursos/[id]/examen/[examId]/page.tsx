@@ -24,7 +24,13 @@ interface Exam {
   attempts_allowed: number;
   pass_pct: number;
   time_limit_min: number | null;
+  shuffle: boolean;
+  random_per_student: boolean;
+  questions_per_attempt: number | null;
 }
+
+interface BankRef { id: string; name: string; questions: string }
+interface BankQ { id: string; tema: string | null; text: string }
 
 const FORMAT_LABEL: Record<Format, string> = { test: '📝 Test', vf: '✔️ Verdadero/Falso', abierta: '✍️ Abierta' };
 
@@ -55,6 +61,14 @@ export default function ExamEditorPage() {
   const [jsonText, setJsonText] = useState('');
   const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Importar preguntas desde un banco
+  const [banks, setBanks] = useState<BankRef[]>([]);
+  const [bankSel, setBankSel] = useState('');
+  const [bankCount, setBankCount] = useState('10');
+  const [bankQs, setBankQs] = useState<BankQ[] | null>(null);
+  const [bankPick, setBankPick] = useState<Record<string, boolean>>({});
+  const [bankMsg, setBankMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   // Calificaciones
   const [attempts, setAttempts] = useState<Array<{ id: string; student: string; email: string; score: number | null; passed: boolean | null; attempts: string; time_spent_seconds: number | null }>>([]);
 
@@ -78,6 +92,13 @@ export default function ExamEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  // Bancos disponibles como fuente de preguntas.
+  useEffect(() => {
+    if (!user) return;
+    api<{ banks: BankRef[] }>('/api/banks?conPreguntas=1', { auth: true })
+      .then((r) => setBanks(r.banks)).catch(() => {});
+  }, [user]);
+
   async function saveConfig(e: React.FormEvent) {
     e.preventDefault();
     setCfgMsg(null);
@@ -91,11 +112,58 @@ export default function ExamEditorPage() {
           attemptsAllowed: exam.attempts_allowed,
           passPct: exam.pass_pct,
           timeLimitMin: exam.time_limit_min,
+          shuffle: exam.shuffle,
+          randomPerStudent: exam.random_per_student,
+          questionsPerAttempt: exam.random_per_student ? (exam.questions_per_attempt ?? null) : null,
         }),
       });
       setCfgMsg('Configuración guardada ✅');
     } catch (err) {
       setCfgMsg(err instanceof ApiError ? err.message : 'Error');
+    }
+  }
+
+  // Modo por intento derivado de los dos flags, y su setter.
+  const modo: 'fijo' | 'barajado' | 'aleatorio' =
+    exam?.random_per_student ? 'aleatorio' : exam?.shuffle ? 'barajado' : 'fijo';
+  function setModo(m: 'fijo' | 'barajado' | 'aleatorio') {
+    if (!exam) return;
+    if (m === 'fijo') setExam({ ...exam, shuffle: false, random_per_student: false });
+    else if (m === 'barajado') setExam({ ...exam, shuffle: true, random_per_student: false });
+    else setExam({ ...exam, shuffle: true, random_per_student: true, questions_per_attempt: exam.questions_per_attempt ?? Math.min(10, questions.length || 10) });
+  }
+
+  async function importarDelBanco(soloSeleccionadas: boolean) {
+    if (!bankSel) { setBankMsg({ ok: false, text: 'Elige un banco' }); return; }
+    setBankMsg(null);
+    try {
+      if (soloSeleccionadas) {
+        const ids = Object.keys(bankPick).filter((k) => bankPick[k]);
+        if (ids.length === 0) { setBankMsg({ ok: false, text: 'Marca al menos una pregunta' }); return; }
+        const r = await api<{ added: number }>(`/api/courses/${courseId}/exams/${examId}/questions/from-bank/select`,
+          { method: 'POST', auth: true, body: JSON.stringify({ bankId: bankSel, questionIds: ids }) });
+        setBankMsg({ ok: true, text: `Añadidas ${r.added} preguntas del banco ✅` });
+        setBankPick({});
+      } else {
+        const n = Math.max(1, Number(bankCount) || 1);
+        const r = await api<{ added: number }>(`/api/courses/${courseId}/exams/${examId}/questions/from-bank`,
+          { method: 'POST', auth: true, body: JSON.stringify({ bankId: bankSel, count: n }) });
+        setBankMsg({ ok: true, text: `Añadidas ${r.added} preguntas al azar ✅` });
+      }
+      load();
+    } catch (err) {
+      setBankMsg({ ok: false, text: err instanceof ApiError ? err.message : 'No se pudo importar' });
+    }
+  }
+
+  async function verPreguntasBanco() {
+    if (!bankSel) { setBankMsg({ ok: false, text: 'Elige un banco' }); return; }
+    setBankMsg(null); setBankQs(null); setBankPick({});
+    try {
+      const r = await api<{ questions: BankQ[] }>(`/api/banks/${bankSel}/questions`, { auth: true });
+      setBankQs(r.questions);
+    } catch (err) {
+      setBankMsg({ ok: false, text: err instanceof ApiError ? err.message : 'No se pudieron cargar' });
     }
   }
 
@@ -220,6 +288,32 @@ export default function ExamEditorPage() {
                     <input className="form-input" type="number" min="1" placeholder="libre" value={exam.time_limit_min ?? ''} onChange={(e) => setExam({ ...exam, time_limit_min: e.target.value ? Number(e.target.value) : null })} />
                   </div>
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label">En cada intento</label>
+                  <select className="form-select" value={modo} onChange={(e) => setModo(e.target.value as typeof modo)}>
+                    <option value="fijo">Mismas preguntas, mismo orden</option>
+                    <option value="barajado">Mismas preguntas, orden distinto cada vez</option>
+                    <option value="aleatorio">Preguntas aleatorias del conjunto en cada intento</option>
+                  </select>
+                  <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                    {modo === 'aleatorio'
+                      ? 'Cada intento saca al azar N preguntas del total del examen. Añade abajo todo el banco y elige N.'
+                      : modo === 'barajado'
+                        ? 'Se usan todas las preguntas del examen; solo cambia el orden.'
+                        : 'Todos los alumnos ven las mismas preguntas en el mismo orden.'}
+                  </p>
+                  {modo === 'aleatorio' && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+                      <span className="muted" style={{ fontSize: 13 }}>Preguntas por intento:</span>
+                      <input className="form-input" type="number" min="1" style={{ width: 90 }}
+                        value={exam.questions_per_attempt ?? ''} placeholder="N"
+                        onChange={(e) => setExam({ ...exam, questions_per_attempt: e.target.value ? Number(e.target.value) : null })} />
+                      <span className="muted" style={{ fontSize: 12 }}>de {questions.length} en el examen</span>
+                    </div>
+                  )}
+                </div>
+
                 <button className="btn btn-primary btn-small">Guardar configuración</button>
               </form>
             </div>
@@ -338,6 +432,47 @@ export default function ExamEditorPage() {
                 Importar
               </button>
             </div>
+          </div>
+
+          {/* Importar preguntas desde un banco */}
+          <div className="card" style={{ marginTop: 24 }}>
+            <div className="card-header"><div className="card-title">Traer preguntas de un banco</div></div>
+            {bankMsg && <div className={`alert ${bankMsg.ok ? 'alert-success' : 'alert-error'}`}>{bankMsg.text}</div>}
+            <div className="form-group">
+              <label className="form-label">Banco</label>
+              <select className="form-select" value={bankSel} onChange={(e) => { setBankSel(e.target.value); setBankQs(null); setBankPick({}); }}>
+                <option value="">Elige un banco…</option>
+                {banks.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.questions})</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span className="muted" style={{ fontSize: 13 }}>Al azar:</span>
+              <input className="form-input" type="number" min="1" style={{ width: 80 }} value={bankCount} onChange={(e) => setBankCount(e.target.value)} />
+              <button className="btn btn-outline btn-small" onClick={() => importarDelBanco(false)} disabled={!bankSel}>Añadir N al azar</button>
+              <button className="btn btn-outline btn-small" onClick={verPreguntasBanco} disabled={!bankSel}>Elegir preguntas concretas</button>
+            </div>
+
+            {bankQs && (
+              <div style={{ marginTop: 12 }}>
+                {bankQs.length === 0 ? (
+                  <p className="muted" style={{ fontSize: 13 }}>Ese banco no tiene preguntas.</p>
+                ) : (
+                  <>
+                    <div style={{ maxHeight: 260, overflowY: 'auto', border: '1px solid var(--gray-200)', borderRadius: 8, padding: 8 }}>
+                      {bankQs.map((q) => (
+                        <label key={q.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '4px 0', fontSize: 13 }}>
+                          <input type="checkbox" checked={!!bankPick[q.id]} onChange={(e) => setBankPick((p) => ({ ...p, [q.id]: e.target.checked }))} />
+                          <span>{q.tema && <span className="muted">[{q.tema}] </span>}{q.text}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <button className="btn btn-primary btn-small" style={{ marginTop: 8 }} onClick={() => importarDelBanco(true)}>
+                      Añadir seleccionadas ({Object.values(bankPick).filter(Boolean).length})
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
