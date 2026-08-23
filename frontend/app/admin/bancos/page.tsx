@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
@@ -72,6 +72,7 @@ export default function BancosPage() {
   const [cursoId, setCursoId] = useState('');
   const [cursos, setCursos] = useState<CursoRef[]>([]);
   const [archivoNuevo, setArchivoNuevo] = useState<File | null>(null);
+  const archivoRef = useRef<HTMLInputElement>(null);
   // Lista de acceso de un banco restringido (solo al editar uno que ya existe).
   const [accesoPersonas, setAccesoPersonas] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [accesoEmail, setAccesoEmail] = useState('');
@@ -128,6 +129,7 @@ export default function BancosPage() {
     setDim1(''); setDim2(''); setOfficial(false); setSimQ(''); setSimMin(''); setSimPass('');
     setVisibility('privado'); setAccesoPersonas([]); setAccesoEmail(''); setAccesoMsg(null);
     setCursoId(''); setArchivoNuevo(null);
+    if (archivoRef.current) archivoRef.current.value = '';
   }
 
   function startEdit(b: Bank) {
@@ -447,7 +449,7 @@ export default function BancosPage() {
             {!editingId && (
               <div className="form-group">
                 <label className="form-label">Preguntas desde archivo (opcional)</label>
-                <input className="form-input" type="file" accept=".xlsx,.json,application/json"
+                <input ref={archivoRef} className="form-input" type="file" accept=".xlsx,.json,application/json"
                   onChange={(e) => setArchivoNuevo(e.target.files?.[0] ?? null)} />
                 <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                   Excel o JSON. Se importan al crear el banco. {archivoNuevo && <strong>{archivoNuevo.name}</strong>}

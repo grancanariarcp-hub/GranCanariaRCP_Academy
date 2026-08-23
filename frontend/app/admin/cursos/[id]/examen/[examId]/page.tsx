@@ -102,7 +102,14 @@ export default function ExamEditorPage() {
   async function saveConfig(e: React.FormEvent) {
     e.preventDefault();
     setCfgMsg(null);
+    setError(null);
     if (!exam) return;
+    // En modo aleatorio hace falta N; sin él, el alumno recibiría el examen
+    // entero en vez de un subconjunto (y sin avisar). Se exige antes de guardar.
+    if (exam.random_per_student && (!exam.questions_per_attempt || exam.questions_per_attempt < 1)) {
+      setError('En el modo «aleatorias en cada intento» indica cuántas preguntas por intento.');
+      return;
+    }
     try {
       await api(`/api/courses/${courseId}/exams/${examId}`, {
         method: 'PATCH',

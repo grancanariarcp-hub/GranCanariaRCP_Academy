@@ -279,8 +279,8 @@ export async function addExamQuestionsFromBank(req: Request, res: Response): Pro
     if (acc.rows.length === 0) throw forbidden('No puedes usar ese banco');
   }
 
-  const qs = await query<{ text: string; options: string[]; correct_index: number }>(
-    `SELECT text, options, correct_index FROM questions
+  const qs = await query<{ text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null }>(
+    `SELECT text, options, correct_index, video_url, image_key FROM questions
       WHERE bank_id = $1 AND is_active = TRUE ${tema ? 'AND tema = $3' : ''}
       ORDER BY RANDOM() LIMIT $2`,
     tema ? [bankId, count, tema] : [bankId, count],
@@ -290,10 +290,10 @@ export async function addExamQuestionsFromBank(req: Request, res: Response): Pro
   let added = 0;
   for (const q of qs.rows) {
     await query(
-      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, sort_order)
-       VALUES ($1, 'test', $2, $3::jsonb, $4,
+      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, sort_order)
+       VALUES ($1, 'test', $2, $3::jsonb, $4, $5, $6,
                COALESCE((SELECT MAX(sort_order) + 1 FROM exam_questions WHERE exam_id = $1), 0))`,
-      [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index],
+      [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key],
     );
     added += 1;
   }

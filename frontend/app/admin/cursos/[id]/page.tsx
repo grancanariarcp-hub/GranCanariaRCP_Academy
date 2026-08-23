@@ -142,8 +142,11 @@ export default function CourseDetailPage() {
   const [docs, setDocs] = useState<Array<{ id: string; title: string; mio?: boolean; course_id?: string | null }>>([]);
   // Duración fijada a mano por el director (lo que verán los alumnos).
   const [horasManual, setHorasManual] = useState('');
-  // Filtro del selector de documentos: todos / míos / de este curso.
-  const [docFiltro, setDocFiltro] = useState<'todos' | 'mios' | 'curso'>('mios');
+  const [durMsg, setDurMsg] = useState<string | null>(null);
+  // Filtro del selector de documentos: todos / míos / de este curso. Por defecto
+  // «todos» para no ocultar documentos compartidos de la plataforma; el usuario
+  // acota con los botones cuando quiere reducir la lista.
+  const [docFiltro, setDocFiltro] = useState<'todos' | 'mios' | 'curso'>('todos');
   const [error, setError] = useState<string | null>(null);
   const [pestana, setPestana] = useState('resumen'); // pestaña visible de la ficha
   const [auditoria, setAuditoria] = useState<{
@@ -368,6 +371,7 @@ export default function CourseDetailPage() {
     if (!dur) return;
     setHorasManual(String(dur.totalHoras));
     await patchCourse({ durationHours: dur.totalHoras });
+    setDurMsg(`Duración fijada en ${dur.totalHoras} h ✅`);
   }
 
   // El director fija la duración a mano; es la que ven los alumnos. La estimada
@@ -375,7 +379,9 @@ export default function CourseDetailPage() {
   async function guardarHorasManual() {
     const h = Number(horasManual);
     if (Number.isNaN(h) || h <= 0) { setError('Indica un número de horas válido'); return; }
+    setDurMsg(null);
     await patchCourse({ durationHours: h });
+    setDurMsg(`Duración guardada: ${h} h (es la que ven los alumnos) ✅`);
   }
 
   async function renombrarModulo(m: { id: string; title: string }) {
@@ -990,6 +996,7 @@ export default function CourseDetailPage() {
                   value={horasManual} onChange={(e) => setHorasManual(e.target.value)} placeholder="h" />
                 <button className="btn btn-primary btn-small" onClick={guardarHorasManual}>Guardar duración</button>
               </div>
+              {durMsg && <div className="alert alert-success" style={{ fontSize: 13 }}>{durMsg}</div>}
               <p className="muted" style={{ fontSize: 12.5, marginTop: 0, marginBottom: 8 }}>
                 Lo que fijes aquí es <strong>lo que ven los alumnos</strong>. La estimación de arriba es solo una guía; si difiere, se avisa con la etiqueta.
               </p>

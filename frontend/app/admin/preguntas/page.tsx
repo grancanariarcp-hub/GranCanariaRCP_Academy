@@ -103,7 +103,8 @@ export default function PreguntasPage() {
   const [saving, setSaving] = useState(false);
   const [list, setList] = useState<QuestionRow[]>([]);
   const [docs, setDocs] = useState<Array<{ id: string; title: string; mio?: boolean }>>([]);
-  const [docFiltro, setDocFiltro] = useState<'todos' | 'mios'>('mios');
+  // Por defecto «todos» para no ocultar documentos compartidos; se acota con el botón.
+  const [docFiltro, setDocFiltro] = useState<'todos' | 'mios'>('todos');
 
   // Bulk import
   const [importing, setImporting] = useState(false);
