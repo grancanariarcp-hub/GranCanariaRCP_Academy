@@ -7,6 +7,7 @@ import { useSession } from '@/hooks/useSession';
 import { AppShell } from '@/components/AppShell';
 import { CourseForum } from '@/components/CourseForum';
 import { ExamWizard } from '@/components/ExamWizard';
+import { CoursePreview } from '@/components/CoursePreview';
 import { api, ApiError, uploadFile, downloadFile } from '@/lib/api';
 import { AttendancePanel } from '@/components/AttendancePanel';
 import { VideoSala } from '@/components/VideoSala';
@@ -285,6 +286,7 @@ export default function CourseDetailPage() {
     }
   }
 
+  const [previewCurso, setPreviewCurso] = useState(false);
   const [duplicando, setDuplicando] = useState(false);
   async function duplicarCurso() {
     if (!confirm('¿Duplicar este curso como plantilla? Se crea una copia en BORRADOR (con sus módulos, actividades y exámenes, pero SIN alumnos ni matrículas) que podrás editar.')) return;
@@ -695,6 +697,9 @@ export default function CourseDetailPage() {
                   </button>
                 ) : (
                   <button className="btn btn-outline btn-small" onClick={ocultar}>Ocultar</button>
+                )}
+                {!course.es_ope && (
+                  <button className="btn btn-outline btn-small" onClick={() => setPreviewCurso(true)} title="Ver el curso como lo verá el alumno">👁 Vista previa</button>
                 )}
                 <button className="btn btn-outline btn-small" onClick={duplicarCurso} disabled={duplicando} title="Crear una copia editable de este curso">
                   {duplicando ? 'Duplicando…' : '⧉ Duplicar'}
@@ -1636,6 +1641,9 @@ export default function CourseDetailPage() {
       )}
 
       {videoAct && <VideoSala activityId={videoAct} onClose={() => setVideoAct(null)} />}
+      {previewCurso && course && (
+        <CoursePreview titulo={course.title} horas={dur?.horasDeclaradas ?? null} modules={modules} onClose={() => setPreviewCurso(false)} />
+      )}
     </AppShell>
   );
 }

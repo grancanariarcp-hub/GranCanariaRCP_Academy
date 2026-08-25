@@ -75,6 +75,7 @@ export default function BancosPage() {
   const [cursos, setCursos] = useState<CursoRef[]>([]);
   const [archivoNuevo, setArchivoNuevo] = useState<File | null>(null);
   const archivoRef = useRef<HTMLInputElement>(null);
+  const importCardRef = useRef<HTMLDivElement>(null);
   // Lista de acceso de un banco restringido (solo al editar uno que ya existe).
   const [accesoPersonas, setAccesoPersonas] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [accesoEmail, setAccesoEmail] = useState('');
@@ -246,6 +247,34 @@ export default function BancosPage() {
     try { await downloadFile(`/api/banks/${b.id}/export`, `${b.name}.json`); } catch { /* ignore */ }
   }
 
+  // Importa un archivo directamente al banco seleccionado (JSON → importador
+  // genérico del banco; Excel → plantilla RCP). Un solo paso.
+  async function importarDirecto(file: File | undefined) {
+    if (!file || !selBank) return;
+    setImpMsg(null); setImportando(true);
+    try {
+      let imp: { created: number; duplicadas?: number; total: number };
+      if (/\.json$/i.test(file.name)) {
+        const parsed = JSON.parse(await file.text());
+        imp = await api(`/api/banks/${selBank}/import`, { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) });
+      } else {
+        imp = await uploadFile(`/api/questions/import`, file, { bankId: selBank });
+      }
+      setArchivo(file.name);
+      setImpMsg({ ok: true, text: `Importadas ${imp.created}/${imp.total}${imp.duplicadas ? ` · ${imp.duplicadas} duplicadas omitidas` : ''} ✅` });
+      try { setTemas((await api<{ temas: Array<{ tema: string; questions: string }> }>(`/api/banks/${selBank}/temas`, { auth: true })).temas); } catch { /* ignore */ }
+      load();
+    } catch (e) {
+      const motivo = e instanceof SyntaxError ? 'el JSON no es válido' : e instanceof ApiError ? e.message : 'error';
+      setImpMsg({ ok: false, text: `No se pudo importar: ${motivo}` });
+    } finally { setImportando(false); }
+  }
+
+  // Al abrir «Importar» de una fila, traer el panel a la vista (está más abajo).
+  useEffect(() => {
+    if (selBank && importCardRef.current) importCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [selBank]);
+
   async function loadTemas(id: string) {
     setSelBank(id); setImpMsg(null);
     try {
@@ -254,34 +283,6 @@ export default function BancosPage() {
       setTemas((await api<{ temas: Array<{ tema: string; questions: string }> }>(
         `/api/banks/${id}/temas`, { auth: true })).temas);
     } catch { setTemas([]); }
-  }
-
-  /**
-   * Lee el archivo elegido y, si el banco quedó sin nombre, le pone el del
-   * archivo: es lo que el usuario espera y ahorra un paso en cada importación.
-   */
-  async function cargarArchivo(file: File | undefined) {
-    if (!file) return;
-    setImpMsg(null);
-    try {
-      const texto = await file.text();
-      JSON.parse(texto); // se valida aquí para avisar antes de enviar nada
-      setJson(texto);
-      setArchivo(file.name);
-
-      const banco = banks.find((b) => b.id === selBank);
-      const sinNombre = !banco?.name || /^sin nombre$/i.test(banco.name);
-      if (banco && sinNombre) {
-        const limpio = file.name.replace(/\.json$/i, '').replace(/[_-]+/g, ' ').trim();
-        await api(`/api/banks/${banco.id}`, { method: 'PATCH', auth: true, body: JSON.stringify({ name: limpio }) });
-        load();
-        setImpMsg({ ok: true, text: `Archivo cargado. El banco pasa a llamarse «${limpio}».` });
-        return;
-      }
-      setImpMsg({ ok: true, text: 'Archivo cargado. Pulsa «Importar preguntas» para añadirlas.' });
-    } catch {
-      setImpMsg({ ok: false, text: 'El archivo no contiene un JSON válido' });
-    }
   }
 
   async function importJson() {
@@ -547,37 +548,33 @@ export default function BancosPage() {
 
       {/* Importar preguntas al banco seleccionado */}
       {selBank && (
-        <div className="card animate-in" style={{ marginTop: 24 }}>
+        <div ref={importCardRef} className="card animate-in" style={{ marginTop: 24 }}>
           <div className="card-header">
-            <div className="card-title">Importar preguntas (JSON)</div>
-            <div className="card-subtitle">Cada pregunta: tema, text, options, correcta (A/B/C/D), explicacion</div>
+            <div className="card-title">Sumar preguntas a «{banks.find((b) => b.id === selBank)?.name ?? 'este banco'}»</div>
+            <div className="card-subtitle">JSON genérico (tema, text, options, correcta, explicacion) o Excel con la plantilla RCP</div>
           </div>
           {temas.length > 0 && <p style={{ fontSize: 13, marginBottom: 8 }}><strong>Temas actuales:</strong> {temas.map((t) => `${t.tema} (${t.questions})`).join(' · ')}</p>}
           {impMsg && <div className={`alert ${impMsg.ok ? 'alert-success' : 'alert-error'}`}>{impMsg.text}</div>}
-          {/* Elegir archivo es lo normal; pegar el texto queda como alternativa
-              para lotes pequeños. Un banco entero pegado a mano es inviable. */}
-          <label className="btn btn-primary btn-full press" style={{ cursor: 'pointer', marginBottom: 10 }}>
-            📂 Elegir archivo (.json)
-            <input type="file" accept=".json,application/json" style={{ display: 'none' }}
-              onChange={(e) => { cargarArchivo(e.target.files?.[0]); e.target.value = ''; }} />
+          {/* Elegir archivo IMPORTA directamente (un solo paso). */}
+          <label className={`btn btn-primary btn-full press ${importando ? 'disabled' : ''}`} style={{ cursor: importando ? 'wait' : 'pointer', marginBottom: 10 }}>
+            {importando ? 'Importando…' : '📂 Elegir archivo (.json o .xlsx) e importar'}
+            <input type="file" accept=".json,application/json,.xlsx" style={{ display: 'none' }} disabled={importando}
+              onChange={(e) => { importarDirecto(e.target.files?.[0]); e.target.value = ''; }} />
           </label>
 
-          {archivo && (
-            <p className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
-              Archivo: <strong>{archivo}</strong>
-            </p>
+          {archivo && !impMsg && (
+            <p className="muted" style={{ fontSize: 13, marginBottom: 8 }}>Archivo: <strong>{archivo}</strong></p>
           )}
 
           <details style={{ marginBottom: 8 }}>
-            <summary className="link-action" style={{ fontSize: 13 }}>o pegar el contenido a mano</summary>
+            <summary className="link-action" style={{ fontSize: 13 }}>o pegar el JSON a mano</summary>
             <textarea className="form-input" style={{ height: 140, padding: 10, fontFamily: 'monospace', fontSize: 12, marginTop: 8 }}
               placeholder='[{"tema":"ICC","text":"...","options":["a","b","c"],"correcta":"B","explicacion":"..."}]'
               value={json} onChange={(e) => setJson(e.target.value)} />
+            <button className="btn btn-primary btn-small" style={{ marginTop: 8 }} onClick={importJson} disabled={!json.trim() || importando}>
+              {importando ? 'Importando…' : 'Importar lo pegado'}
+            </button>
           </details>
-
-          <button className="btn btn-primary btn-small" onClick={importJson} disabled={!json.trim() || importando}>
-            {importando ? 'Importando…' : 'Importar preguntas'}
-          </button>
         </div>
       )}
 
