@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
+import type { PoolClient } from 'pg';
 import { z } from 'zod';
 import { query, withTransaction } from '../config/database.js';
+import { assertEditor } from '../services/courseAuth.js';
 import { forbidden, notFound } from '../utils/httpError.js';
 import { withImageUrls, presignKeys } from '../services/r2.js';
 import { audit } from '../services/audit.js';
@@ -407,4 +409,100 @@ export async function getCourse(req: Request, res: Response): Promise<void> {
     'image_key', 'url',
   );
   res.json({ course: courseFull, modules: modulesWithActivities, staff: staff.rows, gallery: gallery.map((g) => ({ id: g.id, url: g.url })) });
+}
+
+/**
+ * Copia una fila (y solo una) aplicando overrides, mediante INSERT ... SELECT en
+ * el propio Postgres: así los tipos jsonb y arrays se copian intactos (un
+ * round-trip por JavaScript los rompería). Devuelve el id de la copia.
+ */
+async function duplicarFila(
+  c: PoolClient, tabla: string, whereCol: string, whereVal: string,
+  overrides: Record<string, unknown>,
+): Promise<string> {
+  const cols = (await c.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = $1
+        AND column_name NOT IN ('id', 'created_at', 'updated_at')
+      ORDER BY ordinal_position`, [tabla],
+  )).rows.map((r) => r.column_name);
+  const params: unknown[] = [];
+  const selects = cols.map((cn) => {
+    if (Object.prototype.hasOwnProperty.call(overrides, cn)) {
+      params.push(overrides[cn]);
+      return `$${params.length}`;
+    }
+    return `"${cn}"`;
+  });
+  params.push(whereVal);
+  const r = await c.query<{ id: string }>(
+    `INSERT INTO "${tabla}" (${cols.map((cn) => `"${cn}"`).join(', ')})
+     SELECT ${selects.join(', ')} FROM "${tabla}" WHERE "${whereCol}" = $${params.length}
+     RETURNING id`, params,
+  );
+  return r.rows[0].id;
+}
+
+/**
+ * POST /api/courses/:id/duplicar — duplica un curso como plantilla.
+ * Copia la ficha, los módulos, las actividades y sus exámenes (con preguntas).
+ * NO copia alumnos, matrículas ni profesorado; queda en BORRADOR, sin código y
+ * a nombre de quien lo duplica.
+ */
+export async function duplicateCourse(req: Request, res: Response): Promise<void> {
+  if (req.auth!.role === 'auditor') throw forbidden('La comisión no crea cursos');
+  await assertEditor(req); // super_admin o parte del profesorado del curso origen
+  const src = req.params.id;
+
+  const nuevoId = await withTransaction(async (c) => {
+    const existe = await c.query<{ title: string }>('SELECT title FROM courses WHERE id = $1', [src]);
+    if (existe.rows.length === 0) throw notFound('Curso no encontrado');
+
+    const newCourseId = await duplicarFila(c, 'courses', 'id', src, {
+      created_by: req.auth!.sub,
+      status: 'borrador',
+      enrollment_open: false,
+      title: `${existe.rows[0].title} (copia)`,
+      codigo_curso: null,
+      cfc_en_tramite: false,
+      cfc_solicitado_at: null,
+      cfc_solicitado_by: null,
+      starts_at: null,
+      ends_at: null,
+      final_exam_start: null,
+      final_exam_end: null,
+    });
+
+    // Módulos: mapa viejo → nuevo para recolgar sus actividades.
+    const mods = await c.query<{ id: string }>('SELECT id FROM modules WHERE course_id = $1 ORDER BY sort_order', [src]);
+    const modMap = new Map<string, string>();
+    for (const m of mods.rows) {
+      modMap.set(m.id, await duplicarFila(c, 'modules', 'id', m.id, { course_id: newCourseId }));
+    }
+
+    // Actividades, con su examen y preguntas si lo tienen.
+    if (mods.rows.length > 0) {
+      const acts = await c.query<{ id: string; module_id: string; exam_id: string | null }>(
+        'SELECT id, module_id, exam_id FROM activities WHERE module_id = ANY($1::uuid[]) ORDER BY module_id, sort_order',
+        [mods.rows.map((m) => m.id)],
+      );
+      for (const a of acts.rows) {
+        const newModId = modMap.get(a.module_id)!;
+        let newExamId: string | null = null;
+        if (a.exam_id) {
+          newExamId = await duplicarFila(c, 'exams', 'id', a.exam_id, { module_id: newModId });
+          const eqs = await c.query<{ id: string }>('SELECT id FROM exam_questions WHERE exam_id = $1 ORDER BY sort_order', [a.exam_id]);
+          for (const q of eqs.rows) await duplicarFila(c, 'exam_questions', 'id', q.id, { exam_id: newExamId });
+        }
+        await duplicarFila(c, 'activities', 'id', a.id, { module_id: newModId, exam_id: newExamId });
+      }
+    }
+    return newCourseId;
+  });
+
+  await audit({
+    actorId: req.auth!.sub, actorType: req.auth!.role, action: 'COURSE_DUPLICATE',
+    entity: 'course', entityId: nuevoId, ip: clientIp(req), metadata: { origen: src },
+  });
+  res.status(201).json({ course: { id: nuevoId } });
 }

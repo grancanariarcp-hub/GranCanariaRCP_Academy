@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration, courseTaxonomy } from '../controllers/course.controller.js';
+import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration, courseTaxonomy, duplicateCourse } from '../controllers/course.controller.js';
 import { getCourseExtras, updateCourseExtras } from '../controllers/academia.controller.js';
 import multer from 'multer';
 import {
   updateCourse, deleteCourse, cambiarTipoCurso, solicitarCfc, cambiosCfc, uploadCourseThumbnail, addModule, updateModule, deleteModule,
-  addActivity, addImageActivity, deleteActivity, inviteStaff, removeStaff,
+  addActivity, updateActivity, addImageActivity, deleteActivity, moveModule, moveActivity, inviteStaff, removeStaff,
   addCourseImage, deleteCourseImage, setActivityDuration, auditoriaCurso,
   setActivityEval, listActivityGrades, setActivityGrade,
 } from '../controllers/courseContent.controller.js';
@@ -47,6 +47,7 @@ router.put('/:id/extras', asyncHandler(updateCourseExtras));
 router.post('/:id/solicitar-cfc', asyncHandler(solicitarCfc));
 router.get('/:id/cambios-cfc', asyncHandler(cambiosCfc));
 router.get('/:id/auditoria', asyncHandler(auditoriaCurso));
+router.post('/:id/duplicar', asyncHandler(duplicateCourse));
 router.post('/:id/thumbnail', upload.single('file'), asyncHandler(uploadCourseThumbnail));
 router.post('/:id/gallery', upload.single('file'), asyncHandler(addCourseImage));
 router.delete('/:id/gallery/:imageId', asyncHandler(deleteCourseImage));
@@ -54,11 +55,14 @@ router.delete('/:id/gallery/:imageId', asyncHandler(deleteCourseImage));
 // Modules
 router.post('/:id/modules', asyncHandler(addModule));
 router.patch('/:id/modules/:moduleId', asyncHandler(updateModule));
+router.patch('/:id/modules/:moduleId/mover', asyncHandler(moveModule));
 router.delete('/:id/modules/:moduleId', asyncHandler(deleteModule));
 
 // Activities
 router.post('/:id/modules/:moduleId/activities', asyncHandler(addActivity));
 router.post('/:id/modules/:moduleId/activities/image', upload.single('file'), asyncHandler(addImageActivity));
+router.patch('/:id/modules/:moduleId/activities/:activityId/mover', asyncHandler(moveActivity));
+router.patch('/:id/activities/:activityId', asyncHandler(updateActivity));
 router.delete('/:id/activities/:activityId', asyncHandler(deleteActivity));
 router.patch('/:id/activities/:activityId/duration', asyncHandler(setActivityDuration));
 router.patch('/:id/activities/:activityId/eval', asyncHandler(setActivityEval));

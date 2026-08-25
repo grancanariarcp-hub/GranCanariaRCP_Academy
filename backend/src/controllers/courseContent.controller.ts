@@ -391,6 +391,99 @@ export async function setActivityDuration(req: Request, res: Response): Promise<
 }
 
 /**
+ * PATCH /api/courses/:id/activities/:activityId — editar una actividad ya
+ * creada (título, URL, texto, documento, duración) sin borrarla y recrearla.
+ */
+const updateActivitySchema = z.object({
+  title: z.string().min(2).max(200).optional(),
+  url: z.string().url('URL no válida').or(z.literal('')).optional(),
+  body: z.string().optional(),
+  documentId: z.string().uuid().optional(),
+  durationMin: z.number().int().min(0).max(1000).nullable().optional(),
+});
+export async function updateActivity(req: Request, res: Response): Promise<void> {
+  await assertEditaActividad(req, req.params.activityId);
+  const d = updateActivitySchema.parse(req.body);
+
+  // Cambiar el documento exige tener acceso a él (igual que al crear).
+  if (d.documentId && req.auth!.role !== 'super_admin') {
+    const acc = await query(
+      `SELECT 1 FROM documents dc WHERE dc.id = $1 AND dc.is_active = TRUE
+         AND (dc.uploaded_by = $2 OR dc.visibility = 'publico'
+              OR (dc.visibility = 'restringido'
+                  AND EXISTS (SELECT 1 FROM document_access da WHERE da.document_id = dc.id AND da.user_id = $2)))`,
+      [d.documentId, req.auth!.sub],
+    );
+    if (acc.rows.length === 0) throw forbidden('No tienes acceso a ese documento');
+  }
+
+  const map: Record<string, unknown> = {
+    title: d.title,
+    url: d.url === undefined ? undefined : (d.url || null),
+    body: d.body,
+    document_id: d.documentId,
+    duration_min: d.durationMin,
+  };
+  const fields: string[] = [];
+  const params: unknown[] = [];
+  for (const [col, val] of Object.entries(map)) {
+    if (val !== undefined) { params.push(val); fields.push(`${col} = $${params.length}`); }
+  }
+  if (fields.length === 0) throw badRequest('Nada que actualizar');
+  params.push(req.params.activityId, req.params.id);
+  const { rows } = await query(
+    `UPDATE activities SET ${fields.join(', ')}
+      WHERE id = $${params.length - 1} AND module_id IN (SELECT id FROM modules WHERE course_id = $${params.length})
+      RETURNING id, type, title, document_id, url, body, is_mandatory, duration_min, evaluable, metodo_eval`,
+    params,
+  );
+  if (rows.length === 0) throw notFound('Actividad no encontrada');
+  res.json({ activity: rows[0] });
+}
+
+/** Intercambia el orden de dos filas vecinas (módulos o actividades). */
+async function moverEnOrden(
+  tabla: 'modules' | 'activities',
+  ambitoCol: 'course_id' | 'module_id',
+  ambitoId: string,
+  filaId: string,
+  dir: 'up' | 'down',
+): Promise<void> {
+  await withTransaction(async (c) => {
+    const cur = await c.query<{ sort_order: number }>(
+      `SELECT sort_order FROM ${tabla} WHERE id = $1 AND ${ambitoCol} = $2`, [filaId, ambitoId],
+    );
+    if (cur.rows.length === 0) throw notFound('No encontrado');
+    const s = cur.rows[0].sort_order;
+    const comp = dir === 'up' ? '<' : '>';
+    const ord = dir === 'up' ? 'DESC' : 'ASC';
+    const vecino = await c.query<{ id: string; sort_order: number }>(
+      `SELECT id, sort_order FROM ${tabla} WHERE ${ambitoCol} = $1 AND sort_order ${comp} $2 ORDER BY sort_order ${ord} LIMIT 1`,
+      [ambitoId, s],
+    );
+    if (vecino.rows.length === 0) return; // ya está en el borde
+    await c.query(`UPDATE ${tabla} SET sort_order = $1 WHERE id = $2`, [vecino.rows[0].sort_order, filaId]);
+    await c.query(`UPDATE ${tabla} SET sort_order = $1 WHERE id = $2`, [s, vecino.rows[0].id]);
+  });
+}
+
+/** PATCH /api/courses/:id/modules/:moduleId/mover — sube o baja un módulo. */
+export async function moveModule(req: Request, res: Response): Promise<void> {
+  await assertCreaModulo(req); // reordenar la estructura: director o instructor de todo el curso
+  const { dir } = z.object({ dir: z.enum(['up', 'down']) }).parse(req.body);
+  await moverEnOrden('modules', 'course_id', req.params.id, req.params.moduleId, dir);
+  res.json({ ok: true });
+}
+
+/** PATCH /api/courses/:id/modules/:moduleId/activities/:activityId/mover */
+export async function moveActivity(req: Request, res: Response): Promise<void> {
+  await assertEditaModulo(req, req.params.moduleId);
+  const { dir } = z.object({ dir: z.enum(['up', 'down']) }).parse(req.body);
+  await moverEnOrden('activities', 'module_id', req.params.moduleId, req.params.activityId, dir);
+  res.json({ ok: true });
+}
+
+/**
  * PATCH /api/courses/:id/activities/:activityId/eval — marca una actividad como
  * evaluable y con qué método. El profesor decide qué cuenta como calificación.
  */

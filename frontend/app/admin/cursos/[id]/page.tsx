@@ -27,6 +27,7 @@ interface Activity {
   url: string | null;
   body: string | null;
   image_url?: string;
+  duration_min?: number | null;
   is_mandatory: boolean;
   document_title: string | null;
   exam_id: string | null;
@@ -284,6 +285,19 @@ export default function CourseDetailPage() {
     }
   }
 
+  const [duplicando, setDuplicando] = useState(false);
+  async function duplicarCurso() {
+    if (!confirm('¿Duplicar este curso como plantilla? Se crea una copia en BORRADOR (con sus módulos, actividades y exámenes, pero SIN alumnos ni matrículas) que podrás editar.')) return;
+    setDuplicando(true);
+    try {
+      const r = await api<{ course: { id: string } }>(`/api/courses/${courseId}/duplicar`, { method: 'POST', auth: true });
+      router.push(`/admin/cursos/${r.course.id}`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo duplicar el curso');
+      setDuplicando(false);
+    }
+  }
+
   // Cambiar entre Curso y OPE (solo super admin, solo sin matrículas). Descarta
   // el contenido incompatible del nuevo tipo, así que se avisa antes.
   async function cambiarTipo() {
@@ -382,6 +396,41 @@ export default function CourseDetailPage() {
     setDurMsg(null);
     await patchCourse({ durationHours: h });
     setDurMsg(`Duración guardada: ${h} h (es la que ven los alumnos) ✅`);
+  }
+
+  // Reordenar módulos y actividades (subir/bajar).
+  async function moverModulo(m: { id: string }, dir: 'up' | 'down') {
+    try {
+      await api(`/api/courses/${courseId}/modules/${m.id}/mover`, { method: 'PATCH', auth: true, body: JSON.stringify({ dir }) });
+      load();
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'No se pudo mover'); }
+  }
+  async function moverActividad(moduleId: string, a: { id: string }, dir: 'up' | 'down') {
+    try {
+      await api(`/api/courses/${courseId}/modules/${moduleId}/activities/${a.id}/mover`, { method: 'PATCH', auth: true, body: JSON.stringify({ dir }) });
+      load();
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'No se pudo mover'); }
+  }
+
+  // Editar una actividad ya creada (título, URL, texto, duración) sin recrearla.
+  const [editAct, setEditAct] = useState<{ id: string; type: string; title: string; url: string; body: string; duracion: string } | null>(null);
+  function abrirEditarAct(a: Activity) {
+    setEditAct({ id: a.id, type: a.type, title: a.title, url: a.url ?? '', body: a.body ?? '', duracion: a.duration_min != null ? String(a.duration_min) : '' });
+  }
+  async function guardarEditarAct() {
+    if (!editAct) return;
+    const cuerpo: Record<string, unknown> = { title: editAct.title };
+    if (editAct.type === 'video' || editAct.type === 'enlace') {
+      cuerpo.url = editAct.url;
+      cuerpo.durationMin = editAct.duracion && !Number.isNaN(Number(editAct.duracion.replace(',', '.')))
+        ? Math.round(Number(editAct.duracion.replace(',', '.'))) : null;
+    }
+    if (editAct.type === 'texto') cuerpo.body = editAct.body;
+    try {
+      await api(`/api/courses/${courseId}/activities/${editAct.id}`, { method: 'PATCH', auth: true, body: JSON.stringify(cuerpo) });
+      setEditAct(null);
+      load();
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'No se pudo guardar la actividad'); }
   }
 
   async function renombrarModulo(m: { id: string; title: string }) {
@@ -647,6 +696,9 @@ export default function CourseDetailPage() {
                 ) : (
                   <button className="btn btn-outline btn-small" onClick={ocultar}>Ocultar</button>
                 )}
+                <button className="btn btn-outline btn-small" onClick={duplicarCurso} disabled={duplicando} title="Crear una copia editable de este curso">
+                  {duplicando ? 'Duplicando…' : '⧉ Duplicar'}
+                </button>
                 {esMio && <button className="btn btn-danger btn-small" onClick={borrar}>Borrar</button>}
               </div>
             </div>
@@ -1162,7 +1214,7 @@ export default function CourseDetailPage() {
                 <div className="card-subtitle">{modules.length} módulos</div>
               </div>
 
-              {modules.map((m) => (
+              {modules.map((m, mi) => (
                 <div key={m.id} style={{ border: '1px solid var(--gray-200)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                     <strong style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -1170,6 +1222,8 @@ export default function CourseDetailPage() {
                       <button className="link-action" title="Renombrar módulo" onClick={() => renombrarModulo(m)} style={{ flexShrink: 0 }}>✏️</button>
                     </strong>
                     <div style={{ flexShrink: 0 }}>
+                      <button className="btn btn-outline btn-small" title="Subir módulo" disabled={mi === 0} onClick={() => moverModulo(m, 'up')}>↑</button>{' '}
+                      <button className="btn btn-outline btn-small" title="Bajar módulo" disabled={mi === modules.length - 1} onClick={() => moverModulo(m, 'down')}>↓</button>{' '}
                       <button className="btn btn-outline btn-small" onClick={() => setAddingTo(addingTo === m.id ? null : m.id)}>+ Actividad</button>{' '}
                       {m.title !== 'Bienvenida' && (
                         <button className="btn btn-outline btn-small" onClick={() => deleteModule(m.id)} title="Eliminar módulo">🗑</button>
@@ -1179,13 +1233,35 @@ export default function CourseDetailPage() {
 
                   {/* actividades */}
                   <div style={{ marginTop: 8 }}>
-                    {m.activities.map((a) => (
-                      <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 14 }}>
-                        <span>
+                    {m.activities.map((a, ai) => (
+                      editAct?.id === a.id ? (
+                        <div key={a.id} style={{ padding: '8px 0', borderTop: '1px dashed var(--gray-200)' }}>
+                          <div style={{ display: 'grid', gap: 6 }}>
+                            <input className="form-input" value={editAct.title} onChange={(e) => setEditAct({ ...editAct, title: e.target.value })} placeholder="Título de la actividad" />
+                            {(editAct.type === 'video' || editAct.type === 'enlace') && (
+                              <>
+                                <input className="form-input" value={editAct.url} onChange={(e) => setEditAct({ ...editAct, url: e.target.value })} placeholder="https://…" />
+                                <input className="form-input" type="number" min="0" style={{ width: 180 }} value={editAct.duracion} onChange={(e) => setEditAct({ ...editAct, duracion: e.target.value })} placeholder="Duración en minutos" />
+                              </>
+                            )}
+                            {editAct.type === 'texto' && (
+                              <textarea className="form-input" style={{ height: 90, padding: 10 }} value={editAct.body} onChange={(e) => setEditAct({ ...editAct, body: e.target.value })} />
+                            )}
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button className="btn btn-primary btn-small" onClick={guardarEditarAct}>Guardar</button>
+                              <button className="btn btn-outline btn-small" onClick={() => setEditAct(null)}>Cancelar</button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                      <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 14 }}>
+                        <span style={{ minWidth: 0 }}>
                           {TYPE_ICON[a.type]} {a.title}{a.document_title ? ` — ${a.document_title}` : ''}
                           {a.type === 'imagen' && a.image_url && <img src={a.image_url} alt="" style={{ height: 24, marginLeft: 8, borderRadius: 4, verticalAlign: 'middle' }} />}
                         </span>
-                        <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <span style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                          <button className="btn btn-outline btn-small" title="Subir" disabled={ai === 0} onClick={() => moverActividad(m.id, a, 'up')}>↑</button>
+                          <button className="btn btn-outline btn-small" title="Bajar" disabled={ai === m.activities.length - 1} onClick={() => moverActividad(m.id, a, 'down')}>↓</button>
                           {a.type === 'videoconferencia' && (
                             <button className="btn btn-primary btn-small" onClick={() => setVideoAct(a.id)} title="Abrir la sala como profesor">Entrar a la clase</button>
                           )}
@@ -1201,12 +1277,16 @@ export default function CourseDetailPage() {
                           {a.evaluable && a.metodo_eval === 'manual' && (
                             <button className="btn btn-outline btn-small" onClick={() => abrirCalificar(a)}>Calificar</button>
                           )}
+                          {['documento', 'video', 'enlace', 'texto'].includes(a.type) && (
+                            <button className="btn btn-outline btn-small" title="Editar la actividad" onClick={() => abrirEditarAct(a)}>✏️</button>
+                          )}
                           {a.exam_id && (
                             <Link className="btn btn-outline btn-small" href={`/admin/cursos/${courseId}/examen/${a.exam_id}`}>Editar</Link>
                           )}
                           <button className="btn btn-outline btn-small" onClick={() => deleteActivity(a.id)}>✕</button>
                         </span>
                       </div>
+                      )
                     ))}
                     {m.activities.length === 0 && <div className="muted" style={{ fontSize: 13 }}>Sin actividades</div>}
                   </div>
