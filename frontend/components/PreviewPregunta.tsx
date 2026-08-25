@@ -24,7 +24,14 @@ interface FullQuestion {
   image_url?: string | null;
 }
 
-export function PreviewPregunta({ questionId, onClose }: { questionId: string; onClose: () => void }) {
+export function PreviewPregunta({ questionId, onClose, onPrev, onNext, posicion }: {
+  questionId: string;
+  onClose: () => void;
+  /** Navegación opcional (para recorrer las preguntas de un banco). */
+  onPrev?: () => void;
+  onNext?: () => void;
+  posicion?: string;
+}) {
   const [q, setQ] = useState<FullQuestion | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,9 +44,20 @@ export function PreviewPregunta({ questionId, onClose }: { questionId: string; o
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <div className="card-title">Vista del alumno</div>
-          <button className="btn btn-outline btn-small" onClick={onClose}>Cerrar</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div className="card-title">
+            Vista del alumno
+            {posicion && <span className="muted" style={{ fontSize: 13, fontWeight: 400 }}> · {posicion}</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(onPrev || onNext) && (
+              <>
+                <button className="btn btn-outline btn-small" onClick={onPrev} disabled={!onPrev} title="Anterior">←</button>
+                <button className="btn btn-outline btn-small" onClick={onNext} disabled={!onNext} title="Siguiente">→</button>
+              </>
+            )}
+            <button className="btn btn-outline btn-small" onClick={onClose}>Cerrar</button>
+          </div>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}

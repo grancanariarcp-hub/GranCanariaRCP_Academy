@@ -7,6 +7,7 @@ import { api, ApiError, downloadFile, uploadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
 import { BankFilters, FILTROS_VACIOS, type FiltrosBanco, type Facetas } from '@/components/BankFilters';
 import { BankQuestionList } from '@/components/BankQuestionList';
+import { BankPreview } from '@/components/BankPreview';
 import { COMUNIDADES, CATEGORIAS } from '@/lib/sanidad';
 import { useDebounced } from '@/hooks/useDebounced';
 
@@ -57,6 +58,7 @@ export default function BancosPage() {
   const [facetas, setFacetas] = useState<Facetas | null>(null);
   const [total, setTotal] = useState(0);
   const [verPreguntasDe, setVerPreguntasDe] = useState<Bank | null>(null);
+  const [previewBank, setPreviewBank] = useState<Bank | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Formulario (sirve para crear y para editar)
@@ -511,6 +513,7 @@ export default function BancosPage() {
                       <div className="row-actions">
                         {b.canManage ? (
                           <>
+                            <button className="link-action" onClick={() => setPreviewBank(b)} title="Recorrer las preguntas como las ve el alumno">Vista previa</button>
                             <button className="link-action" onClick={() => setVerPreguntasDe(verPreguntasDe?.id === b.id ? null : b)} title="Ver y filtrar sus preguntas">Preguntas</button>
                             <button className="link-action" onClick={() => loadTemas(b.id)} title="Importar preguntas y ver temas">Importar</button>
                             <button className="link-action" onClick={() => startEdit(b)} title="Editar la ficha del banco">Editar</button>
@@ -576,6 +579,10 @@ export default function BancosPage() {
             {importando ? 'Importando…' : 'Importar preguntas'}
           </button>
         </div>
+      )}
+
+      {previewBank && (
+        <BankPreview bankId={previewBank.id} bankName={previewBank.name} onClose={() => setPreviewBank(null)} />
       )}
     </AppShell>
   );
