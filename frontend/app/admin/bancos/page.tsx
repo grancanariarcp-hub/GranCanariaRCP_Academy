@@ -196,15 +196,24 @@ export default function BancosPage() {
         setMsg({ ok: true, text: 'Banco actualizado ✅' });
       } else {
         const r = await api<{ bank: { id: string } }>('/api/banks', { method: 'POST', auth: true, body: JSON.stringify(body) });
-        // Si se adjuntó un archivo, se importan sus preguntas de una vez (Excel o
-        // JSON) al banco recién creado: un solo paso, sin ir al importador aparte.
+        // Si se adjuntó un archivo, se importan sus preguntas al banco recién
+        // creado. JSON → importador genérico del banco (tema/text/options/
+        // correcta/explicacion). Excel → plantilla RCP (nivel/publicos…).
         if (archivoNuevo) {
           try {
-            const imp = await uploadFile<{ created: number; total: number }>(
-              '/api/questions/import', archivoNuevo, { bankId: r.bank.id });
+            let imp: { created: number; total: number };
+            if (/\.json$/i.test(archivoNuevo.name)) {
+              const texto = await archivoNuevo.text();
+              const parsed = JSON.parse(texto);
+              imp = await api<{ created: number; total: number }>(`/api/banks/${r.bank.id}/import`,
+                { method: 'POST', auth: true, body: JSON.stringify({ questions: parsed }) });
+            } else {
+              imp = await uploadFile<{ created: number; total: number }>('/api/questions/import', archivoNuevo, { bankId: r.bank.id });
+            }
             setMsg({ ok: true, text: `Banco creado ✅ · ${imp.created}/${imp.total} preguntas importadas` });
           } catch (e) {
-            setMsg({ ok: true, text: `Banco creado ✅, pero el archivo no se pudo importar: ${e instanceof ApiError ? e.message : 'error'}. Usa «Importar» en su fila.` });
+            const motivo = e instanceof SyntaxError ? 'el JSON no es válido' : e instanceof ApiError ? e.message : 'error';
+            setMsg({ ok: true, text: `Banco creado ✅, pero el archivo no se pudo importar: ${motivo}. Usa «Importar» en su fila.` });
           }
         } else {
           setMsg({ ok: true, text: 'Banco creado ✅' });
@@ -339,10 +348,15 @@ export default function BancosPage() {
               <div className="form-group">
                 <label className="form-label">{shape.d1}</label>
                 {shape.o1 ? (
-                  <select className="form-select" value={dim1} onChange={(e) => setDim1(e.target.value)}>
-                    <option value="">—</option>
-                    {shape.o1.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
+                  // Campo con sugerencias PERO libre: puedes elegir una de la lista
+                  // o escribir la que quieras si no está.
+                  <>
+                    <input className="form-input" list="dim1-sugerencias" value={dim1}
+                      onChange={(e) => setDim1(e.target.value)} placeholder="Elige o escribe la tuya" />
+                    <datalist id="dim1-sugerencias">
+                      {shape.o1.map((o) => <option key={o} value={o} />)}
+                    </datalist>
+                  </>
                 ) : (
                   <input className="form-input" value={dim1} onChange={(e) => setDim1(e.target.value)} />
                 )}
@@ -452,7 +466,8 @@ export default function BancosPage() {
                 <input ref={archivoRef} className="form-input" type="file" accept=".xlsx,.json,application/json"
                   onChange={(e) => setArchivoNuevo(e.target.files?.[0] ?? null)} />
                 <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                  Excel o JSON. Se importan al crear el banco. {archivoNuevo && <strong>{archivoNuevo.name}</strong>}
+                  <strong>JSON</strong> genérico (tema, text, options, correcta, explicacion) o <strong>Excel</strong> con la
+                  plantilla RCP. Se importan al crear el banco. {archivoNuevo && <strong>{archivoNuevo.name}</strong>}
                 </p>
               </div>
             )}
