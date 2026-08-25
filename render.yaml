@@ -53,6 +53,10 @@ services:
         sync: false
       - key: LIVEKIT_URL
         sync: false
+      # Detección de duración de vídeos de YouTube (auto-duración de actividades).
+      # Clave de "YouTube Data API v3" (Google Cloud). Vimeo no necesita clave.
+      - key: YOUTUBE_API_KEY
+        sync: false
       # Base pública del campus para los enlaces de los correos.
       - key: STRIPE_SECRET_KEY
         sync: false

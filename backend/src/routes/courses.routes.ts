@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration, courseTaxonomy, duplicateCourse } from '../controllers/course.controller.js';
+import { createCourse, listCourses, getCourse, listCourseStudents, courseDuration, courseTaxonomy, duplicateCourse, videoDuration } from '../controllers/course.controller.js';
 import { getCourseExtras, updateCourseExtras } from '../controllers/academia.controller.js';
 import multer from 'multer';
 import {
@@ -37,6 +37,7 @@ router.use(requireAuth, requireRole('super_admin', 'profesor'));
 
 router.get('/', asyncHandler(listCourses));
 router.get('/taxonomia', asyncHandler(courseTaxonomy));
+router.get('/video-duration', asyncHandler(videoDuration));
 router.post('/', asyncHandler(createCourse));
 router.get('/:id', asyncHandler(getCourse));
 router.patch('/:id', asyncHandler(updateCourse));

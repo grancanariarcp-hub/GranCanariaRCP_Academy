@@ -525,3 +525,45 @@ export async function duplicateCourse(req: Request, res: Response): Promise<void
   });
   res.status(201).json({ course: { id: nuevoId } });
 }
+
+/** Convierte una duración ISO-8601 de YouTube (PT#H#M#S) a minutos (mín. 1). */
+function isoDurationToMinutes(iso: string): number {
+  const m = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!m) return 1;
+  const h = Number(m[1] ?? 0), mi = Number(m[2] ?? 0), s = Number(m[3] ?? 0);
+  return Math.max(1, Math.round((h * 3600 + mi * 60 + s) / 60));
+}
+
+/**
+ * GET /api/courses/video-duration?url=… — detecta la duración de un vídeo de
+ * YouTube (necesita YOUTUBE_API_KEY) o de Vimeo (sin clave), en minutos, para
+ * rellenar el cómputo de horas sin teclearla a mano.
+ */
+export async function videoDuration(req: Request, res: Response): Promise<void> {
+  const url = String((req.query.url ?? '')).trim();
+  if (!url) throw notFound('Falta la URL del vídeo');
+
+  const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  if (yt) {
+    const key = process.env.YOUTUBE_API_KEY;
+    if (!key) { res.status(503).json({ error: 'La detección de YouTube no está configurada (falta YOUTUBE_API_KEY)' }); return; }
+    const r = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${yt[1]}&key=${key}`);
+    const j = await r.json() as { items?: Array<{ contentDetails?: { duration?: string } }> };
+    const iso = j.items?.[0]?.contentDetails?.duration;
+    if (!iso) { res.status(422).json({ error: 'No se pudo obtener la duración (¿vídeo privado o id incorrecto?)' }); return; }
+    res.json({ minutes: isoDurationToMinutes(iso) });
+    return;
+  }
+
+  const vim = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vim) {
+    const r = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`);
+    if (!r.ok) { res.status(422).json({ error: 'No se pudo consultar Vimeo' }); return; }
+    const j = await r.json() as { duration?: number };
+    if (!j.duration) { res.status(422).json({ error: 'No se pudo obtener la duración del vídeo de Vimeo' }); return; }
+    res.json({ minutes: Math.max(1, Math.round(j.duration / 60)) });
+    return;
+  }
+
+  res.status(422).json({ error: 'Solo se detecta la duración de YouTube o Vimeo. En otros casos, indícala a mano.' });
+}

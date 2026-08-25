@@ -436,6 +436,19 @@ export default function CourseDetailPage() {
     } catch (err) { setError(err instanceof ApiError ? err.message : 'No se pudo guardar la actividad'); }
   }
 
+  // Detecta la duración de un vídeo de YouTube/Vimeo y la aplica al campo dado.
+  const [detectando, setDetectando] = useState(false);
+  async function detectarDuracion(url: string, aplicar: (min: number) => void) {
+    if (!url.trim()) { setError('Pon primero el enlace del vídeo'); return; }
+    setDetectando(true); setError(null);
+    try {
+      const r = await api<{ minutes: number }>(`/api/courses/video-duration?url=${encodeURIComponent(url.trim())}`, { auth: true });
+      aplicar(r.minutes);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo detectar la duración; ponla a mano');
+    } finally { setDetectando(false); }
+  }
+
   async function renombrarModulo(m: { id: string; title: string }) {
     const nuevo = prompt('Nuevo nombre del módulo:', m.title);
     if (!nuevo || nuevo.trim() === m.title) return;
@@ -1247,7 +1260,13 @@ export default function CourseDetailPage() {
                             {(editAct.type === 'video' || editAct.type === 'enlace') && (
                               <>
                                 <input className="form-input" value={editAct.url} onChange={(e) => setEditAct({ ...editAct, url: e.target.value })} placeholder="https://…" />
-                                <input className="form-input" type="number" min="0" style={{ width: 180 }} value={editAct.duracion} onChange={(e) => setEditAct({ ...editAct, duracion: e.target.value })} placeholder="Duración en minutos" />
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                  <input className="form-input" type="number" min="0" style={{ width: 180 }} value={editAct.duracion} onChange={(e) => setEditAct({ ...editAct, duracion: e.target.value })} placeholder="Duración en minutos" />
+                                  <button type="button" className="btn btn-outline btn-small" style={{ whiteSpace: 'nowrap' }} disabled={detectando}
+                                    onClick={() => detectarDuracion(editAct.url, (mn) => setEditAct((p) => (p ? { ...p, duracion: String(mn) } : p)))} title="Detectar desde YouTube o Vimeo">
+                                    {detectando ? '…' : '⏱ Detectar'}
+                                  </button>
+                                </div>
                               </>
                             )}
                             {editAct.type === 'texto' && (
@@ -1362,10 +1381,16 @@ export default function CourseDetailPage() {
                       )}
                       {(actType === 'video' || actType === 'enlace') && (
                         <div style={{ marginBottom: 8 }}>
-                          <input className="form-input" type="number" min="0" step="1" placeholder="Duración en minutos"
-                            value={actDuracion} onChange={(e) => setActDuracion(e.target.value)} />
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input className="form-input" type="number" min="0" step="1" placeholder="Duración en minutos"
+                              value={actDuracion} onChange={(e) => setActDuracion(e.target.value)} />
+                            <button type="button" className="btn btn-outline btn-small" style={{ whiteSpace: 'nowrap' }} disabled={detectando}
+                              onClick={() => detectarDuracion(actUrl, (mn) => setActDuracion(String(mn)))} title="Detectar la duración desde YouTube o Vimeo">
+                              {detectando ? '…' : '⏱ Detectar'}
+                            </button>
+                          </div>
                           <p className="muted" style={{ fontSize: 11.5, marginTop: 3 }}>
-                            Necesaria para el cómputo de horas CFC (la duración del vídeo). Sin ella, figura como «falta indicar duración».
+                            Necesaria para el cómputo de horas CFC. Pulsa «Detectar» para rellenarla desde YouTube/Vimeo, o ponla a mano.
                           </p>
                         </div>
                       )}
