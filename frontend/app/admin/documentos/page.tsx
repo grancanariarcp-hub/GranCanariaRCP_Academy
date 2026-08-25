@@ -76,6 +76,9 @@ export default function DocumentosPage() {
   // Edición en línea de la caducidad de un documento propio.
   const [editId, setEditId] = useState<string | null>(null);
   const [editHasta, setEditHasta] = useState('');
+  // Edición en línea del nº de páginas (para el cómputo de horas CFC).
+  const [editPagId, setEditPagId] = useState<string | null>(null);
+  const [editPag, setEditPag] = useState('');
   // Edición de visibilidad + lista de acceso de un documento propio.
   const [visDocId, setVisDocId] = useState<string | null>(null);
   const [visValor, setVisValor] = useState<'privado' | 'publico' | 'restringido'>('privado');
@@ -95,6 +98,18 @@ export default function DocumentosPage() {
   const totalPaginas = Math.max(1, Math.ceil(docsFiltrados.length / POR_PAGINA));
   const paginaSegura = Math.min(pagina, totalPaginas);
   const docsPagina = docsFiltrados.slice((paginaSegura - 1) * POR_PAGINA, paginaSegura * POR_PAGINA);
+
+  async function guardarPaginas(d: DocRow) {
+    const n = Number(editPag);
+    if (!Number.isInteger(n) || n <= 0) { setMsg({ ok: false, text: 'Indica un número de páginas válido' }); return; }
+    try {
+      await api(`/api/documents/${d.id}`, { method: 'PATCH', auth: true, body: JSON.stringify({ pages: n }) });
+      setEditPagId(null);
+      loadDocs();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : 'No se pudo guardar el nº de páginas' });
+    }
+  }
 
   async function guardarCaducidad(d: DocRow) {
     try {
@@ -371,7 +386,28 @@ export default function DocumentosPage() {
                   const editando = editId === d.id;
                   return (
                   <tr key={d.id}>
-                    <td style={{ fontSize: 13 }}>{d.title}<div className="muted" style={{ fontSize: 11 }}>{humanSize(d.size_bytes)}{d.pages ? ` · ${d.pages} pág.` : ''}{d.course_title ? ` · 📚 ${d.course_title}` : ''}</div></td>
+                    <td style={{ fontSize: 13 }}>
+                      {d.title}
+                      <div className="muted" style={{ fontSize: 11, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                        <span>{humanSize(d.size_bytes)}</span>
+                        {editPagId === d.id ? (
+                          <span style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                            <input className="form-input" type="number" min="1" style={{ width: 64, padding: '2px 6px' }}
+                              value={editPag} onChange={(e) => setEditPag(e.target.value)} autoFocus />
+                            <button className="link-action" onClick={() => guardarPaginas(d)}>Guardar</button>
+                            <button className="link-action" onClick={() => setEditPagId(null)}>Cancelar</button>
+                          </span>
+                        ) : (
+                          <span>
+                            {d.pages ? `· ${d.pages} pág.` : '· sin nº de páginas'}
+                            {d.mio && (
+                              <>{' '}<button className="link-action" onClick={() => { setEditPagId(d.id); setEditPag(d.pages ? String(d.pages) : ''); }}>{d.pages ? 'editar' : 'indicar'}</button></>
+                            )}
+                          </span>
+                        )}
+                        {d.course_title ? <span>· 📚 {d.course_title}</span> : null}
+                      </div>
+                    </td>
                     <td>
                       <span className="badge badge-primary">{KIND_LABEL[d.kind]}</span>
                     </td>
