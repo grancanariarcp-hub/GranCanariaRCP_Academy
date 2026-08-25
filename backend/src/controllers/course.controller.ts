@@ -32,6 +32,8 @@ const createSchema = z.object({
   cfcEnTramite: z.boolean().optional().default(false),
   // Tipo elegido al crear: una OPE es un generador de exámenes, no un curso.
   esOpe: z.boolean().optional().default(false),
+  // Plantilla: añade un módulo «Evaluación final» con un examen (para acreditar).
+  conExamenFinal: z.boolean().optional().default(false),
 });
 
 export async function createCourse(req: Request, res: Response): Promise<void> {
@@ -79,6 +81,23 @@ export async function createCourse(req: Request, res: Response): Promise<void> {
         [created.id],
       );
       await client.query('INSERT INTO course_surveys (course_id) VALUES ($1) ON CONFLICT (course_id) DO NOTHING', [created.id]);
+
+      // Plantilla CFC: un módulo «Evaluación final» con un examen ya creado
+      // (vacío; el profesor le añade preguntas). Arranca verde el requisito de
+      // evaluación del asistente de acreditación.
+      if (data.conExamenFinal) {
+        const m = await client.query<{ id: string }>(
+          `INSERT INTO modules (course_id, title, sort_order) VALUES ($1, 'Evaluación final', 2) RETURNING id`, [created.id],
+        );
+        const ex = await client.query<{ id: string }>(
+          `INSERT INTO exams (module_id, title, kind, attempts_allowed, pass_pct) VALUES ($1, 'Examen final', 'examen', 1, 60) RETURNING id`,
+          [m.rows[0].id],
+        );
+        await client.query(
+          `INSERT INTO activities (module_id, type, title, exam_id, sort_order) VALUES ($1, 'examen', 'Examen final', $2, 0)`,
+          [m.rows[0].id, ex.rows[0].id],
+        );
+      }
     }
 
     return created;

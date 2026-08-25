@@ -57,6 +57,7 @@ export default function CursosPage() {
   const [acreditacion, setAcreditacion] = useState('');
   const [cfc, setCfc] = useState('');
   const [cfcEnTramite, setCfcEnTramite] = useState(false);
+  const [conExamenFinal, setConExamenFinal] = useState(true);
 
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -127,6 +128,7 @@ export default function CursosPage() {
           acreditacion: acreditacion || undefined,
           cfc: cfc || undefined,
           cfcEnTramite,
+          conExamenFinal,
         }),
       });
       // Ir directo a la edición: allí se sube la miniatura, se añaden imágenes y
@@ -313,6 +315,13 @@ export default function CursosPage() {
                   <span>
                     <strong>Tramitar CFC</strong> — permite que la Comisión CFC vea este curso aunque aún no esté
                     publicado. Déjalo sin marcar si no está en trámite de acreditación.
+                  </span>
+                </label>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13.5, marginBottom: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={conExamenFinal} onChange={(e) => setConExamenFinal(e.target.checked)} style={{ marginTop: 3 }} />
+                  <span>
+                    <strong>Añadir examen final</strong> — crea un módulo «Evaluación final» con un examen (vacío, le
+                    añades preguntas luego). La evaluación es casi obligatoria para acreditar; deja marcado si dudas.
                   </span>
                 </label>
               </>

@@ -415,9 +415,9 @@ export default function CourseDetailPage() {
   }
 
   // Editar una actividad ya creada (título, URL, texto, duración) sin recrearla.
-  const [editAct, setEditAct] = useState<{ id: string; type: string; title: string; url: string; body: string; duracion: string } | null>(null);
-  function abrirEditarAct(a: Activity) {
-    setEditAct({ id: a.id, type: a.type, title: a.title, url: a.url ?? '', body: a.body ?? '', duracion: a.duration_min != null ? String(a.duration_min) : '' });
+  const [editAct, setEditAct] = useState<{ id: string; type: string; title: string; url: string; body: string; duracion: string; moduleId: string; origModuleId: string } | null>(null);
+  function abrirEditarAct(a: Activity, moduleId: string) {
+    setEditAct({ id: a.id, type: a.type, title: a.title, url: a.url ?? '', body: a.body ?? '', duracion: a.duration_min != null ? String(a.duration_min) : '', moduleId, origModuleId: moduleId });
   }
   async function guardarEditarAct() {
     if (!editAct) return;
@@ -428,6 +428,7 @@ export default function CourseDetailPage() {
         ? Math.round(Number(editAct.duracion.replace(',', '.'))) : null;
     }
     if (editAct.type === 'texto') cuerpo.body = editAct.body;
+    if (editAct.moduleId !== editAct.origModuleId) cuerpo.moduleId = editAct.moduleId;
     try {
       await api(`/api/courses/${courseId}/activities/${editAct.id}`, { method: 'PATCH', auth: true, body: JSON.stringify(cuerpo) });
       setEditAct(null);
@@ -1252,6 +1253,14 @@ export default function CourseDetailPage() {
                             {editAct.type === 'texto' && (
                               <textarea className="form-input" style={{ height: 90, padding: 10 }} value={editAct.body} onChange={(e) => setEditAct({ ...editAct, body: e.target.value })} />
                             )}
+                            {modules.length > 1 && (
+                              <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className="muted">Módulo:</span>
+                                <select className="form-select" style={{ width: 'auto' }} value={editAct.moduleId} onChange={(e) => setEditAct({ ...editAct, moduleId: e.target.value })}>
+                                  {modules.map((mm) => <option key={mm.id} value={mm.id}>{mm.title}</option>)}
+                                </select>
+                              </label>
+                            )}
                             <div style={{ display: 'flex', gap: 6 }}>
                               <button className="btn btn-primary btn-small" onClick={guardarEditarAct}>Guardar</button>
                               <button className="btn btn-outline btn-small" onClick={() => setEditAct(null)}>Cancelar</button>
@@ -1283,7 +1292,7 @@ export default function CourseDetailPage() {
                             <button className="btn btn-outline btn-small" onClick={() => abrirCalificar(a)}>Calificar</button>
                           )}
                           {['documento', 'video', 'enlace', 'texto'].includes(a.type) && (
-                            <button className="btn btn-outline btn-small" title="Editar la actividad" onClick={() => abrirEditarAct(a)}>✏️</button>
+                            <button className="btn btn-outline btn-small" title="Editar la actividad" onClick={() => abrirEditarAct(a, m.id)}>✏️</button>
                           )}
                           {a.exam_id && (
                             <Link className="btn btn-outline btn-small" href={`/admin/cursos/${courseId}/examen/${a.exam_id}`}>Editar</Link>

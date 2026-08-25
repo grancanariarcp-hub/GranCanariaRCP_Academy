@@ -400,10 +400,23 @@ const updateActivitySchema = z.object({
   body: z.string().optional(),
   documentId: z.string().uuid().optional(),
   durationMin: z.number().int().min(0).max(1000).nullable().optional(),
+  // Mover la actividad a otro módulo del mismo curso.
+  moduleId: z.string().uuid().optional(),
 });
 export async function updateActivity(req: Request, res: Response): Promise<void> {
   await assertEditaActividad(req, req.params.activityId);
   const d = updateActivitySchema.parse(req.body);
+
+  // Cambio de módulo: el destino debe ser del mismo curso; se coloca al final.
+  let nuevoSortOrder: number | null = null;
+  if (d.moduleId) {
+    const destino = await query('SELECT 1 FROM modules WHERE id = $1 AND course_id = $2', [d.moduleId, req.params.id]);
+    if (destino.rows.length === 0) throw badRequest('El módulo de destino no es de este curso', 'BAD_MODULE');
+    // Si es instructor acotado, también debe poder editar el módulo destino.
+    await assertEditaModulo(req, d.moduleId);
+    const mx = await query<{ n: number | null }>('SELECT MAX(sort_order) AS n FROM activities WHERE module_id = $1', [d.moduleId]);
+    nuevoSortOrder = (mx.rows[0].n ?? -1) + 1;
+  }
 
   // Cambiar el documento exige tener acceso a él (igual que al crear).
   if (d.documentId && req.auth!.role !== 'super_admin') {
@@ -423,6 +436,8 @@ export async function updateActivity(req: Request, res: Response): Promise<void>
     body: d.body,
     document_id: d.documentId,
     duration_min: d.durationMin,
+    module_id: d.moduleId,
+    sort_order: nuevoSortOrder ?? undefined,
   };
   const fields: string[] = [];
   const params: unknown[] = [];
