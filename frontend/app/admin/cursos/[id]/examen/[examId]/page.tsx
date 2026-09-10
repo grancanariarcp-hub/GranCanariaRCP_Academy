@@ -8,6 +8,7 @@ import { AppShell } from '@/components/AppShell';
 import { api, ApiError, uploadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
 import { CalidadPreguntas } from '@/components/CalidadPreguntas';
+import { ExamPreview } from '@/components/ExamPreview';
 
 type Format = 'test' | 'vf' | 'abierta' | 'escala' | 'emparejar' | 'multiple';
 type Par = { left: string; right: string };
@@ -21,6 +22,7 @@ interface ExamQuestion {
   explanation?: string | null;
   option_feedback?: string[];
   video_url?: string | null;
+  image_url?: string | null;
 }
 interface Exam {
   id: string;
@@ -72,6 +74,7 @@ export default function ExamEditorPage() {
   const [expl, setExpl] = useState('');
   const [optFb, setOptFb] = useState<string[]>(['', '', '', '']);
   const [editingQId, setEditingQId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   // JSON import
   const [jsonText, setJsonText] = useState('');
@@ -333,6 +336,10 @@ export default function ExamEditorPage() {
   return (
     <AppShell user={user} title={exam?.title ?? 'Examen'} nav={nav}>
       {error && <div className="alert alert-error">{error}</div>}
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <button className="btn btn-outline btn-small" onClick={() => setShowPreview(true)} title="Ver el examen como lo verá el alumno">👁 Vista previa (como alumno)</button>
+      </div>
 
       <CalidadPreguntas courseId={courseId} examId={examId} />
 
@@ -714,6 +721,9 @@ export default function ExamEditorPage() {
           </table>
         </div>
       </div>
+      {showPreview && (
+        <ExamPreview titulo={exam?.title ?? 'Examen'} feedbackGeneral={exam?.feedback_general ?? null} questions={questions} onClose={() => setShowPreview(false)} />
+      )}
     </AppShell>
   );
 }
