@@ -111,11 +111,16 @@ export async function updateExam(req: Request, res: Response): Promise<void> {
 // Add / delete questions (test / verdadero-falso / abierta)
 // ---------------------------------------------------------------------------
 const addQuestionSchema = z.object({
-  format: z.enum(['test', 'vf', 'abierta']),
+  format: z.enum(['test', 'vf', 'abierta', 'escala', 'emparejar']),
   text: z.string().min(3),
   options: z.array(z.string().min(1)).optional(),
   correctIndex: z.number().int().min(0).optional(),
   videoUrl: z.string().url('URL de vídeo no válida').optional().or(z.literal('')),
+  // escala (Likert): etiquetas de los extremos de la escala 1-5.
+  escalaMin: z.string().max(60).optional(),
+  escalaMax: z.string().max(60).optional(),
+  // emparejar: parejas correctas (columna izquierda ↔ derecha).
+  pares: z.array(z.object({ left: z.string().min(1), right: z.string().min(1) })).max(10).optional(),
 });
 
 export async function addExamQuestion(req: Request, res: Response): Promise<void> {
@@ -123,15 +128,26 @@ export async function addExamQuestion(req: Request, res: Response): Promise<void
   await assertExamInCourse(req.params.examId, req.params.id);
   const d = addQuestionSchema.parse(req.body);
 
-  let options: string[] = [];
+  // options guarda distinto según el formato: array de textos (test/vf/escala) o
+  // array de parejas {left,right} (emparejar). correct_index solo en test/vf.
+  let options: unknown = [];
   let correctIndex: number | null = null;
 
   if (d.format === 'test') {
-    ({ options, correctIndex } = opcionesDepuradas(d.options ?? [], d.correctIndex));
+    const dep = opcionesDepuradas(d.options ?? [], d.correctIndex);
+    options = dep.options; correctIndex = dep.correctIndex;
   } else if (d.format === 'vf') {
     options = ['Verdadero', 'Falso'];
     if (d.correctIndex !== 0 && d.correctIndex !== 1) throw badRequest('Indica si es Verdadero o Falso', 'BAD_VF');
     correctIndex = d.correctIndex;
+  } else if (d.format === 'escala') {
+    // Sin respuesta correcta: es una opinión/autoevaluación. Guardamos las
+    // etiquetas de los extremos (1 = min, 5 = max).
+    options = [d.escalaMin?.trim() || 'Nada de acuerdo', d.escalaMax?.trim() || 'Totalmente de acuerdo'];
+  } else if (d.format === 'emparejar') {
+    const pares = (d.pares ?? []).map((p) => ({ left: p.left.trim(), right: p.right.trim() })).filter((p) => p.left && p.right);
+    if (pares.length < 2) throw badRequest('Añade al menos 2 parejas', 'BAD_PARES');
+    options = pares;
   } // abierta: sin opciones ni correcta
 
   const { rows } = await query(

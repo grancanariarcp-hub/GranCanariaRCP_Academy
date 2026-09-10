@@ -107,7 +107,7 @@ export async function startExam(req: Request, res: Response): Promise<void> {
   const e = exam as { shuffle?: boolean; random_per_student?: boolean; questions_per_attempt?: number | null };
   const shuffle = e.shuffle !== false;
   const limit = e.random_per_student && e.questions_per_attempt ? e.questions_per_attempt : null;
-  const q = await query<{ id: string; image_key: string | null }>(
+  const q = await query<{ id: string; format: string; options: unknown; image_key: string | null }>(
     `SELECT id, format, text, options, video_url, image_key FROM exam_questions
       WHERE exam_id = $1 AND excluded_from_grading = FALSE
       ORDER BY ${limit || shuffle ? 'RANDOM()' : 'sort_order'}
@@ -116,11 +116,28 @@ export async function startExam(req: Request, res: Response): Promise<void> {
   );
   await query('UPDATE exam_attempts SET served_questions = $1::jsonb WHERE id = $2',
     [JSON.stringify(q.rows.map((x) => x.id)), att.rows[0].id]);
+
+  // En «emparejar» no se puede enviar la solución: se mandan las dos columnas
+  // (izquierda en orden, derecha BARAJADA) sin el mapeo correcto. El alumno
+  // responde eligiendo, y se corrige por el valor elegido (no por la posición).
+  const preguntas = q.rows.map((row) => {
+    if (row.format === 'emparejar' && Array.isArray(row.options)) {
+      const pares = row.options as Array<{ left: string; right: string }>;
+      const derecha = pares.map((p) => p.right);
+      for (let i = derecha.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [derecha[i], derecha[j]] = [derecha[j], derecha[i]];
+      }
+      return { ...row, options: { izquierda: pares.map((p) => p.left), derecha } };
+    }
+    return row;
+  });
+
   res.status(201).json({
     attemptId: att.rows[0].id,
     startedAt: att.rows[0].started_at,
     exam: { title: exam.title, timeLimitMin: exam.time_limit_min, passPct: exam.pass_pct },
-    questions: await withImageUrls(q.rows),
+    questions: await withImageUrls(preguntas as Array<{ image_key: string | null }>),
   });
 }
 
@@ -134,12 +151,13 @@ export async function submitExam(req: Request, res: Response): Promise<void> {
   if (att.rows.length === 0) throw notFound('Intento no encontrado');
   if (att.rows[0].submitted_at) throw badRequest('Este intento ya fue enviado', 'ALREADY_SUBMITTED');
 
-  const answers = z.record(z.union([z.number(), z.string()])).parse(req.body.answers ?? {});
+  // number (test/vf/escala) · string (abierta) · string[] (emparejar).
+  const answers = z.record(z.union([z.number(), z.string(), z.array(z.string())])).parse(req.body.answers ?? {});
   // Se corrige solo sobre las preguntas que le tocaron a ESTE alumno y que no
   // estén anuladas por el profesorado.
   const served = att.rows[0].served_questions;
-  const q = await query<{ id: string; format: string; correct_index: number | null }>(
-    `SELECT id, format, correct_index FROM exam_questions
+  const q = await query<{ id: string; format: string; correct_index: number | null; options: unknown }>(
+    `SELECT id, format, correct_index, options FROM exam_questions
       WHERE exam_id = $1 AND excluded_from_grading = FALSE
       ${served && served.length > 0 ? 'AND id = ANY($2)' : ''}`,
     served && served.length > 0 ? [exam.id, served] : [exam.id],
@@ -148,9 +166,20 @@ export async function submitExam(req: Request, res: Response): Promise<void> {
   let autoTotal = 0;
   let autoCorrect = 0;
   for (const question of q.rows) {
-    if (question.format === 'abierta') continue;
-    autoTotal += 1;
+    // No se autocorrigen: la abierta (la ve el profesor) ni la escala (opinión).
+    if (question.format === 'abierta' || question.format === 'escala') continue;
     const a = answers[question.id];
+    if (question.format === 'emparejar') {
+      // Crédito parcial: cada pareja acertada suma. answers = right elegido por
+      // cada izquierda, en el orden guardado de las parejas.
+      const pares = Array.isArray(question.options) ? question.options as Array<{ left: string; right: string }> : [];
+      for (let i = 0; i < pares.length; i++) {
+        autoTotal += 1;
+        if (Array.isArray(a) && a[i] === pares[i].right) autoCorrect += 1;
+      }
+      continue;
+    }
+    autoTotal += 1;
     if (typeof a === 'number' && a === question.correct_index) autoCorrect += 1;
   }
   const timeSpent = Math.max(0, Math.round((Date.now() - new Date(att.rows[0].started_at).getTime()) / 1000));

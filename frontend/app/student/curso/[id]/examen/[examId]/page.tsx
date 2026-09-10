@@ -8,11 +8,19 @@ import { AppShell } from '@/components/AppShell';
 import { api, ApiError } from '@/lib/api';
 import { PageNav } from '@/components/PageNav';
 import { AvisarPregunta } from '@/components/AvisarPregunta';
+import { VideoEmbed } from '@/components/VideoEmbed';
 
-type Format = 'test' | 'vf' | 'abierta';
-interface Q { id: string; format: Format; text: string; options: string[]; correct_index?: number | null }
+type Format = 'test' | 'vf' | 'abierta' | 'escala' | 'emparejar';
+type Par = { left: string; right: string };
+type EmparejarOpts = { izquierda: string[]; derecha: string[] };
+interface Q {
+  id: string; format: Format; text: string;
+  options: string[] | EmparejarOpts | Par[];
+  correct_index?: number | null;
+  image_url?: string | null; video_url?: string | null;
+}
 interface Attempt { id: string; score: number | null; passed: boolean | null; time_spent_seconds: number | null; submitted_at: string }
-type Answers = Record<string, number | string>;
+type Answers = Record<string, number | string | string[]>;
 
 function mmss(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
@@ -163,10 +171,46 @@ export default function TakeExamPage() {
           {questions.map((q, i) => (
             <div className="card" key={q.id} style={{ marginTop: 16 }}>
               <div style={{ fontWeight: 600, marginBottom: 8 }}>{i + 1}. {q.text}</div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {q.image_url && <img src={q.image_url} alt="" style={{ maxWidth: '100%', borderRadius: 10, marginBottom: 10 }} />}
+              {q.video_url && <div style={{ marginBottom: 10 }}><VideoEmbed url={q.video_url} /></div>}
               {q.format === 'abierta' ? (
                 <textarea className="form-input" style={{ height: 80, padding: 10 }} value={(answers[q.id] as string) || ''} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />
+              ) : q.format === 'escala' ? (
+                <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span className="muted" style={{ fontSize: 12.5 }}>{(q.options as string[])[0]}</span>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <label key={n} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, cursor: 'pointer' }}>
+                      <input type="radio" name={q.id} checked={answers[q.id] === n} onChange={() => setAnswers({ ...answers, [q.id]: n })} />
+                      <span style={{ fontSize: 12 }}>{n}</span>
+                    </label>
+                  ))}
+                  <span className="muted" style={{ fontSize: 12.5 }}>{(q.options as string[])[1]}</span>
+                </div>
+              ) : q.format === 'emparejar' ? (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {(q.options as EmparejarOpts).izquierda.map((izq, idx) => {
+                    const ans = (answers[q.id] as string[]) || [];
+                    return (
+                      <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span style={{ flex: 1 }}>{izq}</span>
+                        <span className="muted">↔</span>
+                        <select className="form-select" style={{ flex: 1 }} value={ans[idx] ?? ''}
+                          onChange={(e) => {
+                            const next = [...((answers[q.id] as string[]) || [])];
+                            while (next.length < (q.options as EmparejarOpts).izquierda.length) next.push('');
+                            next[idx] = e.target.value;
+                            setAnswers({ ...answers, [q.id]: next });
+                          }}>
+                          <option value="">Elegir…</option>
+                          {(q.options as EmparejarOpts).derecha.map((d, k) => <option key={k} value={d}>{d}</option>)}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
-                q.options.map((opt, idx) => (
+                (q.options as string[]).map((opt, idx) => (
                   <label key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0', cursor: 'pointer' }}>
                     <input type="radio" name={q.id} checked={answers[q.id] === idx} onChange={() => setAnswers({ ...answers, [q.id]: idx })} />
                     {opt}
@@ -203,10 +247,28 @@ export default function TakeExamPage() {
             return (
               <div className="card" key={q.id} style={{ marginTop: 12 }}>
                 <div style={{ fontWeight: 600, marginBottom: 8 }}>{i + 1}. {q.text}</div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {q.image_url && <img src={q.image_url} alt="" style={{ maxWidth: '100%', borderRadius: 10, marginBottom: 10 }} />}
+                {q.video_url && <div style={{ marginBottom: 10 }}><VideoEmbed url={q.video_url} /></div>}
                 {q.format === 'abierta' ? (
                   <div><em>Tu respuesta:</em> {(mine as string) || '—'}<div className="info-box" style={{ marginTop: 6, fontSize: 12 }}>La corrige el profesor.</div></div>
+                ) : q.format === 'escala' ? (
+                  <div><em>Tu respuesta:</em> {typeof mine === 'number' ? `${mine} / 5` : '—'} <span className="muted">(no puntúa)</span></div>
+                ) : q.format === 'emparejar' ? (
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    {(q.options as Par[]).map((p, idx) => {
+                      const mineArr = Array.isArray(mine) ? mine : [];
+                      const ok = mineArr[idx] === p.right;
+                      return (
+                        <div key={idx} style={{ fontSize: 13, color: ok ? 'var(--success)' : 'var(--danger)', fontWeight: ok ? 700 : 400 }}>
+                          {ok ? '✓ ' : '✗ '}{p.left} <span className="muted">↔</span> {p.right}
+                          {!ok && <span className="muted"> (tu respuesta: {mineArr[idx] || '—'})</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
-                  q.options.map((opt, idx) => {
+                  (q.options as string[]).map((opt, idx) => {
                     const isCorrect = idx === q.correct_index;
                     const isMine = mine === idx;
                     return (

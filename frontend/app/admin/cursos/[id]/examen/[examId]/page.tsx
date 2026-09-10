@@ -9,12 +9,13 @@ import { api, ApiError, uploadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
 import { CalidadPreguntas } from '@/components/CalidadPreguntas';
 
-type Format = 'test' | 'vf' | 'abierta';
+type Format = 'test' | 'vf' | 'abierta' | 'escala' | 'emparejar';
+type Par = { left: string; right: string };
 interface ExamQuestion {
   id: string;
   format: Format;
   text: string;
-  options: string[];
+  options: Array<string | Par>;
   correct_index: number | null;
 }
 interface Exam {
@@ -32,7 +33,7 @@ interface Exam {
 interface BankRef { id: string; name: string; questions: string }
 interface BankQ { id: string; tema: string | null; text: string }
 
-const FORMAT_LABEL: Record<Format, string> = { test: '📝 Test', vf: '✔️ Verdadero/Falso', abierta: '✍️ Abierta' };
+const FORMAT_LABEL: Record<Format, string> = { test: '📝 Test', vf: '✔️ Verdadero/Falso', abierta: '✍️ Abierta', escala: '📊 Escala', emparejar: '🔀 Emparejar' };
 
 export default function ExamEditorPage() {
   const params = useParams();
@@ -52,10 +53,14 @@ export default function ExamEditorPage() {
   const [correct, setCorrect] = useState(0);
   // Tipo elegido en la pestaña: los de media generan una pregunta test o V/F
   // que además lleva imagen o vídeo.
-  const [tipo, setTipo] = useState<'test' | 'vf' | 'abierta' | 'imagen' | 'video'>('test');
+  const [tipo, setTipo] = useState<'test' | 'vf' | 'abierta' | 'imagen' | 'video' | 'escala' | 'emparejar'>('test');
   const [mediaFormat, setMediaFormat] = useState<'test' | 'vf'>('test');
   const [videoUrl, setVideoUrl] = useState('');
   const [imgFile, setImgFile] = useState<File | null>(null);
+  // escala (Likert): etiquetas de los extremos. emparejar: parejas correctas.
+  const [escalaMin, setEscalaMin] = useState('Nada de acuerdo');
+  const [escalaMax, setEscalaMax] = useState('Totalmente de acuerdo');
+  const [pares, setPares] = useState<Par[]>([{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]);
 
   // JSON import
   const [jsonText, setJsonText] = useState('');
@@ -175,7 +180,7 @@ export default function ExamEditorPage() {
   }
 
   /** Formato real que se guarda (los tipos de media son test o V/F). */
-  function realFormat(): 'test' | 'vf' | 'abierta' {
+  function realFormat(): Format {
     return tipo === 'imagen' || tipo === 'video' ? mediaFormat : tipo;
   }
 
@@ -208,9 +213,14 @@ export default function ExamEditorPage() {
         body.correctIndex = correct;
       } else if (f === 'vf') {
         body.correctIndex = correct; // 0 = Verdadero, 1 = Falso
+      } else if (f === 'escala') {
+        body.escalaMin = escalaMin; body.escalaMax = escalaMax;
+      } else if (f === 'emparejar') {
+        body.pares = pares.map((p) => ({ left: p.left.trim(), right: p.right.trim() })).filter((p) => p.left && p.right);
       }
       await api(`/api/courses/${courseId}/exams/${examId}/questions`, { method: 'POST', auth: true, body: JSON.stringify(body) });
       setQText(''); setOptions(['', '', '', '']); setCorrect(0);
+      setPares([{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]);
       load();
     } catch (err) {
       const detail = err instanceof ApiError && err.details ? ' — ' + (err.details as Array<{ message: string }>).map((d) => d.message).join('; ') : '';
@@ -331,6 +341,7 @@ export default function ExamEditorPage() {
             <div className="tabs">
               {([
                 ['test', 'Test'], ['vf', 'Verdadero / Falso'], ['abierta', 'Abierta'],
+                ['escala', 'Escala'], ['emparejar', 'Emparejar'],
                 ['imagen', 'Con imagen'], ['video', 'Con vídeo'],
               ] as Array<[typeof tipo, string]>).map(([t, label]) => (
                 <button key={t} type="button" className={`tab ${tipo === t ? 'active' : ''}`}
@@ -399,6 +410,34 @@ export default function ExamEditorPage() {
                 </div>
               </div>
             )}
+            {tipo === 'escala' && (
+              <div className="form-group">
+                <label className="form-label">Etiquetas de la escala (1 a 5)</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input className="form-input" value={escalaMin} onChange={(e) => setEscalaMin(e.target.value)} placeholder="1 = …" />
+                  <span className="muted">…</span>
+                  <input className="form-input" value={escalaMax} onChange={(e) => setEscalaMax(e.target.value)} placeholder="5 = …" />
+                </div>
+                <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>El alumno elige del 1 al 5. No puntúa (es una opinión / autoevaluación).</p>
+              </div>
+            )}
+            {tipo === 'emparejar' && (
+              <div className="form-group">
+                <label className="form-label">Parejas correctas (izquierda ↔ derecha)</label>
+                {pares.map((p, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                    <input className="form-input" placeholder={`Izquierda ${i + 1}`} value={p.left}
+                      onChange={(e) => setPares((ps) => ps.map((x, k) => (k === i ? { ...x, left: e.target.value } : x)))} />
+                    <span className="muted">↔</span>
+                    <input className="form-input" placeholder={`Derecha ${i + 1}`} value={p.right}
+                      onChange={(e) => setPares((ps) => ps.map((x, k) => (k === i ? { ...x, right: e.target.value } : x)))} />
+                    {pares.length > 2 && <button type="button" className="btn btn-outline btn-small" onClick={() => setPares((ps) => ps.filter((_, k) => k !== i))}>✕</button>}
+                  </div>
+                ))}
+                {pares.length < 8 && <button type="button" className="btn btn-outline btn-small" onClick={() => setPares((ps) => [...ps, { left: '', right: '' }])}>+ Añadir pareja</button>}
+                <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>La columna derecha se baraja en cada intento. Cada pareja acertada suma (crédito parcial).</p>
+              </div>
+            )}
             {tipo === 'abierta' && (
               <div className="info-box" style={{ marginBottom: 12, fontSize: 13 }}>
                 Pregunta de respuesta libre (se corrige manualmente).
@@ -407,7 +446,8 @@ export default function ExamEditorPage() {
 
             <button className="btn btn-primary btn-full"
               onClick={tipo === 'imagen' ? addQuestionWithImage : addQuestion}
-              disabled={qText.trim().length < 3 || (tipo === 'imagen' && !imgFile) || (tipo === 'video' && !videoUrl.trim())}>
+              disabled={qText.trim().length < 3 || (tipo === 'imagen' && !imgFile) || (tipo === 'video' && !videoUrl.trim())
+                || (tipo === 'emparejar' && pares.filter((p) => p.left.trim() && p.right.trim()).length < 2)}>
               Añadir pregunta
             </button>
           </div>
@@ -495,9 +535,19 @@ export default function ExamEditorPage() {
                 <div>
                   <span className="badge badge-primary" style={{ marginRight: 6 }}>{FORMAT_LABEL[q.format]}</span>
                   <strong>{i + 1}.</strong> {q.text}
-                  {q.options.length > 0 && (
+                  {q.format === 'emparejar' ? (
                     <ul style={{ margin: '6px 0 0 20px', fontSize: 13 }}>
-                      {q.options.map((o, idx) => (
+                      {(q.options as Par[]).map((p, idx) => (
+                        <li key={idx}>{p.left} <span className="muted">↔</span> {p.right}</li>
+                      ))}
+                    </ul>
+                  ) : q.format === 'escala' ? (
+                    <div className="muted" style={{ fontSize: 13, marginLeft: 20 }}>
+                      Escala 1–5: {(q.options as string[])[0]} … {(q.options as string[])[1]}
+                    </div>
+                  ) : q.options.length > 0 && (
+                    <ul style={{ margin: '6px 0 0 20px', fontSize: 13 }}>
+                      {(q.options as string[]).map((o, idx) => (
                         <li key={idx} style={{ color: idx === q.correct_index ? 'var(--success)' : undefined, fontWeight: idx === q.correct_index ? 700 : 400 }}>
                           {o}{idx === q.correct_index ? ' ✓' : ''}
                         </li>
