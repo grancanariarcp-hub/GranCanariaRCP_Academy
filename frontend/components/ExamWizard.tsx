@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 
 interface Bank { id: string; name: string; kind: string; questions: string }
@@ -14,6 +15,7 @@ const sugerir = (n: number) => Math.max(5, Math.ceil((n * 1.5) / 5) * 5);
  * (aleatorias o por temas) → tiempo (con sugerencia) → listo.
  */
 export function ExamWizard({ courseId, moduleId, onCreated }: { courseId: string; moduleId: string; onCreated: () => void }) {
+  const router = useRouter();
   const [banks, setBanks] = useState<Bank[]>([]);
   const [sel, setSel] = useState<string[]>([]);
   const [temas, setTemas] = useState<Tema[]>([]);
@@ -46,6 +48,28 @@ export function ExamWizard({ courseId, moduleId, onCreated }: { courseId: string
   const nPreguntas = mode === 'aleatorio'
     ? Number(count) || 0
     : Object.values(porTema).reduce((s, v) => s + (Number(v) || 0), 0);
+
+  // Crear el examen VACÍO y ir a su editor, donde se añaden preguntas de
+  // cualquier tipo a mano (test, V/F, abierta, escala, emparejar, imagen/vídeo).
+  async function crearVacio() {
+    if (!title.trim()) { setMsg({ ok: false, text: 'Ponle un nombre al test' }); return; }
+    setMsg(null); setSaving(true);
+    try {
+      const r = await api<{ exam: { id: string } }>(`/api/courses/${courseId}/modules/${moduleId}/exams`, {
+        method: 'POST', auth: true,
+        body: JSON.stringify({
+          title, kind,
+          attemptsAllowed: Number(attempts) || 1,
+          passPct: Number(passPct) || 60,
+          timeLimitMin: minutos ? Number(minutos) : null,
+        }),
+      });
+      router.push(`/admin/cursos/${courseId}/examen/${r.exam.id}`);
+    } catch (err) {
+      setMsg({ ok: false, text: err instanceof ApiError ? err.message : 'Error al crear' });
+      setSaving(false);
+    }
+  }
 
   async function crear() {
     setMsg(null); setSaving(true);
@@ -94,9 +118,17 @@ export function ExamWizard({ courseId, moduleId, onCreated }: { courseId: string
         </div>
       </div>
 
-      {/* 2. Bancos */}
+      {/* Vía rápida: crear vacío y añadir las preguntas a mano (cualquier tipo). */}
+      <div className="info-box" style={{ fontSize: 12.5, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <span>¿Prefieres crear tú las preguntas (test, V/F, escala, emparejar, imagen…)? Créalo vacío y añádelas en su editor.</span>
+        <button type="button" className="btn btn-outline btn-small" style={{ whiteSpace: 'nowrap' }} disabled={saving || !title.trim()} onClick={crearVacio}>
+          Crear vacío y añadir preguntas →
+        </button>
+      </div>
+
+      {/* 2. Bancos (vía asistente: rellenar desde bancos de preguntas) */}
       <div className="form-group">
-        <label className="form-label">2 · Bancos de preguntas</label>
+        <label className="form-label">2 · Bancos de preguntas <span className="muted" style={{ fontWeight: 400 }}>(opcional, para rellenar desde tus bancos)</span></label>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {banks.map((b) => {
             const on = sel.includes(b.id);
