@@ -130,6 +130,10 @@ export async function startExam(req: Request, res: Response): Promise<void> {
       }
       return { ...row, options: { izquierda: pares.map((p) => p.left), derecha } };
     }
+    // «multiple»: enviar solo los textos, nunca cuáles son correctas.
+    if (row.format === 'multiple' && Array.isArray(row.options)) {
+      return { ...row, options: (row.options as Array<{ text: string } | string>).map((o) => (typeof o === 'string' ? o : o.text)) };
+    }
     return row;
   });
 
@@ -151,8 +155,11 @@ export async function submitExam(req: Request, res: Response): Promise<void> {
   if (att.rows.length === 0) throw notFound('Intento no encontrado');
   if (att.rows[0].submitted_at) throw badRequest('Este intento ya fue enviado', 'ALREADY_SUBMITTED');
 
-  // number (test/vf/escala) · string (abierta) · string[] (emparejar).
-  const answers = z.record(z.union([z.number(), z.string(), z.array(z.string())])).parse(req.body.answers ?? {});
+  // number (test/vf/escala) · string (abierta) · string[] (emparejar) ·
+  // number[] (multiple: índices marcados).
+  const answers = z.record(z.union([
+    z.number(), z.string(), z.array(z.string()), z.array(z.number()),
+  ])).parse(req.body.answers ?? {});
   // Se corrige solo sobre las preguntas que le tocaron a ESTE alumno y que no
   // estén anuladas por el profesorado.
   const served = att.rows[0].served_questions;
@@ -176,6 +183,19 @@ export async function submitExam(req: Request, res: Response): Promise<void> {
       for (let i = 0; i < pares.length; i++) {
         autoTotal += 1;
         if (Array.isArray(a) && a[i] === pares[i].right) autoCorrect += 1;
+      }
+      continue;
+    }
+    if (question.format === 'multiple') {
+      // Sin ninguna correcta = encuesta (no puntúa). Si hay correctas, crédito
+      // parcial por opción: acierta si su marca coincide con lo elegido.
+      const opts = Array.isArray(question.options) ? question.options as Array<{ text: string; correct?: boolean }> : [];
+      const hayCorrectas = opts.some((o) => o && typeof o === 'object' && o.correct);
+      if (!hayCorrectas) continue;
+      const elegidas = new Set(Array.isArray(a) ? (a as Array<number | string>).map(Number) : []);
+      for (let i = 0; i < opts.length; i++) {
+        autoTotal += 1;
+        if (elegidas.has(i) === !!opts[i].correct) autoCorrect += 1;
       }
       continue;
     }

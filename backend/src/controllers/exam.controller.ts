@@ -111,7 +111,7 @@ export async function updateExam(req: Request, res: Response): Promise<void> {
 // Add / delete questions (test / verdadero-falso / abierta)
 // ---------------------------------------------------------------------------
 const addQuestionSchema = z.object({
-  format: z.enum(['test', 'vf', 'abierta', 'escala', 'emparejar']),
+  format: z.enum(['test', 'vf', 'abierta', 'escala', 'emparejar', 'multiple']),
   text: z.string().min(3),
   options: z.array(z.string().min(1)).optional(),
   correctIndex: z.number().int().min(0).optional(),
@@ -121,6 +121,9 @@ const addQuestionSchema = z.object({
   escalaMax: z.string().max(60).optional(),
   // emparejar: parejas correctas (columna izquierda ↔ derecha).
   pares: z.array(z.object({ left: z.string().min(1), right: z.string().min(1) })).max(10).optional(),
+  // multiple (selección múltiple): opciones con marca de correcta. Si ninguna
+  // está marcada, es una encuesta/autoinforme y no puntúa.
+  opcionesMulti: z.array(z.object({ text: z.string().min(1), correct: z.boolean() })).max(20).optional(),
 });
 
 export async function addExamQuestion(req: Request, res: Response): Promise<void> {
@@ -148,6 +151,10 @@ export async function addExamQuestion(req: Request, res: Response): Promise<void
     const pares = (d.pares ?? []).map((p) => ({ left: p.left.trim(), right: p.right.trim() })).filter((p) => p.left && p.right);
     if (pares.length < 2) throw badRequest('Añade al menos 2 parejas', 'BAD_PARES');
     options = pares;
+  } else if (d.format === 'multiple') {
+    const opts = (d.opcionesMulti ?? []).map((o) => ({ text: o.text.trim(), correct: !!o.correct })).filter((o) => o.text);
+    if (opts.length < 2) throw badRequest('Añade al menos 2 opciones', 'BAD_OPTS');
+    options = opts; // si ninguna es correct, no puntúa (encuesta)
   } // abierta: sin opciones ni correcta
 
   const { rows } = await query(

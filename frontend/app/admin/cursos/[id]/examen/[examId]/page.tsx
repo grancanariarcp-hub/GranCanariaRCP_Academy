@@ -9,13 +9,14 @@ import { api, ApiError, uploadFile } from '@/lib/api';
 import { adminNav } from '@/lib/nav';
 import { CalidadPreguntas } from '@/components/CalidadPreguntas';
 
-type Format = 'test' | 'vf' | 'abierta' | 'escala' | 'emparejar';
+type Format = 'test' | 'vf' | 'abierta' | 'escala' | 'emparejar' | 'multiple';
 type Par = { left: string; right: string };
+type MultiOpt = { text: string; correct: boolean };
 interface ExamQuestion {
   id: string;
   format: Format;
   text: string;
-  options: Array<string | Par>;
+  options: Array<string | Par | MultiOpt>;
   correct_index: number | null;
 }
 interface Exam {
@@ -33,7 +34,7 @@ interface Exam {
 interface BankRef { id: string; name: string; questions: string }
 interface BankQ { id: string; tema: string | null; text: string }
 
-const FORMAT_LABEL: Record<Format, string> = { test: '📝 Test', vf: '✔️ Verdadero/Falso', abierta: '✍️ Abierta', escala: '📊 Escala', emparejar: '🔀 Emparejar' };
+const FORMAT_LABEL: Record<Format, string> = { test: '📝 Test', vf: '✔️ Verdadero/Falso', abierta: '✍️ Abierta', escala: '📊 Escala', emparejar: '🔀 Emparejar', multiple: '☑️ Selección múltiple' };
 
 export default function ExamEditorPage() {
   const params = useParams();
@@ -53,7 +54,7 @@ export default function ExamEditorPage() {
   const [correct, setCorrect] = useState(0);
   // Tipo elegido en la pestaña: los de media generan una pregunta test o V/F
   // que además lleva imagen o vídeo.
-  const [tipo, setTipo] = useState<'test' | 'vf' | 'abierta' | 'imagen' | 'video' | 'escala' | 'emparejar'>('test');
+  const [tipo, setTipo] = useState<'test' | 'vf' | 'abierta' | 'imagen' | 'video' | 'escala' | 'emparejar' | 'multiple'>('test');
   const [mediaFormat, setMediaFormat] = useState<'test' | 'vf'>('test');
   const [videoUrl, setVideoUrl] = useState('');
   const [imgFile, setImgFile] = useState<File | null>(null);
@@ -61,6 +62,8 @@ export default function ExamEditorPage() {
   const [escalaMin, setEscalaMin] = useState('Nada de acuerdo');
   const [escalaMax, setEscalaMax] = useState('Totalmente de acuerdo');
   const [pares, setPares] = useState<Par[]>([{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]);
+  // multiple (selección múltiple): opciones con marca de correcta (opcional).
+  const [multi, setMulti] = useState<MultiOpt[]>([{ text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }]);
 
   // JSON import
   const [jsonText, setJsonText] = useState('');
@@ -217,10 +220,13 @@ export default function ExamEditorPage() {
         body.escalaMin = escalaMin; body.escalaMax = escalaMax;
       } else if (f === 'emparejar') {
         body.pares = pares.map((p) => ({ left: p.left.trim(), right: p.right.trim() })).filter((p) => p.left && p.right);
+      } else if (f === 'multiple') {
+        body.opcionesMulti = multi.map((o) => ({ text: o.text.trim(), correct: o.correct })).filter((o) => o.text);
       }
       await api(`/api/courses/${courseId}/exams/${examId}/questions`, { method: 'POST', auth: true, body: JSON.stringify(body) });
       setQText(''); setOptions(['', '', '', '']); setCorrect(0);
       setPares([{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]);
+      setMulti([{ text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }]);
       load();
     } catch (err) {
       const detail = err instanceof ApiError && err.details ? ' — ' + (err.details as Array<{ message: string }>).map((d) => d.message).join('; ') : '';
@@ -340,7 +346,7 @@ export default function ExamEditorPage() {
             <div className="card-header"><div className="card-title">Añadir pregunta</div></div>
             <div className="tabs">
               {([
-                ['test', 'Test'], ['vf', 'Verdadero / Falso'], ['abierta', 'Abierta'],
+                ['test', 'Test'], ['vf', 'Verdadero / Falso'], ['multiple', 'Selección múltiple'], ['abierta', 'Abierta'],
                 ['escala', 'Escala'], ['emparejar', 'Emparejar'],
                 ['imagen', 'Con imagen'], ['video', 'Con vídeo'],
               ] as Array<[typeof tipo, string]>).map(([t, label]) => (
@@ -410,6 +416,25 @@ export default function ExamEditorPage() {
                 </div>
               </div>
             )}
+            {tipo === 'multiple' && (
+              <div className="form-group">
+                <label className="form-label">Opciones (marca las correctas)</label>
+                {multi.map((o, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                    <label title="Marcar como correcta" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                      <input type="checkbox" checked={o.correct} onChange={(e) => setMulti((ms) => ms.map((x, k) => (k === i ? { ...x, correct: e.target.checked } : x)))} /> ✓
+                    </label>
+                    <input className="form-input" placeholder={`Opción ${i + 1}`} value={o.text}
+                      onChange={(e) => setMulti((ms) => ms.map((x, k) => (k === i ? { ...x, text: e.target.value } : x)))} />
+                    {multi.length > 2 && <button type="button" className="btn btn-outline btn-small" onClick={() => setMulti((ms) => ms.filter((_, k) => k !== i))}>✕</button>}
+                  </div>
+                ))}
+                {multi.length < 12 && <button type="button" className="btn btn-outline btn-small" onClick={() => setMulti((ms) => [...ms, { text: '', correct: false }])}>+ Añadir opción</button>}
+                <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  El alumno marca todas las que quiera. Marca las correctas para que puntúe (crédito parcial). Si no marcas ninguna, es una encuesta y no puntúa.
+                </p>
+              </div>
+            )}
             {tipo === 'escala' && (
               <div className="form-group">
                 <label className="form-label">Etiquetas de la escala (1 a 5)</label>
@@ -447,7 +472,8 @@ export default function ExamEditorPage() {
             <button className="btn btn-primary btn-full"
               onClick={tipo === 'imagen' ? addQuestionWithImage : addQuestion}
               disabled={qText.trim().length < 3 || (tipo === 'imagen' && !imgFile) || (tipo === 'video' && !videoUrl.trim())
-                || (tipo === 'emparejar' && pares.filter((p) => p.left.trim() && p.right.trim()).length < 2)}>
+                || (tipo === 'emparejar' && pares.filter((p) => p.left.trim() && p.right.trim()).length < 2)
+                || (tipo === 'multiple' && multi.filter((o) => o.text.trim()).length < 2)}>
               Añadir pregunta
             </button>
           </div>
@@ -539,6 +565,14 @@ export default function ExamEditorPage() {
                     <ul style={{ margin: '6px 0 0 20px', fontSize: 13 }}>
                       {(q.options as Par[]).map((p, idx) => (
                         <li key={idx}>{p.left} <span className="muted">↔</span> {p.right}</li>
+                      ))}
+                    </ul>
+                  ) : q.format === 'multiple' ? (
+                    <ul style={{ margin: '6px 0 0 20px', fontSize: 13 }}>
+                      {(q.options as MultiOpt[]).map((o, idx) => (
+                        <li key={idx} style={{ color: o.correct ? 'var(--success)' : undefined, fontWeight: o.correct ? 700 : 400 }}>
+                          {o.text}{o.correct ? ' ✓' : ''}
+                        </li>
                       ))}
                     </ul>
                   ) : q.format === 'escala' ? (

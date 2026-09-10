@@ -10,17 +10,18 @@ import { PageNav } from '@/components/PageNav';
 import { AvisarPregunta } from '@/components/AvisarPregunta';
 import { VideoEmbed } from '@/components/VideoEmbed';
 
-type Format = 'test' | 'vf' | 'abierta' | 'escala' | 'emparejar';
+type Format = 'test' | 'vf' | 'abierta' | 'escala' | 'emparejar' | 'multiple';
 type Par = { left: string; right: string };
+type MultiOpt = { text: string; correct?: boolean };
 type EmparejarOpts = { izquierda: string[]; derecha: string[] };
 interface Q {
   id: string; format: Format; text: string;
-  options: string[] | EmparejarOpts | Par[];
+  options: string[] | EmparejarOpts | Par[] | MultiOpt[];
   correct_index?: number | null;
   image_url?: string | null; video_url?: string | null;
 }
 interface Attempt { id: string; score: number | null; passed: boolean | null; time_spent_seconds: number | null; submitted_at: string }
-type Answers = Record<string, number | string | string[]>;
+type Answers = Record<string, number | string | string[] | number[]>;
 
 function mmss(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
@@ -176,6 +177,24 @@ export default function TakeExamPage() {
               {q.video_url && <div style={{ marginBottom: 10 }}><VideoEmbed url={q.video_url} /></div>}
               {q.format === 'abierta' ? (
                 <textarea className="form-input" style={{ height: 80, padding: 10 }} value={(answers[q.id] as string) || ''} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })} />
+              ) : q.format === 'multiple' ? (
+                <>
+                  <div className="muted" style={{ fontSize: 12.5, marginBottom: 4 }}>Marca todas las que correspondan.</div>
+                  {(q.options as string[]).map((opt, idx) => {
+                    const chosen = Array.isArray(answers[q.id]) ? (answers[q.id] as number[]) : [];
+                    return (
+                      <label key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={chosen.includes(idx)}
+                          onChange={(e) => {
+                            const set = new Set(chosen);
+                            if (e.target.checked) set.add(idx); else set.delete(idx);
+                            setAnswers({ ...answers, [q.id]: Array.from(set).sort((x, y) => x - y) });
+                          }} />
+                        {opt}
+                      </label>
+                    );
+                  })}
+                </>
               ) : q.format === 'escala' ? (
                 <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
                   <span className="muted" style={{ fontSize: 12.5 }}>{(q.options as string[])[0]}</span>
@@ -252,6 +271,19 @@ export default function TakeExamPage() {
                 {q.video_url && <div style={{ marginBottom: 10 }}><VideoEmbed url={q.video_url} /></div>}
                 {q.format === 'abierta' ? (
                   <div><em>Tu respuesta:</em> {(mine as string) || '—'}<div className="info-box" style={{ marginTop: 6, fontSize: 12 }}>La corrige el profesor.</div></div>
+                ) : q.format === 'multiple' ? (
+                  <div style={{ display: 'grid', gap: 3 }}>
+                    {(q.options as MultiOpt[]).map((o, idx) => {
+                      const mineArr = Array.isArray(mine) ? (mine as number[]) : [];
+                      const elegida = mineArr.includes(idx);
+                      const bien = elegida === !!o.correct;
+                      return (
+                        <div key={idx} style={{ fontSize: 13, color: o.correct ? 'var(--success)' : elegida ? 'var(--danger)' : undefined, fontWeight: (o.correct || elegida) ? 700 : 400 }}>
+                          {elegida ? '☑ ' : '☐ '}{o.text}{o.correct ? ' ✓ (correcta)' : elegida ? ' ✗ (no correcta)' : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : q.format === 'escala' ? (
                   <div><em>Tu respuesta:</em> {typeof mine === 'number' ? `${mine} / 5` : '—'} <span className="muted">(no puntúa)</span></div>
                 ) : q.format === 'emparejar' ? (
