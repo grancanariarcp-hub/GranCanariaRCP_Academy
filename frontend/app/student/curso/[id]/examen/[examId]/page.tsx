@@ -19,6 +19,7 @@ interface Q {
   options: string[] | EmparejarOpts | Par[] | MultiOpt[];
   correct_index?: number | null;
   image_url?: string | null; video_url?: string | null;
+  explanation?: string | null; option_feedback?: string[];
 }
 interface Attempt { id: string; score: number | null; passed: boolean | null; time_spent_seconds: number | null; submitted_at: string }
 type Answers = Record<string, number | string | string[] | number[]>;
@@ -48,7 +49,7 @@ export default function TakeExamPage() {
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef<number>(0);
   const [result, setResult] = useState<{ score: number | null; passed: boolean | null; autoCorrect: number; autoTotal: number; hasOpen: boolean } | null>(null);
-  const [review, setReview] = useState<{ questions: Q[]; answers: Answers } | null>(null);
+  const [review, setReview] = useState<{ questions: Q[]; answers: Answers; feedbackGeneral: string | null } | null>(null);
   const submittingRef = useRef(false);
 
   async function loadIntro() {
@@ -111,8 +112,8 @@ export default function TakeExamPage() {
 
   async function openReview(id: string) {
     try {
-      const r = await api<{ attempt: { answers: Answers }; questions: Q[] }>(`/api/student/exams/${examId}/attempts/${id}`, { auth: true });
-      setReview({ questions: r.questions, answers: r.attempt.answers || {} });
+      const r = await api<{ attempt: { answers: Answers }; questions: Q[]; feedbackGeneral: string | null }>(`/api/student/exams/${examId}/attempts/${id}`, { auth: true });
+      setReview({ questions: r.questions, answers: r.attempt.answers || {}, feedbackGeneral: r.feedbackGeneral ?? null });
       setPhase('review');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error');
@@ -132,11 +133,11 @@ export default function TakeExamPage() {
         <div className="card">
           <div className="card-header"><div className="card-title">{cfg.title}</div></div>
           <div className="grid grid-4" style={{ marginBottom: 16 }}>
-            <div className="info-box">Intentos: <strong>{attempts.length}/{cfg.attemptsAllowed}</strong></div>
+            <div className="info-box">Intentos: <strong>{cfg.attemptsAllowed === 0 ? `${attempts.length} · ilimitados` : `${attempts.length}/${cfg.attemptsAllowed}`}</strong></div>
             <div className="info-box">Aprobar: <strong>{cfg.passPct}%</strong></div>
             <div className="info-box">Tiempo: <strong>{cfg.timeLimitMin ? `${cfg.timeLimitMin} min` : 'libre'}</strong></div>
           </div>
-          {attempts.length < cfg.attemptsAllowed ? (
+          {cfg.attemptsAllowed === 0 || attempts.length < cfg.attemptsAllowed ? (
             <button className="btn btn-primary btn-full" onClick={start}>Comenzar examen</button>
           ) : (
             <div className="info-box">Has agotado los intentos.</div>
@@ -261,6 +262,11 @@ export default function TakeExamPage() {
       {phase === 'review' && review && (
         <>
           <div className="card"><div className="card-title">Revisión — puedes repasar con el feedback</div></div>
+          {review.feedbackGeneral && (
+            <div className="card" style={{ marginTop: 12 }}>
+              <div className="info-box" style={{ margin: 0 }}><strong>Valoración general:</strong> {review.feedbackGeneral}</div>
+            </div>
+          )}
           {review.questions.map((q, i) => {
             const mine = review.answers[q.id];
             return (
@@ -278,8 +284,11 @@ export default function TakeExamPage() {
                       const elegida = mineArr.includes(idx);
                       const bien = elegida === !!o.correct;
                       return (
-                        <div key={idx} style={{ fontSize: 13, color: o.correct ? 'var(--success)' : elegida ? 'var(--danger)' : undefined, fontWeight: (o.correct || elegida) ? 700 : 400 }}>
-                          {elegida ? '☑ ' : '☐ '}{o.text}{o.correct ? ' ✓ (correcta)' : elegida ? ' ✗ (no correcta)' : ''}
+                        <div key={idx}>
+                          <div style={{ fontSize: 13, color: o.correct ? 'var(--success)' : elegida ? 'var(--danger)' : undefined, fontWeight: (o.correct || elegida) ? 700 : 400 }}>
+                            {elegida ? '☑ ' : '☐ '}{o.text}{o.correct ? ' ✓ (correcta)' : elegida ? ' ✗ (no correcta)' : ''}
+                          </div>
+                          {q.option_feedback?.[idx] && <div className="muted" style={{ fontSize: 12, marginLeft: 18 }}>💬 {q.option_feedback[idx]}</div>}
                         </div>
                       );
                     })}
@@ -304,12 +313,16 @@ export default function TakeExamPage() {
                     const isCorrect = idx === q.correct_index;
                     const isMine = mine === idx;
                     return (
-                      <div key={idx} style={{ padding: '3px 0', color: isCorrect ? 'var(--success)' : isMine ? 'var(--danger)' : undefined, fontWeight: isCorrect || isMine ? 700 : 400 }}>
-                        {isCorrect ? '✓ ' : isMine ? '✗ ' : '• '}{opt}{isMine && !isCorrect ? ' (tu respuesta)' : ''}
+                      <div key={idx}>
+                        <div style={{ padding: '3px 0', color: isCorrect ? 'var(--success)' : isMine ? 'var(--danger)' : undefined, fontWeight: isCorrect || isMine ? 700 : 400 }}>
+                          {isCorrect ? '✓ ' : isMine ? '✗ ' : '• '}{opt}{isMine && !isCorrect ? ' (tu respuesta)' : ''}
+                        </div>
+                        {q.option_feedback?.[idx] && (isCorrect || isMine) && <div className="muted" style={{ fontSize: 12, marginLeft: 16 }}>💬 {q.option_feedback[idx]}</div>}
                       </div>
                     );
                   })
                 )}
+                {q.explanation && <div className="info-box" style={{ marginTop: 8, fontSize: 13 }}>{q.explanation}</div>}
                 <AvisarPregunta examId={examId} questionId={q.id} />
               </div>
             );

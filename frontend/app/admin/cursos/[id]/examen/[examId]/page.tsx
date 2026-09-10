@@ -18,6 +18,9 @@ interface ExamQuestion {
   text: string;
   options: Array<string | Par | MultiOpt>;
   correct_index: number | null;
+  explanation?: string | null;
+  option_feedback?: string[];
+  video_url?: string | null;
 }
 interface Exam {
   id: string;
@@ -29,6 +32,7 @@ interface Exam {
   shuffle: boolean;
   random_per_student: boolean;
   questions_per_attempt: number | null;
+  feedback_general?: string | null;
 }
 
 interface BankRef { id: string; name: string; questions: string }
@@ -64,6 +68,10 @@ export default function ExamEditorPage() {
   const [pares, setPares] = useState<Par[]>([{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]);
   // multiple (selección múltiple): opciones con marca de correcta (opcional).
   const [multi, setMulti] = useState<MultiOpt[]>([{ text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }]);
+  // Feedback: general de la pregunta + por opción. Y edición de una existente.
+  const [expl, setExpl] = useState('');
+  const [optFb, setOptFb] = useState<string[]>(['', '', '', '']);
+  const [editingQId, setEditingQId] = useState<string | null>(null);
 
   // JSON import
   const [jsonText, setJsonText] = useState('');
@@ -125,6 +133,7 @@ export default function ExamEditorPage() {
         body: JSON.stringify({
           title: exam.title,
           attemptsAllowed: exam.attempts_allowed,
+          feedbackGeneral: exam.feedback_general ?? null,
           passPct: exam.pass_pct,
           timeLimitMin: exam.time_limit_min,
           shuffle: exam.shuffle,
@@ -205,33 +214,75 @@ export default function ExamEditorPage() {
     }
   }
 
+  function resetForm() {
+    setQText(''); setOptions(['', '', '', '']); setCorrect(0); setImgFile(null); setVideoUrl('');
+    setPares([{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]);
+    setMulti([{ text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }]);
+    setExpl(''); setOptFb(['', '', '', '']); setEscalaMin('Nada de acuerdo'); setEscalaMax('Totalmente de acuerdo');
+    setEditingQId(null); setTipo('test');
+  }
+
+  function construirBody(): Record<string, unknown> {
+    const f = realFormat();
+    const body: Record<string, unknown> = { format: f, text: qText, explanation: expl };
+    if (videoUrl) body.videoUrl = videoUrl; // se conserva al editar
+    if (f === 'test') {
+      body.options = options; body.correctIndex = correct; body.optionFeedback = optFb;
+    } else if (f === 'vf') {
+      body.correctIndex = correct; body.optionFeedback = [optFb[0] ?? '', optFb[1] ?? ''];
+    } else if (f === 'escala') {
+      body.escalaMin = escalaMin; body.escalaMax = escalaMax;
+    } else if (f === 'emparejar') {
+      body.pares = pares.map((p) => ({ left: p.left.trim(), right: p.right.trim() })).filter((p) => p.left && p.right);
+    } else if (f === 'multiple') {
+      body.opcionesMulti = multi.map((o) => ({ text: o.text.trim(), correct: o.correct }));
+      body.optionFeedback = optFb;
+    }
+    return body;
+  }
+
   async function addQuestion() {
     setError(null);
     try {
-      const f = realFormat();
-      const body: Record<string, unknown> = { format: f, text: qText };
-      if (tipo === 'video' && videoUrl) body.videoUrl = videoUrl;
-      if (f === 'test') {
-        body.options = options.map((o) => o.trim()).filter(Boolean);
-        body.correctIndex = correct;
-      } else if (f === 'vf') {
-        body.correctIndex = correct; // 0 = Verdadero, 1 = Falso
-      } else if (f === 'escala') {
-        body.escalaMin = escalaMin; body.escalaMax = escalaMax;
-      } else if (f === 'emparejar') {
-        body.pares = pares.map((p) => ({ left: p.left.trim(), right: p.right.trim() })).filter((p) => p.left && p.right);
-      } else if (f === 'multiple') {
-        body.opcionesMulti = multi.map((o) => ({ text: o.text.trim(), correct: o.correct })).filter((o) => o.text);
+      const body = construirBody();
+      if (editingQId) {
+        await api(`/api/courses/${courseId}/exams/${examId}/questions/${editingQId}`, { method: 'PATCH', auth: true, body: JSON.stringify(body) });
+      } else {
+        await api(`/api/courses/${courseId}/exams/${examId}/questions`, { method: 'POST', auth: true, body: JSON.stringify(body) });
       }
-      await api(`/api/courses/${courseId}/exams/${examId}/questions`, { method: 'POST', auth: true, body: JSON.stringify(body) });
-      setQText(''); setOptions(['', '', '', '']); setCorrect(0);
-      setPares([{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]);
-      setMulti([{ text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }, { text: '', correct: false }]);
+      resetForm();
       load();
     } catch (err) {
       const detail = err instanceof ApiError && err.details ? ' — ' + (err.details as Array<{ message: string }>).map((d) => d.message).join('; ') : '';
       setError((err instanceof ApiError ? err.message : 'Error') + detail);
     }
+  }
+
+  // Cargar una pregunta existente en el formulario para editarla (incl. feedback).
+  function cargarParaEditar(q: ExamQuestion) {
+    setEditingQId(q.id);
+    setQText(q.text);
+    setExpl(q.explanation ?? '');
+    setVideoUrl(q.video_url ?? '');
+    const fb = q.option_feedback ?? [];
+    if (q.format === 'test') {
+      setTipo('test');
+      const opts = (q.options as string[]);
+      setOptions(opts.length >= 2 ? [...opts] : [...opts, '', '', ''].slice(0, 4));
+      setCorrect(q.correct_index ?? 0);
+      setOptFb([...fb, '', '', '', ''].slice(0, Math.max(4, opts.length)));
+    } else if (q.format === 'vf') {
+      setTipo('vf'); setCorrect(q.correct_index ?? 0); setOptFb([fb[0] ?? '', fb[1] ?? '']);
+    } else if (q.format === 'escala') {
+      setTipo('escala'); const o = q.options as string[]; setEscalaMin(o[0] ?? ''); setEscalaMax(o[1] ?? '');
+    } else if (q.format === 'emparejar') {
+      setTipo('emparejar'); setPares((q.options as Par[]).map((p) => ({ left: p.left, right: p.right })));
+    } else if (q.format === 'multiple') {
+      setTipo('multiple'); setMulti((q.options as MultiOpt[]).map((o) => ({ text: o.text, correct: !!o.correct }))); setOptFb([...fb]);
+    } else {
+      setTipo('abierta');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   async function deleteQuestion(id: string) {
@@ -300,7 +351,12 @@ export default function ExamEditorPage() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <div className="form-group" style={{ flex: 1 }}>
                     <label className="form-label">Intentos</label>
-                    <input className="form-input" type="number" min="1" value={exam.attempts_allowed} onChange={(e) => setExam({ ...exam, attempts_allowed: Number(e.target.value) })} />
+                    <input className="form-input" type="number" min="1" placeholder="∞" disabled={exam.attempts_allowed === 0}
+                      value={exam.attempts_allowed === 0 ? '' : exam.attempts_allowed}
+                      onChange={(e) => setExam({ ...exam, attempts_allowed: Number(e.target.value) || 1 })} />
+                    <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, marginTop: 4 }}>
+                      <input type="checkbox" checked={exam.attempts_allowed === 0} onChange={(e) => setExam({ ...exam, attempts_allowed: e.target.checked ? 0 : 1 })} /> Infinitos
+                    </label>
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
                     <label className="form-label">% aprobado</label>
@@ -337,13 +393,19 @@ export default function ExamEditorPage() {
                   )}
                 </div>
 
+                <div className="form-group">
+                  <label className="form-label">Valoración general (la ve el alumno al terminar)</label>
+                  <textarea className="form-input" style={{ height: 60, padding: 10 }} placeholder="Mensaje de cierre / recomendaciones para el alumno…"
+                    value={exam.feedback_general ?? ''} onChange={(e) => setExam({ ...exam, feedback_general: e.target.value })} />
+                </div>
+
                 <button className="btn btn-primary btn-small">Guardar configuración</button>
               </form>
             </div>
           )}
 
           <div className="card">
-            <div className="card-header"><div className="card-title">Añadir pregunta</div></div>
+            <div className="card-header"><div className="card-title">{editingQId ? '✏️ Editar pregunta' : 'Añadir pregunta'}</div></div>
             <div className="tabs">
               {([
                 ['test', 'Test'], ['vf', 'Verdadero / Falso'], ['multiple', 'Selección múltiple'], ['abierta', 'Abierta'],
@@ -396,9 +458,14 @@ export default function ExamEditorPage() {
               <div className="form-group">
                 <label className="form-label">Opciones (marca la correcta)</label>
                 {options.map((opt, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                    <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} />
-                    <input className="form-input" placeholder={`Opción ${String.fromCharCode(65 + i)}`} value={opt} onChange={(e) => setOptions((p) => p.map((o, idx) => (idx === i ? e.target.value : o)))} />
+                  <div key={i} style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} />
+                      <input className="form-input" placeholder={`Opción ${String.fromCharCode(65 + i)}`} value={opt} onChange={(e) => setOptions((p) => p.map((o, idx) => (idx === i ? e.target.value : o)))} />
+                    </div>
+                    <input className="form-input" style={{ marginTop: 4, marginLeft: 24, width: 'calc(100% - 24px)', fontSize: 12.5 }}
+                      placeholder="Feedback de esta opción (opcional): por qué es correcta o no"
+                      value={optFb[i] ?? ''} onChange={(e) => setOptFb((p) => { const n = [...p]; while (n.length <= i) n.push(''); n[i] = e.target.value; return n; })} />
                   </div>
                 ))}
               </div>
@@ -414,19 +481,28 @@ export default function ExamEditorPage() {
                     <input type="radio" name="vf" checked={correct === 1} onChange={() => setCorrect(1)} /> Falso
                   </label>
                 </div>
+                <input className="form-input" style={{ marginTop: 6, fontSize: 12.5 }} placeholder="Feedback si responde Verdadero (opcional)"
+                  value={optFb[0] ?? ''} onChange={(e) => setOptFb((p) => { const n = [...p]; n[0] = e.target.value; return n; })} />
+                <input className="form-input" style={{ marginTop: 4, fontSize: 12.5 }} placeholder="Feedback si responde Falso (opcional)"
+                  value={optFb[1] ?? ''} onChange={(e) => setOptFb((p) => { const n = [...p]; while (n.length < 2) n.push(''); n[1] = e.target.value; return n; })} />
               </div>
             )}
             {tipo === 'multiple' && (
               <div className="form-group">
                 <label className="form-label">Opciones (marca las correctas)</label>
                 {multi.map((o, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
-                    <label title="Marcar como correcta" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
-                      <input type="checkbox" checked={o.correct} onChange={(e) => setMulti((ms) => ms.map((x, k) => (k === i ? { ...x, correct: e.target.checked } : x)))} /> ✓
-                    </label>
-                    <input className="form-input" placeholder={`Opción ${i + 1}`} value={o.text}
-                      onChange={(e) => setMulti((ms) => ms.map((x, k) => (k === i ? { ...x, text: e.target.value } : x)))} />
-                    {multi.length > 2 && <button type="button" className="btn btn-outline btn-small" onClick={() => setMulti((ms) => ms.filter((_, k) => k !== i))}>✕</button>}
+                  <div key={i} style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <label title="Marcar como correcta" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12 }}>
+                        <input type="checkbox" checked={o.correct} onChange={(e) => setMulti((ms) => ms.map((x, k) => (k === i ? { ...x, correct: e.target.checked } : x)))} /> ✓
+                      </label>
+                      <input className="form-input" placeholder={`Opción ${i + 1}`} value={o.text}
+                        onChange={(e) => setMulti((ms) => ms.map((x, k) => (k === i ? { ...x, text: e.target.value } : x)))} />
+                      {multi.length > 2 && <button type="button" className="btn btn-outline btn-small" onClick={() => setMulti((ms) => ms.filter((_, k) => k !== i))}>✕</button>}
+                    </div>
+                    <input className="form-input" style={{ marginTop: 4, marginLeft: 26, width: 'calc(100% - 26px)', fontSize: 12.5 }}
+                      placeholder="Feedback de esta opción (opcional)"
+                      value={optFb[i] ?? ''} onChange={(e) => setOptFb((p) => { const n = [...p]; while (n.length <= i) n.push(''); n[i] = e.target.value; return n; })} />
                   </div>
                 ))}
                 {multi.length < 12 && <button type="button" className="btn btn-outline btn-small" onClick={() => setMulti((ms) => [...ms, { text: '', correct: false }])}>+ Añadir opción</button>}
@@ -469,13 +545,24 @@ export default function ExamEditorPage() {
               </div>
             )}
 
+            {/* Feedback general de la pregunta (por qué), para todos los tipos. */}
+            <div className="form-group">
+              <label className="form-label">Feedback / explicación (opcional)</label>
+              <textarea className="form-input" style={{ height: 56, padding: 10 }}
+                placeholder="Se muestra al alumno al revisar. Por qué la respuesta correcta es esa, matices, etc."
+                value={expl} onChange={(e) => setExpl(e.target.value)} />
+            </div>
+
             <button className="btn btn-primary btn-full"
               onClick={tipo === 'imagen' ? addQuestionWithImage : addQuestion}
               disabled={qText.trim().length < 3 || (tipo === 'imagen' && !imgFile) || (tipo === 'video' && !videoUrl.trim())
                 || (tipo === 'emparejar' && pares.filter((p) => p.left.trim() && p.right.trim()).length < 2)
                 || (tipo === 'multiple' && multi.filter((o) => o.text.trim()).length < 2)}>
-              Añadir pregunta
+              {editingQId ? 'Guardar cambios' : 'Añadir pregunta'}
             </button>
+            {editingQId && (
+              <button className="btn btn-outline btn-small btn-full" style={{ marginTop: 6 }} onClick={resetForm}>Cancelar edición</button>
+            )}
           </div>
 
           {/* Importar por JSON */}
@@ -588,8 +675,12 @@ export default function ExamEditorPage() {
                       ))}
                     </ul>
                   )}
+                  {q.explanation && <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>💬 {q.explanation}</div>}
                 </div>
-                <button className="btn btn-outline btn-small" onClick={() => deleteQuestion(q.id)}>✕</button>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button className="btn btn-outline btn-small" title="Editar (incl. feedback)" onClick={() => cargarParaEditar(q)}>✏️</button>
+                  <button className="btn btn-outline btn-small" onClick={() => deleteQuestion(q.id)}>✕</button>
+                </div>
               </div>
             </div>
           ))}

@@ -92,7 +92,8 @@ export async function startExam(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  if ((await submittedCount(exam.id, req.auth!.sub)) >= exam.attempts_allowed) {
+  // attempts_allowed = 0 → intentos infinitos.
+  if (exam.attempts_allowed > 0 && (await submittedCount(exam.id, req.auth!.sub)) >= exam.attempts_allowed) {
     throw badRequest('Has agotado los intentos de este examen', 'NO_ATTEMPTS');
   }
   const att = await query<{ id: string; started_at: string }>(
@@ -266,12 +267,13 @@ export async function reviewAttempt(req: Request, res: Response): Promise<void> 
   const p: unknown[] = [exam.id];
   const soloSuyas = served && served.length > 0 ? (p.push(served), `AND id = ANY($${p.length})`) : '';
   const q = await query(
-    `SELECT id, format, text, options, correct_index FROM exam_questions
+    `SELECT id, format, text, options, correct_index, explanation, option_feedback FROM exam_questions
       WHERE exam_id = $1 AND excluded_from_grading = FALSE ${soloSuyas}
       ORDER BY sort_order`,
     p,
   );
-  res.json({ attempt: att.rows[0], questions: q.rows });
+  const fg = await query<{ feedback_general: string | null }>('SELECT feedback_general FROM exams WHERE id = $1', [exam.id]);
+  res.json({ attempt: att.rows[0], questions: q.rows, feedbackGeneral: fg.rows[0]?.feedback_general ?? null });
 }
 
 // GET /api/student/exams/:examId/attempts  — my attempts + config

@@ -63,9 +63,9 @@ export async function createExam(req: Request, res: Response): Promise<void> {
 export async function getExam(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
-  const exam = await query('SELECT id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt FROM exams WHERE id = $1', [req.params.examId]);
+  const exam = await query('SELECT id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt, feedback_general FROM exams WHERE id = $1', [req.params.examId]);
   const questions = await query<{ id: string; image_key: string | null }>(
-    'SELECT id, format, text, options, correct_index, video_url, image_key, sort_order FROM exam_questions WHERE exam_id = $1 ORDER BY sort_order',
+    'SELECT id, format, text, options, correct_index, video_url, image_key, explanation, option_feedback, sort_order FROM exam_questions WHERE exam_id = $1 ORDER BY sort_order',
     [req.params.examId],
   );
   res.json({ exam: exam.rows[0], questions: await withImageUrls(questions.rows) });
@@ -76,9 +76,11 @@ export async function getExam(req: Request, res: Response): Promise<void> {
 // ---------------------------------------------------------------------------
 const updateExamSchema = z.object({
   title: z.string().min(2).max(200).optional(),
-  attemptsAllowed: z.number().int().min(1).max(50).optional(),
+  attemptsAllowed: z.number().int().min(0).max(50).optional(), // 0 = infinitos
   passPct: z.number().int().min(0).max(100).optional(),
   timeLimitMin: z.number().int().min(1).max(600).nullable().optional(),
+  // Valoración general del examen que verá el alumno tras enviarlo.
+  feedbackGeneral: z.string().max(4000).nullable().optional(),
   // Comportamiento por intento:
   //  shuffle            → baraja el orden de preguntas y opciones en cada intento.
   //  randomPerStudent   → cada intento sirve un subconjunto aleatorio (N) del examen.
@@ -95,6 +97,7 @@ export async function updateExam(req: Request, res: Response): Promise<void> {
   const map: Record<string, unknown> = {
     title: d.title, attempts_allowed: d.attemptsAllowed, pass_pct: d.passPct, time_limit_min: d.timeLimitMin,
     shuffle: d.shuffle, random_per_student: d.randomPerStudent, questions_per_attempt: d.questionsPerAttempt,
+    feedback_general: d.feedbackGeneral,
   };
   const fields: string[] = [];
   const params: unknown[] = [];
@@ -103,7 +106,7 @@ export async function updateExam(req: Request, res: Response): Promise<void> {
   }
   if (fields.length === 0) throw badRequest('Nada que actualizar');
   params.push(req.params.examId);
-  const { rows } = await query(`UPDATE exams SET ${fields.join(', ')} WHERE id = $${params.length} RETURNING id, title, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt`, params);
+  const { rows } = await query(`UPDATE exams SET ${fields.join(', ')} WHERE id = $${params.length} RETURNING id, title, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt, feedback_general`, params);
   res.json({ exam: rows[0] });
 }
 
@@ -124,46 +127,78 @@ const addQuestionSchema = z.object({
   // multiple (selección múltiple): opciones con marca de correcta. Si ninguna
   // está marcada, es una encuesta/autoinforme y no puntúa.
   opcionesMulti: z.array(z.object({ text: z.string().min(1), correct: z.boolean() })).max(20).optional(),
+  // Feedback: general de la pregunta y por opción (alineado a las opciones).
+  explanation: z.string().max(2000).optional(),
+  optionFeedback: z.array(z.string().max(1000)).optional(),
 });
+type AddQuestion = z.infer<typeof addQuestionSchema>;
+
+/**
+ * Construye options / correct_index / option_feedback según el formato. El
+ * feedback por opción se mantiene ALINEADO al filtrar opciones vacías (para que
+ * no se descoloque respecto a la opción a la que pertenece).
+ */
+function construirPregunta(d: AddQuestion): { options: unknown; correctIndex: number | null; optionFeedback: string[] } {
+  const fb = (d.optionFeedback ?? []).map((x) => String(x ?? ''));
+  if (d.format === 'test') {
+    const comb = (d.options ?? []).map((t, i) => ({ t: (t ?? '').trim(), f: (fb[i] ?? '').trim(), ok: i === d.correctIndex }));
+    const kept = comb.filter((c) => c.t);
+    if (kept.length < 2) throw badRequest('Añade al menos 2 opciones', 'BAD_OPTS');
+    const ci = kept.findIndex((c) => c.ok);
+    return { options: kept.map((c) => c.t), correctIndex: ci >= 0 ? ci : 0, optionFeedback: kept.map((c) => c.f) };
+  }
+  if (d.format === 'vf') {
+    if (d.correctIndex !== 0 && d.correctIndex !== 1) throw badRequest('Indica si es Verdadero o Falso', 'BAD_VF');
+    return { options: ['Verdadero', 'Falso'], correctIndex: d.correctIndex, optionFeedback: [fb[0] ?? '', fb[1] ?? ''] };
+  }
+  if (d.format === 'escala') {
+    return { options: [d.escalaMin?.trim() || 'Nada de acuerdo', d.escalaMax?.trim() || 'Totalmente de acuerdo'], correctIndex: null, optionFeedback: [] };
+  }
+  if (d.format === 'emparejar') {
+    const pares = (d.pares ?? []).map((p) => ({ left: p.left.trim(), right: p.right.trim() })).filter((p) => p.left && p.right);
+    if (pares.length < 2) throw badRequest('Añade al menos 2 parejas', 'BAD_PARES');
+    return { options: pares, correctIndex: null, optionFeedback: [] };
+  }
+  if (d.format === 'multiple') {
+    const opts = (d.opcionesMulti ?? []).map((o, i) => ({ text: o.text.trim(), correct: !!o.correct, f: (fb[i] ?? '').trim() })).filter((o) => o.text);
+    if (opts.length < 2) throw badRequest('Añade al menos 2 opciones', 'BAD_OPTS');
+    return { options: opts.map((o) => ({ text: o.text, correct: o.correct })), correctIndex: null, optionFeedback: opts.map((o) => o.f) };
+  }
+  return { options: [], correctIndex: null, optionFeedback: [] }; // abierta
+}
 
 export async function addExamQuestion(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
   const d = addQuestionSchema.parse(req.body);
-
-  // options guarda distinto según el formato: array de textos (test/vf/escala) o
-  // array de parejas {left,right} (emparejar). correct_index solo en test/vf.
-  let options: unknown = [];
-  let correctIndex: number | null = null;
-
-  if (d.format === 'test') {
-    const dep = opcionesDepuradas(d.options ?? [], d.correctIndex);
-    options = dep.options; correctIndex = dep.correctIndex;
-  } else if (d.format === 'vf') {
-    options = ['Verdadero', 'Falso'];
-    if (d.correctIndex !== 0 && d.correctIndex !== 1) throw badRequest('Indica si es Verdadero o Falso', 'BAD_VF');
-    correctIndex = d.correctIndex;
-  } else if (d.format === 'escala') {
-    // Sin respuesta correcta: es una opinión/autoevaluación. Guardamos las
-    // etiquetas de los extremos (1 = min, 5 = max).
-    options = [d.escalaMin?.trim() || 'Nada de acuerdo', d.escalaMax?.trim() || 'Totalmente de acuerdo'];
-  } else if (d.format === 'emparejar') {
-    const pares = (d.pares ?? []).map((p) => ({ left: p.left.trim(), right: p.right.trim() })).filter((p) => p.left && p.right);
-    if (pares.length < 2) throw badRequest('Añade al menos 2 parejas', 'BAD_PARES');
-    options = pares;
-  } else if (d.format === 'multiple') {
-    const opts = (d.opcionesMulti ?? []).map((o) => ({ text: o.text.trim(), correct: !!o.correct })).filter((o) => o.text);
-    if (opts.length < 2) throw badRequest('Añade al menos 2 opciones', 'BAD_OPTS');
-    options = opts; // si ninguna es correct, no puntúa (encuesta)
-  } // abierta: sin opciones ni correcta
+  const { options, correctIndex, optionFeedback } = construirPregunta(d);
 
   const { rows } = await query(
-    `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, sort_order)
-     VALUES ($1,$2,$3,$4::jsonb,$5,$6, COALESCE((SELECT MAX(sort_order)+1 FROM exam_questions WHERE exam_id=$1),0))
-     RETURNING id, format, text, options, correct_index, video_url`,
-    [req.params.examId, d.format, d.text.trim(), JSON.stringify(options), correctIndex, d.videoUrl || null],
+    `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, explanation, option_feedback, sort_order)
+     VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8::jsonb, COALESCE((SELECT MAX(sort_order)+1 FROM exam_questions WHERE exam_id=$1),0))
+     RETURNING id, format, text, options, correct_index, video_url, explanation, option_feedback`,
+    [req.params.examId, d.format, d.text.trim(), JSON.stringify(options), correctIndex, d.videoUrl || null, d.explanation?.trim() || null, JSON.stringify(optionFeedback)],
   );
   res.status(201).json({ question: rows[0] });
+}
+
+/** PATCH /:id/exams/:examId/questions/:questionId — editar una pregunta y su feedback. */
+export async function updateExamQuestion(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  const existe = await query<{ format: string }>('SELECT format FROM exam_questions WHERE id = $1 AND exam_id = $2', [req.params.questionId, req.params.examId]);
+  if (existe.rows.length === 0) throw notFound('Pregunta no encontrada');
+  // El formato no cambia al editar: se toma el guardado.
+  const d = addQuestionSchema.parse({ ...req.body, format: existe.rows[0].format });
+  const { options, correctIndex, optionFeedback } = construirPregunta(d);
+
+  const { rows } = await query(
+    `UPDATE exam_questions SET text = $1, options = $2::jsonb, correct_index = $3, video_url = $4, explanation = $5, option_feedback = $6::jsonb
+      WHERE id = $7 AND exam_id = $8
+      RETURNING id, format, text, options, correct_index, video_url, explanation, option_feedback`,
+    [d.text.trim(), JSON.stringify(options), correctIndex, d.videoUrl || null, d.explanation?.trim() || null, JSON.stringify(optionFeedback), req.params.questionId, req.params.examId],
+  );
+  res.json({ question: rows[0] });
 }
 
 // ---------------------------------------------------------------------------

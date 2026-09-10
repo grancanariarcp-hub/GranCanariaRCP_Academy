@@ -9,7 +9,7 @@ import {
   setActivityEval, listActivityGrades, setActivityGrade,
 } from '../controllers/courseContent.controller.js';
 import {
-  createExam, getExam, updateExam, addExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts,
+  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts,
 } from '../controllers/exam.controller.js';
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
@@ -84,6 +84,7 @@ router.post('/:id/exams/:examId/questions/image', upload.single('file'), asyncHa
 router.post('/:id/exams/:examId/questions/import', asyncHandler(importExamQuestions));
 router.post('/:id/exams/:examId/questions/from-bank', asyncHandler(addExamQuestionsFromBank));
 router.post('/:id/exams/:examId/questions/from-bank/select', asyncHandler(addExamQuestionsFromBankByIds));
+router.patch('/:id/exams/:examId/questions/:questionId', asyncHandler(updateExamQuestion));
 router.delete('/:id/exams/:examId/questions/:questionId', asyncHandler(deleteExamQuestion));
 router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
 router.get('/:id/exams/:examId/quality', asyncHandler(examQuality));
