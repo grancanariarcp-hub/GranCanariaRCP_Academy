@@ -165,7 +165,10 @@ function parseJson(buffer: Buffer): ParsedRow[] {
       explicacion: String(o.explicacion ?? ''),
       documento: String(o.documento ?? ''),
       pagina: o.pagina,
-      flashcard: String(o.flashcard ?? ''),
+      // La flashcard puede venir como texto o como objeto {anverso, reverso}.
+      flashcard: (o.flashcard && typeof o.flashcard === 'object')
+        ? String((o.flashcard as Record<string, unknown>).reverso ?? (o.flashcard as Record<string, unknown>).anverso ?? '')
+        : String(o.flashcard ?? ''),
       etiquetas: separarEtiquetas(o.etiquetas),
       critica: o.critica,
     };
@@ -247,11 +250,14 @@ export async function importQuestions(req: Request, res: Response): Promise<void
     let refDocumentId: string | null = null;
     let refPage: number | null = null;
     if (row.documento.trim()) {
+      // Si el documento citado no está subido, NO se descarta la pregunta: se
+      // importa sin la referencia (habitual en ficheros generados con IA).
       const id = docByTitle.get(norm(row.documento));
-      if (!id) rowErrors.push(`documento no encontrado: "${row.documento}" (súbelo antes en Documentos)`);
-      else refDocumentId = id;
-      const p = parseInt(String(row.pagina ?? ''), 10);
-      if (Number.isInteger(p) && p > 0) refPage = p;
+      if (id) {
+        refDocumentId = id;
+        const p = parseInt(String(row.pagina ?? ''), 10);
+        if (Number.isInteger(p) && p > 0) refPage = p;
+      }
     }
 
     if (rowErrors.length > 0) {
