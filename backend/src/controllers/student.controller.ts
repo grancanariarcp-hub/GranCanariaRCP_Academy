@@ -140,8 +140,14 @@ export async function misCalificaciones(req: Request, res: Response): Promise<vo
   const { rows } = await query(
     `SELECT c.id AS course_id, c.title AS course_title, m.title AS modulo,
             a.title AS actividad, a.metodo_eval,
-            (SELECT MAX(score) FROM exam_attempts ea WHERE ea.exam_id = a.exam_id AND ea.student_id = $1) AS examen_score,
-            (SELECT bool_or(passed) FROM exam_attempts ea WHERE ea.exam_id = a.exam_id AND ea.student_id = $1) AS examen_apto,
+            (SELECT ea.score FROM exam_attempts ea JOIN exams ex ON ex.id = ea.exam_id
+               WHERE ea.exam_id = a.exam_id AND ea.student_id = $1 AND ea.submitted_at IS NOT NULL
+               ORDER BY (CASE WHEN ex.grading_policy = 'mejor' THEN ea.score END) DESC NULLS LAST, ea.submitted_at DESC
+               LIMIT 1) AS examen_score,
+            (SELECT ea.passed FROM exam_attempts ea JOIN exams ex ON ex.id = ea.exam_id
+               WHERE ea.exam_id = a.exam_id AND ea.student_id = $1 AND ea.submitted_at IS NOT NULL
+               ORDER BY (CASE WHEN ex.grading_policy = 'mejor' THEN ea.score END) DESC NULLS LAST, ea.submitted_at DESC
+               LIMIT 1) AS examen_apto,
             EXISTS (SELECT 1 FROM activity_completions ac WHERE ac.activity_id = a.id AND ac.student_id = $1) AS completada,
             EXISTS (SELECT 1 FROM forum_posts fp JOIN forum_threads ft ON ft.id = fp.thread_id
                      WHERE ft.module_id = m.id AND fp.author_id = $1 AND fp.author_type = 'student') AS foro_ok,

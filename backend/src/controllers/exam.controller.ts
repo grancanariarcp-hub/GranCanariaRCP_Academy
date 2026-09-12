@@ -63,7 +63,7 @@ export async function createExam(req: Request, res: Response): Promise<void> {
 export async function getExam(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
-  const exam = await query('SELECT id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt, feedback_general FROM exams WHERE id = $1', [req.params.examId]);
+  const exam = await query('SELECT id, title, kind, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt, feedback_general, grading_policy FROM exams WHERE id = $1', [req.params.examId]);
   const questions = await query<{ id: string; image_key: string | null }>(
     'SELECT id, format, text, options, correct_index, video_url, image_key, explanation, option_feedback, sort_order FROM exam_questions WHERE exam_id = $1 ORDER BY sort_order',
     [req.params.examId],
@@ -88,6 +88,8 @@ const updateExamSchema = z.object({
   shuffle: z.boolean().optional(),
   randomPerStudent: z.boolean().optional(),
   questionsPerAttempt: z.number().int().min(1).max(300).nullable().optional(),
+  // Con varios intentos: qué nota cuenta (la mejor o la del último intento).
+  gradingPolicy: z.enum(['mejor', 'ultimo']).optional(),
 });
 
 export async function updateExam(req: Request, res: Response): Promise<void> {
@@ -97,7 +99,7 @@ export async function updateExam(req: Request, res: Response): Promise<void> {
   const map: Record<string, unknown> = {
     title: d.title, attempts_allowed: d.attemptsAllowed, pass_pct: d.passPct, time_limit_min: d.timeLimitMin,
     shuffle: d.shuffle, random_per_student: d.randomPerStudent, questions_per_attempt: d.questionsPerAttempt,
-    feedback_general: d.feedbackGeneral,
+    feedback_general: d.feedbackGeneral, grading_policy: d.gradingPolicy,
   };
   const fields: string[] = [];
   const params: unknown[] = [];
@@ -106,7 +108,7 @@ export async function updateExam(req: Request, res: Response): Promise<void> {
   }
   if (fields.length === 0) throw badRequest('Nada que actualizar');
   params.push(req.params.examId);
-  const { rows } = await query(`UPDATE exams SET ${fields.join(', ')} WHERE id = $${params.length} RETURNING id, title, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt, feedback_general`, params);
+  const { rows } = await query(`UPDATE exams SET ${fields.join(', ')} WHERE id = $${params.length} RETURNING id, title, attempts_allowed, pass_pct, time_limit_min, shuffle, random_per_student, questions_per_attempt, feedback_general, grading_policy`, params);
   res.json({ exam: rows[0] });
 }
 
@@ -337,8 +339,8 @@ export async function addExamQuestionsFromBank(req: Request, res: Response): Pro
     if (acc.rows.length === 0) throw forbidden('No puedes usar ese banco');
   }
 
-  const qs = await query<{ text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null }>(
-    `SELECT text, options, correct_index, video_url, image_key FROM questions
+  const qs = await query<{ text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null; explanation: string | null }>(
+    `SELECT text, options, correct_index, video_url, image_key, explanation FROM questions
       WHERE bank_id = $1 AND is_active = TRUE ${tema ? 'AND tema = $3' : ''}
       ORDER BY RANDOM() LIMIT $2`,
     tema ? [bankId, count, tema] : [bankId, count],
@@ -348,10 +350,10 @@ export async function addExamQuestionsFromBank(req: Request, res: Response): Pro
   let added = 0;
   for (const q of qs.rows) {
     await query(
-      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, sort_order)
-       VALUES ($1, 'test', $2, $3::jsonb, $4, $5, $6,
+      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, explanation, sort_order)
+       VALUES ($1, 'test', $2, $3::jsonb, $4, $5, $6, $7,
                COALESCE((SELECT MAX(sort_order) + 1 FROM exam_questions WHERE exam_id = $1), 0))`,
-      [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key],
+      [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key, q.explanation],
     );
     added += 1;
   }
@@ -382,8 +384,8 @@ export async function addExamQuestionsFromBankByIds(req: Request, res: Response)
     if (acc.rows.length === 0) throw forbidden('No puedes usar ese banco');
   }
 
-  const qs = await query<{ text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null }>(
-    `SELECT text, options, correct_index, video_url, image_key FROM questions
+  const qs = await query<{ text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null; explanation: string | null }>(
+    `SELECT text, options, correct_index, video_url, image_key, explanation FROM questions
       WHERE bank_id = $1 AND is_active = TRUE AND id = ANY($2::uuid[])`,
     [bankId, questionIds],
   );
@@ -392,10 +394,10 @@ export async function addExamQuestionsFromBankByIds(req: Request, res: Response)
   let added = 0;
   for (const q of qs.rows) {
     await query(
-      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, sort_order)
-       VALUES ($1, 'test', $2, $3::jsonb, $4, $5, $6,
+      `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, explanation, sort_order)
+       VALUES ($1, 'test', $2, $3::jsonb, $4, $5, $6, $7,
                COALESCE((SELECT MAX(sort_order) + 1 FROM exam_questions WHERE exam_id = $1), 0))`,
-      [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key],
+      [req.params.examId, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key, q.explanation],
     );
     added += 1;
   }
@@ -481,13 +483,13 @@ export async function createExamWizard(req: Request, res: Response): Promise<voi
   if (ids.length === 0) throw badRequest('No puedes usar esos bancos', 'BAD_BANKS');
 
   // Selección de preguntas: aleatoria del conjunto, o por temas con su cupo.
-  type Q = { text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null };
+  type Q = { text: string; options: string[]; correct_index: number; video_url: string | null; image_key: string | null; explanation: string | null };
   let picked: Q[] = [];
   if (d.mode === 'temas') {
     if (!d.porTema?.length) throw badRequest('Indica cuántas preguntas quieres de cada tema', 'NO_TEMAS');
     for (const t of d.porTema) {
       const r = await query<Q>(
-        `SELECT text, options, correct_index, video_url, image_key FROM questions
+        `SELECT text, options, correct_index, video_url, image_key, explanation FROM questions
           WHERE bank_id = ANY($1) AND is_active = TRUE AND COALESCE(tema,'(sin tema)') = $2
           ORDER BY RANDOM() LIMIT $3`,
         [ids, t.tema, t.count],
@@ -500,7 +502,7 @@ export async function createExamWizard(req: Request, res: Response): Promise<voi
   } else {
     const count = d.count ?? 10;
     const r = await query<Q>(
-      `SELECT text, options, correct_index, video_url, image_key FROM questions
+      `SELECT text, options, correct_index, video_url, image_key, explanation FROM questions
         WHERE bank_id = ANY($1) AND is_active = TRUE ORDER BY RANDOM() LIMIT $2`,
       [ids, count],
     );
@@ -529,9 +531,9 @@ export async function createExamWizard(req: Request, res: Response): Promise<voi
     let i = 0;
     for (const q of picked) {
       await client.query(
-        `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, sort_order)
-         VALUES ($1,'test',$2,$3::jsonb,$4,$5,$6,$7)`,
-        [created.id, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key, i++],
+        `INSERT INTO exam_questions (exam_id, format, text, options, correct_index, video_url, image_key, explanation, sort_order)
+         VALUES ($1,'test',$2,$3::jsonb,$4,$5,$6,$7,$8)`,
+        [created.id, q.text, JSON.stringify(q.options), q.correct_index, q.video_url, q.image_key, q.explanation, i++],
       );
     }
     return created;

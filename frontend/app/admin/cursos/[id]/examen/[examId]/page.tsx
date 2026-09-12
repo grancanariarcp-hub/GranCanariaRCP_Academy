@@ -35,6 +35,7 @@ interface Exam {
   random_per_student: boolean;
   questions_per_attempt: number | null;
   feedback_general?: string | null;
+  grading_policy?: 'mejor' | 'ultimo';
 }
 
 interface BankRef { id: string; name: string; questions: string }
@@ -142,6 +143,7 @@ export default function ExamEditorPage() {
           shuffle: exam.shuffle,
           randomPerStudent: exam.random_per_student,
           questionsPerAttempt: exam.random_per_student ? (exam.questions_per_attempt ?? null) : null,
+          gradingPolicy: exam.grading_policy ?? 'mejor',
         }),
       });
       setCfgMsg('Configuración guardada ✅');
@@ -374,6 +376,16 @@ export default function ExamEditorPage() {
                     <input className="form-input" type="number" min="1" placeholder="libre" value={exam.time_limit_min ?? ''} onChange={(e) => setExam({ ...exam, time_limit_min: e.target.value ? Number(e.target.value) : null })} />
                   </div>
                 </div>
+
+                {exam.attempts_allowed !== 1 && (
+                  <div className="form-group">
+                    <label className="form-label">Nota que cuenta (con varios intentos)</label>
+                    <select className="form-select" value={exam.grading_policy ?? 'mejor'} onChange={(e) => setExam({ ...exam, grading_policy: e.target.value as 'mejor' | 'ultimo' })}>
+                      <option value="mejor">La mejor de todos los intentos</option>
+                      <option value="ultimo">La del último intento realizado</option>
+                    </select>
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label className="form-label">En cada intento</label>
