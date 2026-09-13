@@ -49,7 +49,7 @@ export default function TakeExamPage() {
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef<number>(0);
   const [result, setResult] = useState<{ score: number | null; passed: boolean | null; autoCorrect: number; autoTotal: number; hasOpen: boolean } | null>(null);
-  const [review, setReview] = useState<{ questions: Q[]; answers: Answers; feedbackGeneral: string | null } | null>(null);
+  const [review, setReview] = useState<{ questions: Q[]; answers: Answers; feedbackGeneral: string | null; openGrades: Record<string, { points: number; comment: string | null }> } | null>(null);
   const submittingRef = useRef(false);
 
   async function loadIntro() {
@@ -112,8 +112,8 @@ export default function TakeExamPage() {
 
   async function openReview(id: string) {
     try {
-      const r = await api<{ attempt: { answers: Answers }; questions: Q[]; feedbackGeneral: string | null }>(`/api/student/exams/${examId}/attempts/${id}`, { auth: true });
-      setReview({ questions: r.questions, answers: r.attempt.answers || {}, feedbackGeneral: r.feedbackGeneral ?? null });
+      const r = await api<{ attempt: { answers: Answers }; questions: Q[]; feedbackGeneral: string | null; openGrades: Record<string, { points: number; comment: string | null }> }>(`/api/student/exams/${examId}/attempts/${id}`, { auth: true });
+      setReview({ questions: r.questions, answers: r.attempt.answers || {}, feedbackGeneral: r.feedbackGeneral ?? null, openGrades: r.openGrades ?? {} });
       setPhase('review');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Error');
@@ -276,7 +276,17 @@ export default function TakeExamPage() {
                 {q.image_url && <img src={q.image_url} alt="" style={{ maxWidth: '100%', borderRadius: 10, marginBottom: 10 }} />}
                 {q.video_url && <div style={{ marginBottom: 10 }}><VideoEmbed url={q.video_url} /></div>}
                 {q.format === 'abierta' ? (
-                  <div><em>Tu respuesta:</em> {(mine as string) || '—'}<div className="info-box" style={{ marginTop: 6, fontSize: 12 }}>La corrige el profesor.</div></div>
+                  <div>
+                    <em>Tu respuesta:</em> {(mine as string) || '—'}
+                    {review.openGrades[q.id] ? (
+                      <div className="info-box" style={{ marginTop: 6, fontSize: 13 }}>
+                        <strong>Nota del profesor: {Math.round(review.openGrades[q.id].points * 100)}%</strong>
+                        {review.openGrades[q.id].comment && <div style={{ marginTop: 2 }}>{review.openGrades[q.id].comment}</div>}
+                      </div>
+                    ) : (
+                      <div className="info-box" style={{ marginTop: 6, fontSize: 12 }}>Pendiente de corrección por el profesor.</div>
+                    )}
+                  </div>
                 ) : q.format === 'multiple' ? (
                   <div style={{ display: 'grid', gap: 3 }}>
                     {(q.options as MultiOpt[]).map((o, idx) => {

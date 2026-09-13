@@ -311,6 +311,101 @@ export async function listExamAttempts(req: Request, res: Response): Promise<voi
   res.json({ attempts: rows });
 }
 
+// GET /api/courses/:id/exams/:examId/attempts/:attemptId/abiertas
+// Devuelve las respuestas ABIERTAS de un intento para que el profesor las corrija.
+export async function getAttemptOpenAnswers(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  const att = await query<{ id: string; answers: Record<string, unknown> | null; served_questions: string[] | null; score: number | null; passed: boolean | null; student: string }>(
+    `SELECT a.id, a.answers, a.served_questions, a.score, a.passed, s.display_name AS student
+       FROM exam_attempts a JOIN students s ON s.id = a.student_id
+      WHERE a.id = $1 AND a.exam_id = $2`,
+    [req.params.attemptId, req.params.examId],
+  );
+  if (att.rows.length === 0) throw notFound('Intento no encontrado');
+  const served = att.rows[0].served_questions;
+  const qs = await query<{ id: string; text: string }>(
+    `SELECT id, text FROM exam_questions
+      WHERE exam_id = $1 AND format = 'abierta'
+      ${served && served.length > 0 ? 'AND id = ANY($2)' : ''} ORDER BY sort_order`,
+    served && served.length > 0 ? [req.params.examId, served] : [req.params.examId],
+  );
+  const g = await query<{ question_id: string; points: string; comment: string | null }>(
+    'SELECT question_id, points, comment FROM exam_open_grades WHERE attempt_id = $1', [req.params.attemptId],
+  );
+  const gradeByQ = new Map(g.rows.map((r) => [r.question_id, r]));
+  const answers = att.rows[0].answers ?? {};
+  res.json({
+    student: att.rows[0].student, score: att.rows[0].score, passed: att.rows[0].passed,
+    abiertas: qs.rows.map((q) => ({
+      questionId: q.id, text: q.text,
+      answer: typeof answers[q.id] === 'string' ? (answers[q.id] as string) : '',
+      points: gradeByQ.has(q.id) ? Number(gradeByQ.get(q.id)!.points) : null,
+      comment: gradeByQ.get(q.id)?.comment ?? '',
+    })),
+  });
+}
+
+// PUT /api/courses/:id/exams/:examId/attempts/:attemptId/abiertas
+// Guarda las notas de las abiertas y RECALCULA la nota del intento.
+export async function gradeAttemptOpenAnswers(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  const { grades } = z.object({
+    grades: z.array(z.object({ questionId: z.string().uuid(), points: z.number().min(0).max(1), comment: z.string().max(2000).optional() })),
+  }).parse(req.body);
+
+  const att = await query<{ auto_correct: number | null; auto_total: number | null; served_questions: string[] | null }>(
+    'SELECT auto_correct, auto_total, served_questions FROM exam_attempts WHERE id = $1 AND exam_id = $2',
+    [req.params.attemptId, req.params.examId],
+  );
+  if (att.rows.length === 0) throw notFound('Intento no encontrado');
+
+  await withTransaction(async (client) => {
+    for (const g of grades) {
+      await client.query(
+        `INSERT INTO exam_open_grades (attempt_id, question_id, points, comment, graded_by)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (attempt_id, question_id) DO UPDATE SET points = EXCLUDED.points, comment = EXCLUDED.comment, graded_by = EXCLUDED.graded_by, graded_at = NOW()`,
+        [req.params.attemptId, g.questionId, g.points, g.comment ?? null, req.auth!.sub],
+      );
+    }
+  });
+
+  // Recalcular: auto (ya guardado) + puntos de abiertas, sobre auto_total + nº abiertas.
+  const served = att.rows[0].served_questions;
+  const nAbiertas = await query<{ n: number }>(
+    `SELECT COUNT(*)::int AS n FROM exam_questions WHERE exam_id = $1 AND format = 'abierta'
+      ${served && served.length > 0 ? 'AND id = ANY($2)' : ''}`,
+    served && served.length > 0 ? [req.params.examId, served] : [req.params.examId],
+  );
+  const suma = await query<{ s: string | null }>('SELECT SUM(points) AS s FROM exam_open_grades WHERE attempt_id = $1', [req.params.attemptId]);
+  const autoTotal = att.rows[0].auto_total ?? 0;
+  const autoCorrect = att.rows[0].auto_correct ?? 0;
+  const openCount = nAbiertas.rows[0].n;
+  const openPoints = Number(suma.rows[0].s ?? 0);
+  const denom = autoTotal + openCount;
+  const score = denom > 0 ? Math.round(((autoCorrect + openPoints) / denom) * 100) : null;
+
+  const exam = await query<{ pass_pct: number }>('SELECT pass_pct FROM exams WHERE id = $1', [req.params.examId]);
+  const passed = score !== null ? score >= exam.rows[0].pass_pct : null;
+  await query('UPDATE exam_attempts SET score = $1, passed = $2 WHERE id = $3', [score, passed, req.params.attemptId]);
+
+  // Reflejar el resultado en la finalización de la actividad del examen.
+  const act = await query<{ id: string; student_id: string }>(
+    'SELECT a.id, ea.student_id FROM activities a, exam_attempts ea WHERE a.exam_id = $1 AND ea.id = $2', [req.params.examId, req.params.attemptId],
+  );
+  if (act.rows.length > 0) {
+    const { id: activityId, student_id } = act.rows[0];
+    if (passed) {
+      await query('INSERT INTO activity_completions (student_id, activity_id) VALUES ($1, $2) ON CONFLICT (student_id, activity_id) DO NOTHING', [student_id, activityId]).catch(() => {});
+    } else {
+      await query('DELETE FROM activity_completions WHERE student_id = $1 AND activity_id = $2', [student_id, activityId]).catch(() => {});
+    }
+  }
+  res.json({ score, passed });
+}
+
 /**
  * Copia preguntas de un banco al examen. Sirve para reutilizar cualquier banco
  * PÚBLICO como fuente sin poder descargarlo: las preguntas se copian dentro del

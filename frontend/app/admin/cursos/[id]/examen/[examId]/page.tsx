@@ -76,6 +76,11 @@ export default function ExamEditorPage() {
   const [optFb, setOptFb] = useState<string[]>(['', '', '', '']);
   const [editingQId, setEditingQId] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  // Corrección manual de preguntas abiertas de un intento.
+  type Abierta = { questionId: string; text: string; answer: string; points: number | null; comment: string };
+  const [gradingAtt, setGradingAtt] = useState<{ id: string; student: string } | null>(null);
+  const [openAns, setOpenAns] = useState<Abierta[] | null>(null);
+  const [gradeMsg, setGradeMsg] = useState<string | null>(null);
 
   // JSON import
   const [jsonText, setJsonText] = useState('');
@@ -331,9 +336,30 @@ export default function ExamEditorPage() {
     reader.readAsText(file);
   }
 
+  async function abrirCorreccion(a: { id: string; student: string }) {
+    setGradingAtt(a); setOpenAns(null); setGradeMsg(null);
+    try {
+      const r = await api<{ abiertas: Abierta[] }>(`/api/courses/${courseId}/exams/${examId}/attempts/${a.id}/abiertas`, { auth: true });
+      // El backend guarda puntos 0..1; en el editor se manejan como 0..100 %.
+      setOpenAns(r.abiertas.map((o) => ({ ...o, points: o.points != null ? Math.round(o.points * 100) : null })));
+    } catch (err) { setGradeMsg(err instanceof ApiError ? err.message : 'No se pudo cargar'); }
+  }
+  async function guardarCorreccion() {
+    if (!gradingAtt || !openAns) return;
+    setGradeMsg(null);
+    try {
+      const grades = openAns.map((o) => ({ questionId: o.questionId, points: Math.min(1, Math.max(0, (o.points ?? 0) / 100)), comment: o.comment || undefined }));
+      const r = await api<{ score: number | null; passed: boolean | null }>(`/api/courses/${courseId}/exams/${examId}/attempts/${gradingAtt.id}/abiertas`,
+        { method: 'PUT', auth: true, body: JSON.stringify({ grades }) });
+      setGradeMsg(`Guardado ✅ · nota recalculada: ${r.score ?? '—'}%`);
+      load();
+    } catch (err) { setGradeMsg(err instanceof ApiError ? err.message : 'No se pudo guardar'); }
+  }
+
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
 
   const nav = adminNav(user.role, '/admin/cursos');
+  const hayAbiertas = questions.some((q) => q.format === 'abierta');
 
   return (
     <AppShell user={user} title={exam?.title ?? 'Examen'} nav={nav}>
@@ -716,7 +742,7 @@ export default function ExamEditorPage() {
         <div className="table-responsive">
           <table>
             <thead>
-              <tr><th>Alumno</th><th>Nota</th><th>Resultado</th><th>Intentos</th><th>Tiempo</th></tr>
+              <tr><th>Alumno</th><th>Nota</th><th>Resultado</th><th>Intentos</th><th>Tiempo</th>{hayAbiertas && <th></th>}</tr>
             </thead>
             <tbody>
               {attempts.map((a) => (
@@ -726,13 +752,51 @@ export default function ExamEditorPage() {
                   <td>{a.passed == null ? '—' : a.passed ? <span className="badge badge-success">Aprobado</span> : <span className="badge badge-danger">No superado</span>}</td>
                   <td>{a.attempts}</td>
                   <td>{a.time_spent_seconds != null ? `${Math.floor(a.time_spent_seconds / 60)}m ${a.time_spent_seconds % 60}s` : '—'}</td>
+                  {hayAbiertas && <td><button className="btn btn-outline btn-small" onClick={() => abrirCorreccion({ id: a.id, student: a.student })}>Corregir abiertas</button></td>}
                 </tr>
               ))}
-              {attempts.length === 0 && <tr><td colSpan={5} className="muted">Aún nadie ha realizado el examen</td></tr>}
+              {attempts.length === 0 && <tr><td colSpan={hayAbiertas ? 6 : 5} className="muted">Aún nadie ha realizado el examen</td></tr>}
             </tbody>
           </table>
         </div>
       </div>
+      {gradingAtt && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => { setGradingAtt(null); setOpenAns(null); }}>
+          <div className="modal modal-wide" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div className="card-title">Corregir abiertas · {gradingAtt.student}</div>
+              <button className="btn btn-outline btn-small" onClick={() => { setGradingAtt(null); setOpenAns(null); }}>Cerrar</button>
+            </div>
+            {gradeMsg && <div className="alert alert-success" style={{ fontSize: 13 }}>{gradeMsg}</div>}
+            {!openAns ? <p className="muted">Cargando…</p> : openAns.length === 0 ? (
+              <p className="muted">Este intento no tiene preguntas abiertas.</p>
+            ) : (
+              <>
+                {openAns.map((o, i) => (
+                  <div key={o.questionId} style={{ borderTop: '1px solid var(--gray-200)', padding: '10px 0' }}>
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{i + 1}. {o.text}</div>
+                    <div className="info-box" style={{ fontSize: 13, marginBottom: 8, whiteSpace: 'pre-wrap' }}>{o.answer || <span className="muted">(sin respuesta)</span>}</div>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <label style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        Puntuación:
+                        <input className="form-input" type="number" min="0" max="100" style={{ width: 90 }} placeholder="0–100"
+                          value={o.points ?? ''} onChange={(e) => setOpenAns((p) => p!.map((x, k) => (k === i ? { ...x, points: e.target.value === '' ? null : Number(e.target.value) } : x)))} /> %
+                      </label>
+                    </div>
+                    <input className="form-input" style={{ marginTop: 6, fontSize: 13 }} placeholder="Comentario para el alumno (opcional)"
+                      value={o.comment} onChange={(e) => setOpenAns((p) => p!.map((x, k) => (k === i ? { ...x, comment: e.target.value } : x)))} />
+                  </div>
+                ))}
+                <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                  Cada abierta cuenta como una pregunta más. Al guardar se recalcula la nota del intento (automáticas + abiertas).
+                </p>
+                <button className="btn btn-primary" style={{ marginTop: 6 }} onClick={guardarCorreccion}>Guardar y recalcular</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {showPreview && (
         <ExamPreview titulo={exam?.title ?? 'Examen'} feedbackGeneral={exam?.feedback_general ?? null} questions={questions} onClose={() => setShowPreview(false)} />
       )}

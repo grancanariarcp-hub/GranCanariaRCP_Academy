@@ -273,7 +273,13 @@ export async function reviewAttempt(req: Request, res: Response): Promise<void> 
     p,
   );
   const fg = await query<{ feedback_general: string | null }>('SELECT feedback_general FROM exams WHERE id = $1', [exam.id]);
-  res.json({ attempt: att.rows[0], questions: q.rows, feedbackGeneral: fg.rows[0]?.feedback_general ?? null });
+  // Notas del profesor a las preguntas abiertas (si ya las corrigió).
+  const og = await query<{ question_id: string; points: string; comment: string | null }>(
+    'SELECT question_id, points, comment FROM exam_open_grades WHERE attempt_id = $1', [req.params.attemptId],
+  );
+  const openGrades: Record<string, { points: number; comment: string | null }> = {};
+  for (const r of og.rows) openGrades[r.question_id] = { points: Number(r.points), comment: r.comment };
+  res.json({ attempt: att.rows[0], questions: q.rows, feedbackGeneral: fg.rows[0]?.feedback_general ?? null, openGrades });
 }
 
 // GET /api/student/exams/:examId/attempts  — my attempts + config
