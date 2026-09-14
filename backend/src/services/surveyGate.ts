@@ -17,6 +17,18 @@ export async function hasAnsweredSurvey(courseId: string, studentId: string): Pr
   return rows.length > 0;
 }
 
+/**
+ * ¿La encuesta actúa como requisito? Solo si está INCLUIDA (is_open) y marcada
+ * como OBLIGATORIA. Si no, no bloquea ni el examen final ni el certificado.
+ */
+export async function encuestaObligatoria(courseId: string): Promise<boolean> {
+  const { rows } = await query<{ is_open: boolean; required: boolean }>(
+    'SELECT is_open, required FROM course_surveys WHERE course_id = $1',
+    [courseId],
+  );
+  return !!rows[0] && rows[0].is_open && rows[0].required;
+}
+
 /** ¿El curso tiene examen final? */
 export async function hasFinalExam(courseId: string): Promise<boolean> {
   const { rows } = await query(

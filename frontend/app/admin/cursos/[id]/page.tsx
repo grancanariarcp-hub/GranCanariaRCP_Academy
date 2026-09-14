@@ -124,11 +124,19 @@ export default function CourseDetailPage() {
     pendientes: Array<{ activity_id: string; title: string; type: string; pendientes: string }>;
   }>(null);
   const [surv, setSurv] = useState<null | {
+    isOpen: boolean; required: boolean;
     respuestas: number; matriculados: number; participacionPct: number;
     mediaGlobal: number | null; recomiendanPct: number | null;
     porItem: Array<{ kind: string; label: string; media: number; n: number }>;
     comentarios: Array<{ comments: string; submitted_at: string }>;
   }>(null);
+  async function guardarEncuesta(cambios: { isOpen?: boolean; required?: boolean }) {
+    if (!surv) return;
+    setSurv({ ...surv, ...cambios }); // pinta el cambio al instante
+    try {
+      await api(`/api/courses/${courseId}/survey`, { method: 'PATCH', auth: true, body: JSON.stringify(cambios) });
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'No se pudo guardar'); }
+  }
   const [cfc, setCfc] = useState<null | {
     checks: Array<{ clave: string; titulo: string; estado: 'ok' | 'aviso' | 'falta'; detalle: string; comoMejorar?: string }>;
     resumen: { ok: number; avisos: number; faltan: number; total: number };
@@ -1106,6 +1114,27 @@ export default function CourseDetailPage() {
                 <div className="card-title">Encuesta de satisfacción</div>
                 <div className="card-subtitle">{surv.respuestas} de {surv.matriculados} alumnos ({surv.participacionPct}%)</div>
               </div>
+
+              {/* Configuración: se genera sola con una pregunta por módulo, por
+                  docente y varias generales. Aquí decides si se incluye y si es
+                  obligatoria. */}
+              <div style={{ background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Configuración</div>
+                <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
+                  Se genera automáticamente: valora cada módulo, cada docente y unas preguntas generales (escala 1–10). No hay que redactarla.
+                </p>
+                <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14, marginBottom: 8 }}>
+                  <input type="checkbox" checked={surv.isOpen} onChange={(e) => guardarEncuesta({ isOpen: e.target.checked })} />
+                  <span><strong>Incluir la encuesta</strong> en este curso (los alumnos la ven y pueden responderla)</span>
+                </label>
+                {surv.isOpen && (
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 14 }}>
+                    <input type="checkbox" checked={surv.required} onChange={(e) => guardarEncuesta({ required: e.target.checked })} />
+                    <span><strong>Obligatoria</strong>: hay que responderla para hacer el examen final y descargar el certificado</span>
+                  </label>
+                )}
+              </div>
+
               {surv.respuestas === 0 ? (
                 <div className="info-box">Aún no hay respuestas. La encuesta aparece a tus alumnos dentro del curso.</div>
               ) : (

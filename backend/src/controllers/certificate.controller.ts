@@ -9,7 +9,7 @@ import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { r2Configured, getObjectBuffer, buildKey, uploadObject } from '../services/r2.js';
 import { renderCertificate, renderPrograma, type CertData } from '../services/certificatePdf.js';
-import { hasAnsweredSurvey, hasFinalExam } from '../services/surveyGate.js';
+import { hasAnsweredSurvey, hasFinalExam, encuestaObligatoria } from '../services/surveyGate.js';
 
 function fmt(d: string | Date | null): string {
   if (!d) return '';
@@ -160,7 +160,7 @@ export async function studentCertificate(req: Request, res: Response): Promise<v
 
   // Si el curso no tiene examen final, la encuesta es el requisito para el
   // certificado (si lo tiene, el requisito ya se aplicó antes del examen).
-  if (!(await hasFinalExam(courseId)) && !(await hasAnsweredSurvey(courseId, req.auth!.sub))) {
+  if (!(await hasFinalExam(courseId)) && (await encuestaObligatoria(courseId)) && !(await hasAnsweredSurvey(courseId, req.auth!.sub))) {
     throw badRequest('Antes de descargar el certificado debes responder la encuesta de satisfacción del curso.', 'SURVEY_REQUIRED');
   }
 

@@ -114,9 +114,10 @@ export async function surveyResults(req: Request, res: Response): Promise<void> 
     const staff = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [courseId, req.auth!.sub]);
     if (staff.rows.length === 0) throw forbidden('No formas parte de este curso');
   }
-  const s = await query<{ id: string }>('SELECT id FROM course_surveys WHERE course_id = $1', [courseId]);
-  if (s.rows.length === 0) { res.json({ respuestas: 0, porItem: [], comentarios: [] }); return; }
+  const s = await query<{ id: string; is_open: boolean; required: boolean }>('SELECT id, is_open, required FROM course_surveys WHERE course_id = $1', [courseId]);
+  if (s.rows.length === 0) { res.json({ respuestas: 0, porItem: [], comentarios: [], isOpen: true, required: true }); return; }
   const surveyId = s.rows[0].id;
+  const cfg = { isOpen: s.rows[0].is_open, required: s.rows[0].required };
 
   const [resumen, porItem, comentarios, matriculados] = await Promise.all([
     query<{ n: string; media_global: string | null; recomiendan: string }>(
@@ -150,6 +151,7 @@ export async function surveyResults(req: Request, res: Response): Promise<void> 
   const n = Number(resumen.rows[0].n);
   const matric = Number(matriculados.rows[0].n);
   res.json({
+    ...cfg,
     respuestas: n,
     matriculados: matric,
     participacionPct: matric > 0 ? Math.round((n / matric) * 100) : 0,
@@ -171,9 +173,15 @@ export async function setSurveyOpen(req: Request, res: Response): Promise<void> 
     const staff = await query("SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2 AND role = 'director'", [courseId, req.auth!.sub]);
     if (staff.rows.length === 0) throw forbidden('Solo el director puede abrir o cerrar la encuesta');
   }
-  const { isOpen } = z.object({ isOpen: z.boolean() }).parse(req.body);
+  const d = z.object({ isOpen: z.boolean().optional(), required: z.boolean().optional() }).parse(req.body);
   const surveyId = await surveyIdFor(courseId);
-  const r = await query('UPDATE course_surveys SET is_open = $1 WHERE id = $2 RETURNING is_open', [isOpen, surveyId]);
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  if (d.isOpen !== undefined) { params.push(d.isOpen); sets.push(`is_open = $${params.length}`); }
+  if (d.required !== undefined) { params.push(d.required); sets.push(`required = $${params.length}`); }
+  if (sets.length === 0) throw badRequest('Nada que actualizar');
+  params.push(surveyId);
+  const r = await query(`UPDATE course_surveys SET ${sets.join(', ')} WHERE id = $${params.length} RETURNING is_open, required`, params);
   if (r.rows.length === 0) throw notFound('Encuesta no encontrada');
-  res.json({ ok: true, isOpen });
+  res.json({ ok: true, isOpen: r.rows[0].is_open, required: r.rows[0].required });
 }

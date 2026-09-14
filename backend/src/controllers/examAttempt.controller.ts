@@ -4,7 +4,7 @@ import { query } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
-import { hasAnsweredSurvey } from '../services/surveyGate.js';
+import { hasAnsweredSurvey, encuestaObligatoria } from '../services/surveyGate.js';
 import { withImageUrls } from '../services/r2.js';
 
 /** Student side: taking exams. All routes assume role 'student'. */
@@ -55,8 +55,11 @@ async function submittedCount(examId: string, studentId: string): Promise<number
 // POST /api/student/exams/:examId/start
 export async function startExam(req: Request, res: Response): Promise<void> {
   const exam = await examForStudent(req.params.examId, req.auth!.sub);
-  // El examen FINAL solo se habilita tras responder la encuesta de satisfacción.
-  if ((exam as { kind?: string }).kind === 'examen' && !(await hasAnsweredSurvey(exam.course_id, req.auth!.sub))) {
+  // El examen FINAL solo se habilita tras responder la encuesta de satisfacción,
+  // y solo si la encuesta está marcada como obligatoria.
+  if ((exam as { kind?: string }).kind === 'examen'
+      && (await encuestaObligatoria(exam.course_id))
+      && !(await hasAnsweredSurvey(exam.course_id, req.auth!.sub))) {
     throw badRequest('Antes de realizar el examen final debes responder la encuesta de satisfacción del curso.', 'SURVEY_REQUIRED');
   }
   // Un intento empezado y sin enviar SE REANUDA, no se sustituye por otro.
