@@ -429,12 +429,39 @@ export async function gradeAttemptOpenAnswers(req: Request, res: Response): Prom
   res.json({ score, passed });
 }
 
+// Tipos de una pregunta de opinión de escala o de selección múltiple (encuesta).
+type OpQ = { id: string; text: string; format: string; options: unknown };
+
+/** Calcula la estadística de una pregunta de opinión sobre un conjunto de
+ *  respuestas (answers de los intentos). Devuelve null si la pregunta puntúa
+ *  (una múltiple con opción correcta no es de opinión). */
+function computarOpinion(q: OpQ, respuestas: Array<Record<string, unknown>>) {
+  if (q.format === 'escala') {
+    const labels = Array.isArray(q.options) ? (q.options as string[]) : [];
+    const dist = [0, 0, 0, 0, 0]; let n = 0; let sum = 0;
+    for (const ans of respuestas) {
+      const v = ans[q.id];
+      if (typeof v === 'number' && v >= 1 && v <= 5) { dist[v - 1] += 1; n += 1; sum += v; }
+    }
+    return { id: q.id, text: q.text, format: 'escala', etiquetaMin: labels[0] ?? '1', etiquetaMax: labels[1] ?? '5', dist, n, media: n ? Math.round((sum / n) * 100) / 100 : null };
+  }
+  // multiple: solo cuenta como opinión si NINGUNA opción es correcta (encuesta).
+  const opts = Array.isArray(q.options) ? (q.options as Array<{ text: string; correct?: boolean }>) : [];
+  if (opts.some((o) => o && o.correct)) return null;
+  const counts = opts.map(() => 0); let n = 0;
+  for (const ans of respuestas) {
+    const v = ans[q.id];
+    if (Array.isArray(v)) { n += 1; for (const idx of v) { const k = Number(idx); if (counts[k] != null) counts[k] += 1; } }
+  }
+  return { id: q.id, text: q.text, format: 'multiple', opciones: opts.map((o, i) => ({ text: o.text, count: counts[i] })), n };
+}
+
 // GET /api/courses/:id/exams/:examId/opinion — estadística de las preguntas de
 // opinión (escala 1-5 y selección múltiple sin correctas), para perfilar/mejorar.
 export async function examOpinionStats(req: Request, res: Response): Promise<void> {
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
-  const qs = await query<{ id: string; text: string; format: string; options: unknown }>(
+  const qs = await query<OpQ>(
     "SELECT id, text, format, options FROM exam_questions WHERE exam_id = $1 AND format IN ('escala','multiple') ORDER BY sort_order",
     [req.params.examId],
   );
@@ -442,29 +469,51 @@ export async function examOpinionStats(req: Request, res: Response): Promise<voi
     'SELECT answers FROM exam_attempts WHERE exam_id = $1 AND submitted_at IS NOT NULL', [req.params.examId],
   );
   const respuestas = att.rows.map((a) => a.answers ?? {});
-
-  const preguntas = qs.rows.map((q) => {
-    if (q.format === 'escala') {
-      const labels = Array.isArray(q.options) ? (q.options as string[]) : [];
-      const dist = [0, 0, 0, 0, 0]; let n = 0; let sum = 0;
-      for (const ans of respuestas) {
-        const v = ans[q.id];
-        if (typeof v === 'number' && v >= 1 && v <= 5) { dist[v - 1] += 1; n += 1; sum += v; }
-      }
-      return { id: q.id, text: q.text, format: 'escala', etiquetaMin: labels[0] ?? '1', etiquetaMax: labels[1] ?? '5', dist, n, media: n ? Math.round((sum / n) * 100) / 100 : null };
-    }
-    // multiple: solo cuenta como opinión si NINGUNA opción es correcta (encuesta).
-    const opts = Array.isArray(q.options) ? (q.options as Array<{ text: string; correct?: boolean }>) : [];
-    if (opts.some((o) => o && o.correct)) return null;
-    const counts = opts.map(() => 0); let n = 0;
-    for (const ans of respuestas) {
-      const v = ans[q.id];
-      if (Array.isArray(v)) { n += 1; for (const idx of v) { const k = Number(idx); if (counts[k] != null) counts[k] += 1; } }
-    }
-    return { id: q.id, text: q.text, format: 'multiple', opciones: opts.map((o, i) => ({ text: o.text, count: counts[i] })), n };
-  }).filter(Boolean);
-
+  const preguntas = qs.rows.map((q) => computarOpinion(q, respuestas)).filter(Boolean);
   res.json({ preguntas });
+}
+
+// GET /api/courses/:id/opinion — estadística de opinión de TODO el curso, agrupada
+// por examen, para verla de un vistazo en el Resumen del curso.
+export async function courseOpinionStats(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  const id = req.params.id;
+  if (req.auth!.role !== 'super_admin' && req.auth!.role !== 'auditor') {
+    const staff = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [id, req.auth!.sub]);
+    if (staff.rows.length === 0) throw forbidden('No formas parte de este curso');
+  }
+  const qs = await query<OpQ & { exam_id: string; exam_title: string }>(
+    `SELECT q.id, q.text, q.format, q.options, e.id AS exam_id, e.title AS exam_title
+       FROM exam_questions q
+       JOIN exams e ON e.id = q.exam_id
+       JOIN modules m ON m.id = e.module_id
+      WHERE m.course_id = $1 AND q.format IN ('escala','multiple')
+      ORDER BY e.title, q.sort_order`,
+    [id],
+  );
+  const att = await query<{ exam_id: string; answers: Record<string, unknown> | null }>(
+    `SELECT a.exam_id, a.answers FROM exam_attempts a
+       JOIN exams e ON e.id = a.exam_id
+       JOIN modules m ON m.id = e.module_id
+      WHERE m.course_id = $1 AND a.submitted_at IS NOT NULL`,
+    [id],
+  );
+  // Respuestas agrupadas por examen (cada pregunta se mide sobre las de SU examen).
+  const porExamen = new Map<string, Array<Record<string, unknown>>>();
+  for (const a of att.rows) {
+    const arr = porExamen.get(a.exam_id) ?? [];
+    arr.push(a.answers ?? {});
+    porExamen.set(a.exam_id, arr);
+  }
+  const examenes: Array<{ examId: string; examTitle: string; preguntas: unknown[] }> = [];
+  for (const q of qs.rows) {
+    const stat = computarOpinion(q, porExamen.get(q.exam_id) ?? []);
+    if (!stat) continue;
+    let g = examenes.find((x) => x.examId === q.exam_id);
+    if (!g) { g = { examId: q.exam_id, examTitle: q.exam_title, preguntas: [] }; examenes.push(g); }
+    g.preguntas.push(stat);
+  }
+  res.json({ examenes });
 }
 
 /**

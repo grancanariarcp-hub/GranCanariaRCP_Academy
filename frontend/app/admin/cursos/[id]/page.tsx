@@ -131,6 +131,11 @@ export default function CourseDetailPage() {
     porItem: Array<{ kind: string; label: string; media: number; n: number }>;
     comentarios: Array<{ comments: string; submitted_at: string }>;
   }>(null);
+  // Estadística de opinión (escalas Likert / encuestas) agregada por examen.
+  type OpinionQ =
+    | { id: string; text: string; format: 'escala'; etiquetaMin: string; etiquetaMax: string; dist: number[]; n: number; media: number | null }
+    | { id: string; text: string; format: 'multiple'; opciones: Array<{ text: string; count: number }>; n: number };
+  const [opinion, setOpinion] = useState<Array<{ examId: string; examTitle: string; preguntas: OpinionQ[] }>>([]);
   async function guardarEncuesta(cambios: { isOpen?: boolean; required?: boolean }) {
     if (!surv) return;
     setSurv({ ...surv, ...cambios }); // pinta el cambio al instante
@@ -231,6 +236,8 @@ export default function CourseDetailPage() {
         .then((r) => { setDur(r); if (r?.horasDeclaradas != null) setHorasManual(String(r.horasDeclaradas)); }).catch(() => {});
       api<typeof cdash>(`/api/courses/${courseId}/dashboard`, { auth: true })
         .then((r) => setCdash(r)).catch(() => {});
+      api<{ examenes: typeof opinion }>(`/api/courses/${courseId}/opinion`, { auth: true })
+        .then((r) => setOpinion(r.examenes)).catch(() => {});
       api<typeof cfc>(`/api/courses/${courseId}/cfc`, { auth: true })
         .then((r) => setCfc(r)).catch(() => {});
       api<typeof surv>(`/api/courses/${courseId}/survey/results`, { auth: true })
@@ -846,6 +853,65 @@ export default function CourseDetailPage() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* Estadística de opinión del curso (escalas Likert y encuestas), de un
+              vistazo en el Resumen: no puntúan; sirven para perfilar y mejorar. */}
+          {pestana === 'resumen' && opinion.length > 0 && (
+            <div className="card animate-in" style={{ marginBottom: 24 }}>
+              <div className="card-header">
+                <div className="card-title">Opiniones de los alumnos</div>
+                <div className="card-subtitle">Respuestas de encuestas y escalas (no cuentan para la nota)</div>
+              </div>
+              {opinion.map((ex) => (
+                <div key={ex.examId} style={{ marginBottom: 14 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, margin: '4px 0 8px' }}>📋 {ex.examTitle}</div>
+                  {ex.preguntas.map((q) => (
+                    <div key={q.id} style={{ borderTop: '1px solid var(--gray-200)', padding: '10px 0' }}>
+                      <div style={{ fontSize: 14, marginBottom: 6 }}>
+                        {q.text}
+                        <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>· {q.n} respuesta(s)</span>
+                      </div>
+                      {q.format === 'escala' ? (
+                        <div>
+                          <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+                            {q.etiquetaMin} (1) → {q.etiquetaMax} (5) · Media: <strong>{q.media ?? '—'}</strong>
+                          </div>
+                          {[1, 2, 3, 4, 5].map((v) => {
+                            const c = q.dist[v - 1];
+                            const pct = q.n ? Math.round((c / q.n) * 100) : 0;
+                            return (
+                              <div key={v} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ width: 16, fontSize: 13, textAlign: 'right' }}>{v}</span>
+                                <div style={{ flex: 1, background: 'var(--gray-100)', borderRadius: 4, height: 16, overflow: 'hidden' }}>
+                                  <div style={{ width: `${pct}%`, background: 'var(--primary, #2563eb)', height: '100%' }} />
+                                </div>
+                                <span className="muted" style={{ fontSize: 12, width: 66 }}>{c} · {pct}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div>
+                          {q.opciones.map((o, i) => {
+                            const pct = q.n ? Math.round((o.count / q.n) * 100) : 0;
+                            return (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ flex: '0 0 40%', fontSize: 13 }}>{o.text}</span>
+                                <div style={{ flex: 1, background: 'var(--gray-100)', borderRadius: 4, height: 16, overflow: 'hidden' }}>
+                                  <div style={{ width: `${pct}%`, background: 'var(--primary, #2563eb)', height: '100%' }} />
+                                </div>
+                                <span className="muted" style={{ fontSize: 12, width: 66 }}>{o.count} · {pct}%</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           )}
 

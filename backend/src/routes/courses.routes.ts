@@ -9,7 +9,7 @@ import {
   setActivityEval, listActivityGrades, setActivityGrade,
 } from '../controllers/courseContent.controller.js';
 import {
-  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts, getAttemptOpenAnswers, gradeAttemptOpenAnswers, examOpinionStats, grantExtraAttempt,
+  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts, getAttemptOpenAnswers, gradeAttemptOpenAnswers, examOpinionStats, courseOpinionStats, grantExtraAttempt,
 } from '../controllers/exam.controller.js';
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
@@ -97,6 +97,7 @@ router.patch('/:id/exams/:examId/questions/:questionId/grading', asyncHandler(se
 router.get('/:id/students', asyncHandler(listCourseStudents));
 router.get('/:id/duration', asyncHandler(courseDuration));
 router.get('/:id/dashboard', asyncHandler(courseDashboard));
+router.get('/:id/opinion', asyncHandler(courseOpinionStats));
 router.get('/:id/cfc', asyncHandler(cfcAssistant));
 router.get('/:id/survey/results', asyncHandler(surveyResults));
 router.patch('/:id/survey', asyncHandler(setSurveyOpen));
