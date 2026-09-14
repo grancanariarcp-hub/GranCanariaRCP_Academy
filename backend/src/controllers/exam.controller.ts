@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import PDFDocument from 'pdfkit';
 import { query, withTransaction } from '../config/database.js';
 import { badRequest, forbidden, notFound } from '../utils/httpError.js';
 import { assertEditor, assertEditaModulo } from '../services/courseAuth.js';
@@ -7,6 +8,7 @@ import { audit } from '../services/audit.js';
 import { clientIp } from '../utils/asyncHandler.js';
 import { r2Configured, buildKey, uploadObject, withImageUrls } from '../services/r2.js';
 import { norm, separarOpciones, resolverCorrecta, opcionesDepuradas } from '../services/importacionPreguntas.js';
+import { renderOpinionReport, type OpinionStat } from '../services/opinionReportPdf.js';
 
 /** Exams live inside a module; each is also an activity in that module. */
 
@@ -435,7 +437,7 @@ type OpQ = { id: string; text: string; format: string; options: unknown };
 /** Calcula la estadística de una pregunta de opinión sobre un conjunto de
  *  respuestas (answers de los intentos). Devuelve null si la pregunta puntúa
  *  (una múltiple con opción correcta no es de opinión). */
-function computarOpinion(q: OpQ, respuestas: Array<Record<string, unknown>>) {
+function computarOpinion(q: OpQ, respuestas: Array<Record<string, unknown>>): OpinionStat | null {
   if (q.format === 'escala') {
     const labels = Array.isArray(q.options) ? (q.options as string[]) : [];
     const dist = [0, 0, 0, 0, 0]; let n = 0; let sum = 0;
@@ -456,47 +458,26 @@ function computarOpinion(q: OpQ, respuestas: Array<Record<string, unknown>>) {
   return { id: q.id, text: q.text, format: 'multiple', opciones: opts.map((o, i) => ({ text: o.text, count: counts[i] })), n };
 }
 
-// GET /api/courses/:id/exams/:examId/opinion — estadística de las preguntas de
-// opinión (escala 1-5 y selección múltiple sin correctas), para perfilar/mejorar.
-export async function examOpinionStats(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
-  await assertExamInCourse(req.params.examId, req.params.id);
-  const qs = await query<OpQ>(
-    "SELECT id, text, format, options FROM exam_questions WHERE exam_id = $1 AND format IN ('escala','multiple') ORDER BY sort_order",
-    [req.params.examId],
-  );
-  const att = await query<{ answers: Record<string, unknown> | null }>(
-    'SELECT answers FROM exam_attempts WHERE exam_id = $1 AND submitted_at IS NOT NULL', [req.params.examId],
-  );
-  const respuestas = att.rows.map((a) => a.answers ?? {});
-  const preguntas = qs.rows.map((q) => computarOpinion(q, respuestas)).filter(Boolean);
-  res.json({ preguntas });
-}
-
-// GET /api/courses/:id/opinion — estadística de opinión de TODO el curso, agrupada
-// por examen, para verla de un vistazo en el Resumen del curso.
-export async function courseOpinionStats(req: Request, res: Response): Promise<void> {
-  await assertEditor(req);
-  const id = req.params.id;
-  if (req.auth!.role !== 'super_admin' && req.auth!.role !== 'auditor') {
-    const staff = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [id, req.auth!.sub]);
-    if (staff.rows.length === 0) throw forbidden('No formas parte de este curso');
-  }
+/** Obtiene la estadística de opinión de un curso agrupada por examen. Con
+ *  `examId` se limita a esa encuesta. Se comparte entre la vista JSON y el PDF. */
+async function obtenerOpinionCurso(courseId: string, examId?: string) {
   const qs = await query<OpQ & { exam_id: string; exam_title: string }>(
     `SELECT q.id, q.text, q.format, q.options, e.id AS exam_id, e.title AS exam_title
        FROM exam_questions q
        JOIN exams e ON e.id = q.exam_id
        JOIN modules m ON m.id = e.module_id
       WHERE m.course_id = $1 AND q.format IN ('escala','multiple')
+        ${examId ? 'AND e.id = $2' : ''}
       ORDER BY e.title, q.sort_order`,
-    [id],
+    examId ? [courseId, examId] : [courseId],
   );
   const att = await query<{ exam_id: string; answers: Record<string, unknown> | null }>(
     `SELECT a.exam_id, a.answers FROM exam_attempts a
        JOIN exams e ON e.id = a.exam_id
        JOIN modules m ON m.id = e.module_id
-      WHERE m.course_id = $1 AND a.submitted_at IS NOT NULL`,
-    [id],
+      WHERE m.course_id = $1 AND a.submitted_at IS NOT NULL
+        ${examId ? 'AND e.id = $2' : ''}`,
+    examId ? [courseId, examId] : [courseId],
   );
   // Respuestas agrupadas por examen (cada pregunta se mide sobre las de SU examen).
   const porExamen = new Map<string, Array<Record<string, unknown>>>();
@@ -505,7 +486,7 @@ export async function courseOpinionStats(req: Request, res: Response): Promise<v
     arr.push(a.answers ?? {});
     porExamen.set(a.exam_id, arr);
   }
-  const examenes: Array<{ examId: string; examTitle: string; preguntas: unknown[] }> = [];
+  const examenes: Array<{ examId: string; examTitle: string; preguntas: NonNullable<ReturnType<typeof computarOpinion>>[] }> = [];
   for (const q of qs.rows) {
     const stat = computarOpinion(q, porExamen.get(q.exam_id) ?? []);
     if (!stat) continue;
@@ -513,7 +494,67 @@ export async function courseOpinionStats(req: Request, res: Response): Promise<v
     if (!g) { g = { examId: q.exam_id, examTitle: q.exam_title, preguntas: [] }; examenes.push(g); }
     g.preguntas.push(stat);
   }
-  res.json({ examenes });
+  return examenes;
+}
+
+/** Comprueba que quien pide es del curso (editor del curso, super admin o auditor). */
+async function assertCursoStaff(req: Request): Promise<void> {
+  await assertEditor(req);
+  if (req.auth!.role !== 'super_admin' && req.auth!.role !== 'auditor') {
+    const staff = await query('SELECT 1 FROM course_staff WHERE course_id = $1 AND user_id = $2', [req.params.id, req.auth!.sub]);
+    if (staff.rows.length === 0) throw forbidden('No formas parte de este curso');
+  }
+}
+
+// GET /api/courses/:id/exams/:examId/opinion — estadística de las preguntas de
+// opinión (escala 1-5 y selección múltiple sin correctas), para perfilar/mejorar.
+export async function examOpinionStats(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  const g = await obtenerOpinionCurso(req.params.id, req.params.examId);
+  res.json({ preguntas: g[0]?.preguntas ?? [] });
+}
+
+// GET /api/courses/:id/opinion — estadística de opinión de TODO el curso, agrupada
+// por examen, para verla de un vistazo en el Resumen del curso.
+export async function courseOpinionStats(req: Request, res: Response): Promise<void> {
+  await assertCursoStaff(req);
+  res.json({ examenes: await obtenerOpinionCurso(req.params.id) });
+}
+
+/** Emite el informe de opiniones en PDF (global del curso o de una encuesta). */
+async function emitirInformeOpinion(req: Request, res: Response, examId?: string): Promise<void> {
+  const curso = await query<{ title: string }>('SELECT title FROM courses WHERE id = $1', [req.params.id]);
+  if (curso.rows.length === 0) throw notFound('Curso no encontrado');
+  const examenes = await obtenerOpinionCurso(req.params.id, examId);
+  const nombre = examId
+    ? `informe-encuesta-${(examenes[0]?.examTitle ?? 'encuesta').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`
+    : 'informe-opiniones.pdf';
+
+  const doc = new PDFDocument({ size: 'A4', margin: 0 });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${nombre}"`);
+  doc.pipe(res);
+  renderOpinionReport(doc, {
+    courseTitle: curso.rows[0].title,
+    fecha: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' }),
+    scope: examId ? 'encuesta' : 'global',
+    examenes: examenes.map((e) => ({ examTitle: e.examTitle, preguntas: e.preguntas })),
+  });
+  doc.end();
+}
+
+// GET /api/courses/:id/opinion/report.pdf — informe visual GLOBAL del curso.
+export async function courseOpinionReport(req: Request, res: Response): Promise<void> {
+  await assertCursoStaff(req);
+  await emitirInformeOpinion(req, res);
+}
+
+// GET /api/courses/:id/exams/:examId/opinion/report.pdf — informe de una encuesta.
+export async function examOpinionReport(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  await emitirInformeOpinion(req, res, req.params.examId);
 }
 
 /**

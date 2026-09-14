@@ -860,13 +860,25 @@ export default function CourseDetailPage() {
               vistazo en el Resumen: no puntúan; sirven para perfilar y mejorar. */}
           {pestana === 'resumen' && opinion.length > 0 && (
             <div className="card animate-in" style={{ marginBottom: 24 }}>
-              <div className="card-header">
-                <div className="card-title">Opiniones de los alumnos</div>
-                <div className="card-subtitle">Respuestas de encuestas y escalas (no cuentan para la nota)</div>
+              <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                <div>
+                  <div className="card-title">Opiniones de los alumnos</div>
+                  <div className="card-subtitle">Respuestas de encuestas y escalas (no cuentan para la nota)</div>
+                </div>
+                <button className="btn btn-primary btn-small" style={{ flexShrink: 0 }}
+                  onClick={() => downloadFile(`/api/courses/${courseId}/opinion/report.pdf`, 'informe-opiniones.pdf')}>
+                  📄 Informe global (PDF)
+                </button>
               </div>
               {opinion.map((ex) => (
                 <div key={ex.examId} style={{ marginBottom: 14 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, margin: '4px 0 8px' }}>📋 {ex.examTitle}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, margin: '4px 0 8px' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>📋 {ex.examTitle}</div>
+                    <button className="btn btn-outline btn-small" style={{ flexShrink: 0 }}
+                      onClick={() => downloadFile(`/api/courses/${courseId}/exams/${ex.examId}/opinion/report.pdf`, `informe-${ex.examTitle.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`)}>
+                      📄 PDF
+                    </button>
+                  </div>
                   {ex.preguntas.map((q) => (
                     <div key={q.id} style={{ borderTop: '1px solid var(--gray-200)', padding: '10px 0' }}>
                       <div style={{ fontSize: 14, marginBottom: 6 }}>

@@ -9,7 +9,7 @@ import {
   setActivityEval, listActivityGrades, setActivityGrade,
 } from '../controllers/courseContent.controller.js';
 import {
-  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts, getAttemptOpenAnswers, gradeAttemptOpenAnswers, examOpinionStats, courseOpinionStats, grantExtraAttempt,
+  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts, getAttemptOpenAnswers, gradeAttemptOpenAnswers, examOpinionStats, courseOpinionStats, courseOpinionReport, examOpinionReport, grantExtraAttempt,
 } from '../controllers/exam.controller.js';
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
@@ -91,6 +91,7 @@ router.post('/:id/exams/:examId/students/:studentId/otra-oportunidad', asyncHand
 router.get('/:id/exams/:examId/attempts/:attemptId/abiertas', asyncHandler(getAttemptOpenAnswers));
 router.put('/:id/exams/:examId/attempts/:attemptId/abiertas', asyncHandler(gradeAttemptOpenAnswers));
 router.get('/:id/exams/:examId/opinion', asyncHandler(examOpinionStats));
+router.get('/:id/exams/:examId/opinion/report.pdf', asyncHandler(examOpinionReport));
 router.get('/:id/exams/:examId/quality', asyncHandler(examQuality));
 router.patch('/:id/exams/:examId/questions/:questionId/grading', asyncHandler(setQuestionGrading));
 
@@ -98,6 +99,7 @@ router.get('/:id/students', asyncHandler(listCourseStudents));
 router.get('/:id/duration', asyncHandler(courseDuration));
 router.get('/:id/dashboard', asyncHandler(courseDashboard));
 router.get('/:id/opinion', asyncHandler(courseOpinionStats));
+router.get('/:id/opinion/report.pdf', asyncHandler(courseOpinionReport));
 router.get('/:id/cfc', asyncHandler(cfcAssistant));
 router.get('/:id/survey/results', asyncHandler(surveyResults));
 router.patch('/:id/survey', asyncHandler(setSurveyOpen));
