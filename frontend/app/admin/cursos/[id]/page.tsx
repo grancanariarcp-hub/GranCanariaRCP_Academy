@@ -114,7 +114,7 @@ export default function CourseDetailPage() {
   const [modules, setModules] = useState<Module[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [gallery, setGallery] = useState<Array<{ id: string; url: string }>>([]);
-  const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean; completadas: string; active_seconds: string }>>([]);
+  const [students, setStudents] = useState<Array<{ id: string; name: string; email: string | null; status: string; intentos: string; aprobado: boolean; completadas: string; active_seconds: string; dias_activos: string; ultima_conexion: string | null }>>([]);
   const [totalActivities, setTotalActivities] = useState(0);
   const [cdash, setCdash] = useState<null | {
     matriculas: { mes_anterior: string; mes_actual: string; anio: string; total: string };
@@ -1485,7 +1485,7 @@ export default function CourseDetailPage() {
               ) : (
                 <div className="table-responsive">
                   <table>
-                    <thead><tr><th>Alumno</th><th>Avance</th><th>Estudio</th><th>Examen</th><th></th></tr></thead>
+                    <thead><tr><th>Alumno</th><th>Avance</th><th>Estudio</th><th>Última conexión</th><th>Examen</th><th></th></tr></thead>
                     <tbody>
                       {students.map((s) => (
                         <tr key={s.id}>
@@ -1503,7 +1503,19 @@ export default function CourseDetailPage() {
                               );
                             })()}
                           </td>
-                          <td>{Number(s.active_seconds) > 0 ? `${Math.round((Number(s.active_seconds) / 3600) * 10) / 10} h` : <span className="muted">—</span>}</td>
+                          <td>
+                            {Number(s.active_seconds) > 0 ? `${Math.round((Number(s.active_seconds) / 3600) * 10) / 10} h` : <span className="muted">—</span>}
+                            {Number(s.dias_activos) > 0 && (
+                              <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                                ~{Math.round(Number(s.active_seconds) / Number(s.dias_activos) / 60)} min/día · {s.dias_activos} día(s)
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ fontSize: 12 }}>
+                            {s.ultima_conexion
+                              ? <span title={new Date(s.ultima_conexion).toLocaleString('es-ES')}>{new Date(s.ultima_conexion).toLocaleDateString('es-ES')}</span>
+                              : <span className="muted">nunca</span>}
+                          </td>
                           <td>{s.aprobado ? <span className="badge badge-success">aprobado</span> : <span className="muted" style={{ fontSize: 12 }}>{Number(s.intentos) > 0 ? `${s.intentos} intento(s)` : 'sin intentos'}</span>}</td>
                           <td>
                             <div className="row-actions">

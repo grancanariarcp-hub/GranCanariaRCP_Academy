@@ -48,7 +48,7 @@ export default function TakeExamPage() {
 
   const [elapsed, setElapsed] = useState(0);
   const startRef = useRef<number>(0);
-  const [result, setResult] = useState<{ score: number | null; passed: boolean | null; autoCorrect: number; autoTotal: number; hasOpen: boolean } | null>(null);
+  const [result, setResult] = useState<{ score: number | null; passed: boolean | null; autoCorrect: number; autoTotal: number; hasOpen: boolean; soloOpinion?: boolean } | null>(null);
   const [review, setReview] = useState<{ questions: Q[]; answers: Answers; feedbackGeneral: string | null; openGrades: Record<string, { points: number; comment: string | null }> } | null>(null);
   const submittingRef = useRef(false);
 
@@ -246,10 +246,14 @@ export default function TakeExamPage() {
       {/* RESULT */}
       {phase === 'result' && result && (
         <div className="card">
-          <div className={`alert ${result.passed ? 'alert-success' : 'alert-error'}`} style={{ fontSize: 16 }}>
-            {result.passed ? '✅ ¡Aprobado!' : result.passed === false ? '❌ No superado' : 'Enviado'} — Nota: <strong>{result.score ?? '—'}%</strong>{' '}
-            ({result.autoCorrect}/{result.autoTotal} correctas)
-          </div>
+          {result.soloOpinion ? (
+            <div className="alert alert-success" style={{ fontSize: 16 }}>🙏 ¡Gracias por tus respuestas! Esta actividad es de opinión: no tiene nota, queda como realizada.</div>
+          ) : (
+            <div className={`alert ${result.passed ? 'alert-success' : 'alert-error'}`} style={{ fontSize: 16 }}>
+              {result.passed ? '✅ ¡Aprobado!' : result.passed === false ? '❌ No superado' : 'Enviado'} — Nota: <strong>{result.score ?? '—'}%</strong>{' '}
+              ({result.autoCorrect}/{result.autoTotal} correctas)
+            </div>
+          )}
           {result.hasOpen && <div className="info-box" style={{ marginBottom: 12 }}>Tiene preguntas abiertas que revisará el profesor.</div>}
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary" onClick={() => openReview(attemptId)}>Revisar respuestas</button>

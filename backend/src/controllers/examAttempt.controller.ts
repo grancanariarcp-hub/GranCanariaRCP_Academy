@@ -237,8 +237,13 @@ export async function submitExam(req: Request, res: Response): Promise<void> {
       'FUERA_DE_PLAZO',
     );
   }
-  // Al aprobar, la actividad de ese examen queda completada automáticamente.
-  if (passed) {
+  const hasOpen = q.rows.some((x) => x.format === 'abierta');
+  // «Solo opinión»: no hay nada calificable (todo escala/encuesta) ni abiertas
+  // pendientes → no tiene nota, solo cuenta como REALIZADA.
+  const soloOpinion = autoTotal === 0 && !hasOpen;
+
+  // La actividad del examen se completa al aprobar, o al enviar si es solo opinión.
+  if (passed || soloOpinion) {
     await query(
       `INSERT INTO activity_completions (student_id, activity_id)
        SELECT $1, a.id FROM activities a WHERE a.exam_id = $2
@@ -249,7 +254,7 @@ export async function submitExam(req: Request, res: Response): Promise<void> {
 
   await audit({ actorId: req.auth!.sub, actorType: 'student', action: 'EXAM_SUBMIT', entity: 'exam', entityId: exam.id, ip: clientIp(req), metadata: { score, passed } });
 
-  res.json({ score, passed, autoCorrect, autoTotal, hasOpen: q.rows.some((x) => x.format === 'abierta') });
+  res.json({ score, passed, autoCorrect, autoTotal, hasOpen, soloOpinion });
 }
 
 // GET /api/student/exams/:examId/attempts/:attemptId  — free review with feedback

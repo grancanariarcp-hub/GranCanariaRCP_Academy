@@ -350,6 +350,10 @@ export async function listCourseStudents(req: Request, res: Response): Promise<v
             ) AS completadas,
             (SELECT COALESCE(SUM(lt.active_seconds),0) FROM learning_time lt
               WHERE lt.student_id = s.id AND lt.course_id = $1) AS active_seconds,
+            (SELECT COUNT(DISTINCT lt.day) FROM learning_time lt
+              WHERE lt.student_id = s.id AND lt.course_id = $1) AS dias_activos,
+            (SELECT MAX(se.last_seen_at) FROM sessions se
+              WHERE se.subject_id = s.id AND se.subject_type = 'student') AS ultima_conexion,
             (SELECT COUNT(*) FROM exam_attempts a
                JOIN exams ex ON ex.id = a.exam_id
                JOIN modules m ON m.id = ex.module_id
