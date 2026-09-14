@@ -72,7 +72,7 @@ export default function TakeExamPage() {
     const iv = setInterval(() => {
       const secs = (Date.now() - startRef.current) / 1000;
       setElapsed(secs);
-      if (cfg?.timeLimitMin && secs >= cfg.timeLimitMin * 60) submit();
+      if (cfg?.timeLimitMin && secs >= cfg.timeLimitMin * 60) submit(true);
     }, 500);
     return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,8 +93,19 @@ export default function TakeExamPage() {
     }
   }
 
-  async function submit() {
+  async function submit(skipConfirm = false) {
     if (submittingRef.current) return;
+    // Confirmación para no cerrar el examen por error (salvo autoenvío por tiempo).
+    if (!skipConfirm) {
+      const sinResponder = questions.filter((q) => {
+        const v = answersRef.current[q.id];
+        return v == null || v === '' || (Array.isArray(v) && v.length === 0);
+      }).length;
+      const aviso = sinResponder > 0
+        ? `Tienes ${sinResponder} pregunta(s) sin responder. `
+        : '';
+      if (!confirm(`${aviso}¿Enviar el examen ahora? No podrás cambiar tus respuestas.`)) return;
+    }
     submittingRef.current = true;
     try {
       const r = await api<typeof result>(`/api/student/exams/${examId}/attempts/${attemptId}/submit`, {
@@ -168,7 +179,7 @@ export default function TakeExamPage() {
         <>
           <div className="card" style={{ position: 'sticky', top: 8, zIndex: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong>⏱️ {remaining != null ? `Restante: ${mmss(remaining)}` : `Tiempo: ${mmss(elapsed)}`}</strong>
-            <button className="btn btn-primary btn-small" onClick={submit}>Enviar examen</button>
+            <button className="btn btn-primary btn-small" onClick={() => submit()}>Enviar examen</button>
           </div>
           {questions.map((q, i) => (
             <div className="card" key={q.id} style={{ marginTop: 16 }}>
@@ -239,7 +250,7 @@ export default function TakeExamPage() {
               )}
             </div>
           ))}
-          <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={submit}>Enviar examen</button>
+          <button className="btn btn-primary btn-full" style={{ marginTop: 16 }} onClick={() => submit()}>Enviar examen</button>
         </>
       )}
 

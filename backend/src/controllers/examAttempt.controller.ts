@@ -52,6 +52,15 @@ async function submittedCount(examId: string, studentId: string): Promise<number
   return Number(rows[0].count);
 }
 
+/** Intentos extra que el profesor haya concedido a este alumno en el examen. */
+async function extraAttemptsGranted(examId: string, studentId: string): Promise<number> {
+  const { rows } = await query<{ extra_attempts: number }>(
+    'SELECT extra_attempts FROM exam_attempt_grants WHERE exam_id = $1 AND student_id = $2',
+    [examId, studentId],
+  );
+  return rows.length > 0 ? Number(rows[0].extra_attempts) : 0;
+}
+
 // POST /api/student/exams/:examId/start
 export async function startExam(req: Request, res: Response): Promise<void> {
   const exam = await examForStudent(req.params.examId, req.auth!.sub);
@@ -95,9 +104,13 @@ export async function startExam(req: Request, res: Response): Promise<void> {
     return;
   }
 
-  // attempts_allowed = 0 → intentos infinitos.
-  if (exam.attempts_allowed > 0 && (await submittedCount(exam.id, req.auth!.sub)) >= exam.attempts_allowed) {
-    throw badRequest('Has agotado los intentos de este examen', 'NO_ATTEMPTS');
+  // attempts_allowed = 0 → intentos infinitos. Además, el profesor puede conceder
+  // intentos EXTRA a este alumno (p. ej. si envió por error): suman al límite.
+  if (exam.attempts_allowed > 0) {
+    const extra = await extraAttemptsGranted(exam.id, req.auth!.sub);
+    if ((await submittedCount(exam.id, req.auth!.sub)) >= exam.attempts_allowed + extra) {
+      throw badRequest('Has agotado los intentos de este examen', 'NO_ATTEMPTS');
+    }
   }
   const att = await query<{ id: string; started_at: string }>(
     'INSERT INTO exam_attempts (exam_id, student_id) VALUES ($1, $2) RETURNING id, started_at',

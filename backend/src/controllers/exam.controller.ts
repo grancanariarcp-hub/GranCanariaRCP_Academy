@@ -299,16 +299,39 @@ export async function listExamAttempts(req: Request, res: Response): Promise<voi
   await assertEditor(req);
   await assertExamInCourse(req.params.examId, req.params.id);
   const { rows } = await query(
-    `SELECT a.id, a.score, a.passed, a.time_spent_seconds, a.submitted_at,
+    `SELECT a.id, a.student_id, a.score, a.passed, a.time_spent_seconds, a.submitted_at,
             s.display_name AS student, s.email,
             (SELECT COUNT(*) FROM exam_attempts a2
-               WHERE a2.exam_id = a.exam_id AND a2.student_id = a.student_id AND a2.submitted_at IS NOT NULL) AS attempts
+               WHERE a2.exam_id = a.exam_id AND a2.student_id = a.student_id AND a2.submitted_at IS NOT NULL) AS attempts,
+            COALESCE((SELECT g.extra_attempts FROM exam_attempt_grants g
+               WHERE g.exam_id = a.exam_id AND g.student_id = a.student_id), 0) AS extra_attempts
      FROM exam_attempts a JOIN students s ON s.id = a.student_id
      WHERE a.exam_id = $1 AND a.submitted_at IS NOT NULL
      ORDER BY a.submitted_at DESC`,
     [req.params.examId],
   );
   res.json({ attempts: rows });
+}
+
+// POST /api/courses/:id/exams/:examId/students/:studentId/otra-oportunidad
+// Concede UN intento extra al alumno en este examen (p. ej. si lo envió por
+// error). No borra su historial; según la política de nota (mejor/último) el
+// nuevo intento contará como corresponda.
+export async function grantExtraAttempt(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  const enr = await query('SELECT 1 FROM students WHERE id = $1', [req.params.studentId]);
+  if (enr.rows.length === 0) throw notFound('Alumno no encontrado');
+  const { rows } = await query<{ extra_attempts: number }>(
+    `INSERT INTO exam_attempt_grants (exam_id, student_id, extra_attempts, granted_by)
+     VALUES ($1, $2, 1, $3)
+     ON CONFLICT (exam_id, student_id)
+     DO UPDATE SET extra_attempts = exam_attempt_grants.extra_attempts + 1, granted_by = $3, granted_at = NOW()
+     RETURNING extra_attempts`,
+    [req.params.examId, req.params.studentId, req.auth!.sub],
+  );
+  await audit({ actorId: req.auth!.sub, actorType: req.auth!.role, action: 'EXAM_GRANT_ATTEMPT', entity: 'exam', entityId: req.params.examId, ip: clientIp(req) });
+  res.json({ extraAttempts: rows[0].extra_attempts });
 }
 
 // GET /api/courses/:id/exams/:examId/attempts/:attemptId/abiertas

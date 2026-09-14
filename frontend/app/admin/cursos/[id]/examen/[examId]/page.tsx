@@ -95,7 +95,7 @@ export default function ExamEditorPage() {
   const [bankMsg, setBankMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Calificaciones
-  const [attempts, setAttempts] = useState<Array<{ id: string; student: string; email: string; score: number | null; passed: boolean | null; attempts: string; time_spent_seconds: number | null }>>([]);
+  const [attempts, setAttempts] = useState<Array<{ id: string; student_id: string; student: string; email: string; score: number | null; passed: boolean | null; attempts: string; extra_attempts: string; time_spent_seconds: number | null }>>([]);
 
   // Estadística de preguntas de opinión (escala Likert y encuestas de selección múltiple).
   type Opinion =
@@ -366,6 +366,14 @@ export default function ExamEditorPage() {
       setGradeMsg(`Guardado ✅ · nota recalculada: ${r.score ?? '—'}%`);
       load();
     } catch (err) { setGradeMsg(err instanceof ApiError ? err.message : 'No se pudo guardar'); }
+  }
+
+  async function otraOportunidad(a: { student_id: string; student: string }) {
+    if (!confirm(`¿Conceder otro intento a ${a.student}? Podrá volver a realizar el examen; se conserva el intento anterior.`)) return;
+    try {
+      await api(`/api/courses/${courseId}/exams/${examId}/students/${a.student_id}/otra-oportunidad`, { method: 'POST', auth: true });
+      load();
+    } catch (err) { alert(err instanceof ApiError ? err.message : 'No se pudo conceder el intento'); }
   }
 
   if (!user) return <div style={{ padding: 40 }}>Cargando…</div>;
@@ -754,7 +762,7 @@ export default function ExamEditorPage() {
         <div className="table-responsive">
           <table>
             <thead>
-              <tr><th>Alumno</th><th>Nota</th><th>Resultado</th><th>Intentos</th><th>Tiempo</th>{hayAbiertas && <th></th>}</tr>
+              <tr><th>Alumno</th><th>Nota</th><th>Resultado</th><th>Intentos</th><th>Tiempo</th><th></th></tr>
             </thead>
             <tbody>
               {attempts.map((a) => (
@@ -762,12 +770,15 @@ export default function ExamEditorPage() {
                   <td>{a.student}<div className="muted" style={{ fontSize: 12 }}>{a.email}</div></td>
                   <td>{a.score ?? '—'}%</td>
                   <td>{a.passed == null ? '—' : a.passed ? <span className="badge badge-success">Aprobado</span> : <span className="badge badge-danger">No superado</span>}</td>
-                  <td>{a.attempts}</td>
+                  <td>{a.attempts}{Number(a.extra_attempts) > 0 && <span className="badge badge-info" style={{ marginLeft: 6 }} title="Intentos extra concedidos">+{a.extra_attempts}</span>}</td>
                   <td>{a.time_spent_seconds != null ? `${Math.floor(a.time_spent_seconds / 60)}m ${a.time_spent_seconds % 60}s` : '—'}</td>
-                  {hayAbiertas && <td><button className="btn btn-outline btn-small" onClick={() => abrirCorreccion({ id: a.id, student: a.student })}>Corregir abiertas</button></td>}
+                  <td style={{ display: 'flex', gap: 6 }}>
+                    {hayAbiertas && <button className="btn btn-outline btn-small" onClick={() => abrirCorreccion({ id: a.id, student: a.student })}>Corregir abiertas</button>}
+                    <button className="btn btn-outline btn-small" onClick={() => otraOportunidad({ student_id: a.student_id, student: a.student })}>+ Otra oportunidad</button>
+                  </td>
                 </tr>
               ))}
-              {attempts.length === 0 && <tr><td colSpan={hayAbiertas ? 6 : 5} className="muted">Aún nadie ha realizado el examen</td></tr>}
+              {attempts.length === 0 && <tr><td colSpan={6} className="muted">Aún nadie ha realizado el examen</td></tr>}
             </tbody>
           </table>
         </div>

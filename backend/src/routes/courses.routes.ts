@@ -9,7 +9,7 @@ import {
   setActivityEval, listActivityGrades, setActivityGrade,
 } from '../controllers/courseContent.controller.js';
 import {
-  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts, getAttemptOpenAnswers, gradeAttemptOpenAnswers, examOpinionStats,
+  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts, getAttemptOpenAnswers, gradeAttemptOpenAnswers, examOpinionStats, grantExtraAttempt,
 } from '../controllers/exam.controller.js';
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
@@ -87,6 +87,7 @@ router.post('/:id/exams/:examId/questions/from-bank/select', asyncHandler(addExa
 router.patch('/:id/exams/:examId/questions/:questionId', asyncHandler(updateExamQuestion));
 router.delete('/:id/exams/:examId/questions/:questionId', asyncHandler(deleteExamQuestion));
 router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
+router.post('/:id/exams/:examId/students/:studentId/otra-oportunidad', asyncHandler(grantExtraAttempt));
 router.get('/:id/exams/:examId/attempts/:attemptId/abiertas', asyncHandler(getAttemptOpenAnswers));
 router.put('/:id/exams/:examId/attempts/:attemptId/abiertas', asyncHandler(gradeAttemptOpenAnswers));
 router.get('/:id/exams/:examId/opinion', asyncHandler(examOpinionStats));
