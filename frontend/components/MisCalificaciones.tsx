@@ -20,10 +20,17 @@ interface Item {
   foro_ok: boolean;
   manual_nota: number | string | null;
   manual_apto: boolean | null;
+  es_opinion: boolean;
 }
 
 function Resultado({ it }: { it: Item }) {
   if (it.metodo_eval === 'examen') {
+    // Encuestas/opinión: solo importa haberlas realizado, no puntúan.
+    if (it.es_opinion) {
+      return it.completada
+        ? <span className="badge badge-success">Tarea realizada ✓</span>
+        : <span className="badge badge-warning">Pendiente</span>;
+    }
     if (it.examen_score == null) return <span className="muted">Sin intentos</span>;
     return <span><strong>{it.examen_score}%</strong> <span className={`badge ${it.examen_apto ? 'badge-success' : 'badge-danger'}`}>{it.examen_apto ? 'apto' : 'no apto'}</span></span>;
   }

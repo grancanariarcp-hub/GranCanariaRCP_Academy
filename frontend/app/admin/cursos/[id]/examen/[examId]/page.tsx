@@ -97,6 +97,12 @@ export default function ExamEditorPage() {
   // Calificaciones
   const [attempts, setAttempts] = useState<Array<{ id: string; student: string; email: string; score: number | null; passed: boolean | null; attempts: string; time_spent_seconds: number | null }>>([]);
 
+  // Estadística de preguntas de opinión (escala Likert y encuestas de selección múltiple).
+  type Opinion =
+    | { id: string; text: string; format: 'escala'; etiquetaMin: string; etiquetaMax: string; dist: number[]; n: number; media: number | null }
+    | { id: string; text: string; format: 'multiple'; opciones: Array<{ text: string; count: number }>; n: number };
+  const [opinion, setOpinion] = useState<Opinion[]>([]);
+
   async function load() {
     try {
       const r = await api<{ exam: Exam; questions: ExamQuestion[] }>(`/api/courses/${courseId}/exams/${examId}`, { auth: true });
@@ -105,6 +111,12 @@ export default function ExamEditorPage() {
       try {
         const a = await api<{ attempts: typeof attempts }>(`/api/courses/${courseId}/exams/${examId}/attempts`, { auth: true });
         setAttempts(a.attempts);
+      } catch {
+        /* ignore */
+      }
+      try {
+        const o = await api<{ preguntas: Opinion[] }>(`/api/courses/${courseId}/exams/${examId}/opinion`, { auth: true });
+        setOpinion(o.preguntas);
       } catch {
         /* ignore */
       }
@@ -760,6 +772,60 @@ export default function ExamEditorPage() {
           </table>
         </div>
       </div>
+      {/* Estadística de opinión: escalas Likert y encuestas de selección múltiple.
+          No puntúan; sirven para perfilar alumnos y valorar mejoras. */}
+      {opinion.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <div className="card-header">
+            <div className="card-title">Estadística de opinión</div>
+            <div className="card-subtitle">Respuestas de las preguntas de encuesta (no cuentan para la nota)</div>
+          </div>
+          {opinion.map((q) => (
+            <div key={q.id} style={{ borderTop: '1px solid var(--gray-200)', padding: '12px 0' }}>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                {q.text}
+                <span className="muted" style={{ fontWeight: 400, fontSize: 12, marginLeft: 8 }}>· {q.n} respuesta(s)</span>
+              </div>
+              {q.format === 'escala' ? (
+                <div>
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 6 }}>
+                    {q.etiquetaMin} (1) → {q.etiquetaMax} (5) · Media: <strong>{q.media ?? '—'}</strong>
+                  </div>
+                  {[1, 2, 3, 4, 5].map((v) => {
+                    const c = q.dist[v - 1];
+                    const pct = q.n ? Math.round((c / q.n) * 100) : 0;
+                    return (
+                      <div key={v} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ width: 16, fontSize: 13, textAlign: 'right' }}>{v}</span>
+                        <div style={{ flex: 1, background: 'var(--gray-100)', borderRadius: 4, height: 18, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, background: 'var(--primary, #2563eb)', height: '100%' }} />
+                        </div>
+                        <span className="muted" style={{ fontSize: 12, width: 70 }}>{c} · {pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div>
+                  {q.opciones.map((o, i) => {
+                    const pct = q.n ? Math.round((o.count / q.n) * 100) : 0;
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ flex: '0 0 40%', fontSize: 13 }}>{o.text}</span>
+                        <div style={{ flex: 1, background: 'var(--gray-100)', borderRadius: 4, height: 18, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, background: 'var(--primary, #2563eb)', height: '100%' }} />
+                        </div>
+                        <span className="muted" style={{ fontSize: 12, width: 70 }}>{o.count} · {pct}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {gradingAtt && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => { setGradingAtt(null); setOpenAns(null); }}>
           <div className="modal modal-wide" onClick={(e) => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>

@@ -149,6 +149,18 @@ export async function misCalificaciones(req: Request, res: Response): Promise<vo
                ORDER BY (CASE WHEN ex.grading_policy = 'mejor' THEN ea.score END) DESC NULLS LAST, ea.submitted_at DESC
                LIMIT 1) AS examen_apto,
             EXISTS (SELECT 1 FROM activity_completions ac WHERE ac.activity_id = a.id AND ac.student_id = $1) AS completada,
+            -- Examen "de opinión": tiene preguntas pero ninguna puntúa (escalas Likert
+            -- y/o encuestas de selección múltiple sin opción correcta). Solo hace falta
+            -- realizarlo; no aporta nota a la calificación final.
+            (a.exam_id IS NOT NULL
+              AND EXISTS (SELECT 1 FROM exam_questions q WHERE q.exam_id = a.exam_id)
+              AND NOT EXISTS (
+                SELECT 1 FROM exam_questions q WHERE q.exam_id = a.exam_id AND (
+                  q.format IN ('test','vf','abierta','emparejar')
+                  OR (q.format = 'multiple'
+                      AND EXISTS (SELECT 1 FROM jsonb_array_elements(q.options) e WHERE (e->>'correct') = 'true'))
+                ))
+            ) AS es_opinion,
             EXISTS (SELECT 1 FROM forum_posts fp JOIN forum_threads ft ON ft.id = fp.thread_id
                      WHERE ft.module_id = m.id AND fp.author_id = $1 AND fp.author_type = 'student') AS foro_ok,
             g.nota AS manual_nota, g.apto AS manual_apto

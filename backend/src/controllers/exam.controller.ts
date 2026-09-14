@@ -406,6 +406,44 @@ export async function gradeAttemptOpenAnswers(req: Request, res: Response): Prom
   res.json({ score, passed });
 }
 
+// GET /api/courses/:id/exams/:examId/opinion — estadística de las preguntas de
+// opinión (escala 1-5 y selección múltiple sin correctas), para perfilar/mejorar.
+export async function examOpinionStats(req: Request, res: Response): Promise<void> {
+  await assertEditor(req);
+  await assertExamInCourse(req.params.examId, req.params.id);
+  const qs = await query<{ id: string; text: string; format: string; options: unknown }>(
+    "SELECT id, text, format, options FROM exam_questions WHERE exam_id = $1 AND format IN ('escala','multiple') ORDER BY sort_order",
+    [req.params.examId],
+  );
+  const att = await query<{ answers: Record<string, unknown> | null }>(
+    'SELECT answers FROM exam_attempts WHERE exam_id = $1 AND submitted_at IS NOT NULL', [req.params.examId],
+  );
+  const respuestas = att.rows.map((a) => a.answers ?? {});
+
+  const preguntas = qs.rows.map((q) => {
+    if (q.format === 'escala') {
+      const labels = Array.isArray(q.options) ? (q.options as string[]) : [];
+      const dist = [0, 0, 0, 0, 0]; let n = 0; let sum = 0;
+      for (const ans of respuestas) {
+        const v = ans[q.id];
+        if (typeof v === 'number' && v >= 1 && v <= 5) { dist[v - 1] += 1; n += 1; sum += v; }
+      }
+      return { id: q.id, text: q.text, format: 'escala', etiquetaMin: labels[0] ?? '1', etiquetaMax: labels[1] ?? '5', dist, n, media: n ? Math.round((sum / n) * 100) / 100 : null };
+    }
+    // multiple: solo cuenta como opinión si NINGUNA opción es correcta (encuesta).
+    const opts = Array.isArray(q.options) ? (q.options as Array<{ text: string; correct?: boolean }>) : [];
+    if (opts.some((o) => o && o.correct)) return null;
+    const counts = opts.map(() => 0); let n = 0;
+    for (const ans of respuestas) {
+      const v = ans[q.id];
+      if (Array.isArray(v)) { n += 1; for (const idx of v) { const k = Number(idx); if (counts[k] != null) counts[k] += 1; } }
+    }
+    return { id: q.id, text: q.text, format: 'multiple', opciones: opts.map((o, i) => ({ text: o.text, count: counts[i] })), n };
+  }).filter(Boolean);
+
+  res.json({ preguntas });
+}
+
 /**
  * Copia preguntas de un banco al examen. Sirve para reutilizar cualquier banco
  * PÚBLICO como fuente sin poder descargarlo: las preguntas se copian dentro del

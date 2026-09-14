@@ -9,7 +9,7 @@ import {
   setActivityEval, listActivityGrades, setActivityGrade,
 } from '../controllers/courseContent.controller.js';
 import {
-  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts, getAttemptOpenAnswers, gradeAttemptOpenAnswers,
+  createExam, getExam, updateExam, addExamQuestion, updateExamQuestion, importExamQuestions, addExamQuestionsFromBank, addExamQuestionsFromBankByIds, createExamWizard, addExamQuestionWithImage, deleteExamQuestion, listExamAttempts, getAttemptOpenAnswers, gradeAttemptOpenAnswers, examOpinionStats,
 } from '../controllers/exam.controller.js';
 import { previewCertificate, uploadCertBackground, uploadCfcImage } from '../controllers/certificate.controller.js';
 import { directorResetStudentPassword } from '../controllers/credentials.controller.js';
@@ -89,6 +89,7 @@ router.delete('/:id/exams/:examId/questions/:questionId', asyncHandler(deleteExa
 router.get('/:id/exams/:examId/attempts', asyncHandler(listExamAttempts));
 router.get('/:id/exams/:examId/attempts/:attemptId/abiertas', asyncHandler(getAttemptOpenAnswers));
 router.put('/:id/exams/:examId/attempts/:attemptId/abiertas', asyncHandler(gradeAttemptOpenAnswers));
+router.get('/:id/exams/:examId/opinion', asyncHandler(examOpinionStats));
 router.get('/:id/exams/:examId/quality', asyncHandler(examQuality));
 router.patch('/:id/exams/:examId/questions/:questionId/grading', asyncHandler(setQuestionGrading));
 

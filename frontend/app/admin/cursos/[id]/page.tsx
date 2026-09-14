@@ -122,6 +122,7 @@ export default function CourseDetailPage() {
     tiempo: { horas: string; media_horas: string | null };
     examenes: { aprobados: string; presentados: string };
     pendientes: Array<{ activity_id: string; title: string; type: string; pendientes: string }>;
+    correccionPendiente: Array<{ exam_id: string; title: string; pendientes: string }>;
   }>(null);
   const [surv, setSurv] = useState<null | {
     isOpen: boolean; required: boolean;
@@ -813,6 +814,19 @@ export default function CourseDetailPage() {
                   <div className="muted" style={{ fontSize: 11 }}>de {cdash.examenes.presentados} presentados</div>
                 </div>
               </div>
+              {cdash.correccionPendiente && cdash.correccionPendiente.filter((p) => Number(p.pendientes) > 0).length > 0 && (
+                <div className="info-box" style={{ marginBottom: 14, borderLeft: '4px solid var(--warning, #d97706)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>✍️ Entregas pendientes de feedback</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {cdash.correccionPendiente.filter((p) => Number(p.pendientes) > 0).map((p) => (
+                      <div key={p.exam_id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                        <span>{p.title} <span className="badge badge-warning">{p.pendientes}</span></span>
+                        <button className="btn btn-sm btn-primary" onClick={() => router.push(`/admin/cursos/${courseId}/examen/${p.exam_id}`)}>Corregir →</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               {cdash.pendientes.filter((p) => Number(p.pendientes) > 0).length > 0 && (
                 <>
                   <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>Alumnos pendientes por actividad</div>

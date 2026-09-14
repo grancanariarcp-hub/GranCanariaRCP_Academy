@@ -74,7 +74,7 @@ export async function courseDashboard(req: Request, res: Response): Promise<void
   const course = await query<{ title: string }>('SELECT title FROM courses WHERE id = $1', [id]);
   if (course.rows.length === 0) throw notFound('Curso no encontrado');
 
-  const [alumnos, avance, tiempo, pendientes, examenes] = await Promise.all([
+  const [alumnos, avance, tiempo, pendientes, examenes, correccion] = await Promise.all([
     query(`SELECT ${periodsOn('enrolled_at')} FROM enrollments WHERE course_id = $1`, [id]),
     // Avance medio del curso
     query<{ total_actividades: string; media_pct: string | null }>(
@@ -120,6 +120,21 @@ export async function courseDashboard(req: Request, res: Response): Promise<void
         WHERE m.course_id = $1 AND a.submitted_at IS NOT NULL`,
       [id],
     ),
+    // Entregas pendientes de FEEDBACK: intentos con alguna abierta sin corregir.
+    query<{ exam_id: string; title: string; pendientes: string }>(
+      `SELECT e.id AS exam_id, e.title, COUNT(DISTINCT a.id) AS pendientes
+         FROM exam_attempts a
+         JOIN exams e ON e.id = a.exam_id
+         JOIN modules m ON m.id = e.module_id
+        WHERE m.course_id = $1 AND a.submitted_at IS NOT NULL
+          AND EXISTS (SELECT 1 FROM exam_questions q
+                       WHERE q.exam_id = e.id AND q.format = 'abierta'
+                         AND NOT EXISTS (SELECT 1 FROM exam_open_grades g
+                                          WHERE g.attempt_id = a.id AND g.question_id = q.id))
+        GROUP BY e.id, e.title
+        ORDER BY pendientes DESC`,
+      [id],
+    ),
   ]);
 
   res.json({
@@ -129,5 +144,6 @@ export async function courseDashboard(req: Request, res: Response): Promise<void
     tiempo: tiempo.rows[0],
     pendientes: pendientes.rows,
     examenes: examenes.rows[0],
+    correccionPendiente: correccion.rows,
   });
 }
